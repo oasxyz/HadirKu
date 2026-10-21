@@ -1,56 +1,114 @@
-# Welcome to your Expo app 👋
+# HadirKu
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Sistem Informasi Praktikum — Presensi Praktikum Berbasis Mobile**
 
-## Get started
+![Expo SDK](https://img.shields.io/badge/Expo-SDK%2057-000020?logo=expo&logoColor=white)
+![React Native](https://img.shields.io/badge/React%20Native-0.86-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Web-blue)
 
-1. Install dependencies
+Aplikasi mobile untuk mencatat kehadiran praktikum di laboratorium.
 
-   ```bash
-   npm install
-   ```
+## Tentang
 
-2. Start the app
+HadirKu memindahkan proses presensi praktikum manual ke satu aplikasi mobile. Asisten membuka
+sesi, praktikan melakukan presensi dengan kode sesi, lalu asisten melihat rekap dan menutup sesi.
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+Asisten membuka sesi  →  Praktikan presensi dengan kode  →  Asisten melihat rekap  →  Asisten menutup sesi
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Aplikasi mendukung dua peran dalam satu perangkat:
 
-### Other setup steps
+| Peran | Tab | Kegiatan utama |
+| --- | --- | --- |
+| **Asisten** | Jadwal, Rekap, Profil | Membuka dan menutup sesi, membagikan kode sesi, melihat rekap kehadiran |
+| **Praktikan** | Jadwal, Catatan, Profil | Melihat jadwal, melakukan presensi, melihat riwayat kehadiran sendiri |
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Peran dipilih pada layar awal dan dapat diganti kapan saja dari tab Profil. Status sesi
+(`belum_dibuka`, `dibuka`, `ditutup`) tersinkron ke seluruh layar, dan perubahan langsung terlihat
+tanpa memuat ulang.
 
-## Learn more
+Seluruh data berada di memori aplikasi sebagai data dummy. Tidak ada backend, sehingga data
+kembali ke kondisi awal setiap aplikasi dibuka. Perilaku ini disengaja agar aplikasi dapat
+didemokan tanpa infrastruktur.
 
-To learn more about developing your project with Expo, look at the following resources:
+## TechStack
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+| Lapisan | Teknologi |
+| --- | --- |
+| Framework | Expo SDK 57 |
+| UI | React Native 0.86 + React 19 |
+| Navigasi | Expo Router (Stack + Tabs) |
+| Bahasa | TypeScript (strict) |
+| State | Context + `useReducer` |
+| Styling | `StyleSheet` + Flexbox |
+| Data | Dummy in-memory |
 
-## Join the community
+## Struktur Proyek
 
-Join our community of developers creating universal apps.
+```
+HadirKu/
+├── src/
+│   ├── app/          # Route dan layar (Expo Router)
+│   ├── components/   # Komponen bersama
+│   ├── constants/    # Tema, warna, spasi
+│   ├── context/      # Provider dan reducer state global
+│   ├── data/         # Data dummy
+│   ├── hooks/        # Hook turunan
+│   ├── types/        # Tipe entitas dan state
+│   └── utils/        # Format tanggal/jam, generator kode sesi
+├── assets/
+├── app.json
+└── tsconfig.json     # Path alias @/* → src/*
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Setiap berkas di dalam `src/app/` adalah layar. Kode non-route (komponen, hook, context, tipe)
+diletakkan di luar folder tersebut.
+
+## Menjalankan
+
+### Prasyarat
+
+- Node.js LTS (20 atau lebih baru) beserta npm
+- Expo Go di perangkat, atau emulator Android / simulator iOS
+
+### Instalasi
+
+```bash
+git clone https://github.com/oasxyz/HadirKu.git
+cd HadirKu
+npm install
+```
+
+### Menjalankan aplikasi
+
+```bash
+npm start            # buka Metro bundler dan tampilkan pilihan target
+npm run android      # ke emulator/perangkat Android
+npm run ios          # ke simulator iOS (macOS)
+npm run web          # versi web di browser
+```
+
+Setelah Metro berjalan, pindai QR code dengan Expo Go, atau tekan `a` untuk Android dan `i` untuk
+iOS pada terminal.
+
+### Perintah pendukung
+
+```bash
+npx tsc --noEmit         # cek tipe TypeScript
+npx expo-doctor          # periksa konfigurasi dan dependency
+npx expo install --fix   # selaraskan versi paket dengan SDK
+npm run lint             # jalankan ESLint
+npx expo start --clear   # mulai ulang dengan cache bersih
+```
+
+## Spesifikasi
+
+Rincian sistem — fitur, pemilik fitur, model data, aturan bisnis, kontrak teknis, pembagian berkas,
+dan alur kerja Git — ada pada **SRS Sprint 1** di `../SRS.md` (folder induk proyek).
+
+## Lisensi
+
+Dikembangkan untuk keperluan Praktikum Pemrograman dan Pengembangan Kualitas Perangkat Lunak.
+Lihat berkas [LICENSE](./LICENSE).
