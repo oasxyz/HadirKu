@@ -63,3 +63,18 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+/** Palet HadirKu: dark + aksen ungu, mengikuti desain mockup SI-Praktikum. */
+export const Palette = {
+  background: '#0E0E10',
+  card: '#18181B',
+  cardMuted: '#141417',
+  border: '#2F2F35',
+  primary: '#9146FF',
+  primaryMuted: 'rgba(145, 70, 255, 0.16)',
+  text: '#F0F0F3',
+  textSecondary: '#ADADB8',
+  textMuted: '#6B6B76',
+  success: '#22C55E',
+  danger: '#EB0400',
+} as const;
