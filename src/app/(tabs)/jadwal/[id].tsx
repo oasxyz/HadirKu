@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import AttendanceAction from '@/components/attendance-action';
 import { EmptyState } from '@/components/empty-state';
+import SessionControls from '@/components/session-controls';
 import { StatusBadge } from '@/components/status-badge';
 import { MaxContentWidth, Palette, Spacing } from '@/constants/theme';
 import { useAppContext } from '@/context/app-context';
@@ -50,7 +51,7 @@ export default function SesiDetailScreen() {
 
         <View style={styles.actionWrapper}>
           {isAsisten ? (
-            <EmptyState message="Kontrol buka/tutup sesi, kode presensi, dan log kehadiran dikerjakan di fitur F3 (Yustinus)." />
+            <SessionControls sessionId={session.id} />
           ) : (
             <AttendanceAction sessionId={session.id} />
           )}
