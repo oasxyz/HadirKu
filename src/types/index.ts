@@ -17,6 +17,7 @@ export interface Session {
   jamMulai: string;
   jamSelesai: string;
   asistenId: string;
+  pesertaIds: string[];
   kodeSesi: string | null;
   status: SessionStatus;
 }

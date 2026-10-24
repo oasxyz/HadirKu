@@ -11,8 +11,16 @@ import { formatRentangJam, formatTanggal } from '@/utils/format';
 
 export default function JadwalScreen() {
   const { state } = useAppContext();
+  const currentUser = state.users.find((user) => user.id === state.currentUserId);
+  const isAsisten = currentUser?.role === 'asisten';
 
-  const sessions = [...state.sessions].sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+  const sessions = state.sessions
+    .filter((session) =>
+      isAsisten
+        ? session.asistenId === currentUser?.id
+        : session.pesertaIds.includes(currentUser?.id ?? ''),
+    )
+    .sort((a, b) => a.tanggal.localeCompare(b.tanggal));
 
   return (
     <View style={styles.container}>
@@ -21,7 +29,13 @@ export default function JadwalScreen() {
 
         {sessions.length === 0 ? (
           <View style={styles.emptyWrapper}>
-            <EmptyState message="Belum ada jadwal praktikum." />
+            <EmptyState
+              message={
+                isAsisten
+                  ? 'Kamu belum menjadi asisten di sesi manapun.'
+                  : 'Kamu belum terdaftar di sesi praktikum manapun.'
+              }
+            />
           </View>
         ) : (
           <FlatList
