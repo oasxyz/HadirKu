@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,7 +16,9 @@ export default function SelectIdentityScreen() {
 
   function handleSelect(user: User) {
     dispatch({ type: 'SWITCH_USER', userId: user.id });
-    router.replace('/jadwal');
+    // '/jadwal' resolves correctly at runtime (nested index flattening), but
+    // expo-router's typed-routes generator doesn't list it for this folder shape.
+    router.replace('/jadwal' as Href);
   }
 
   const asisten = groupByRole(state.users, 'asisten');

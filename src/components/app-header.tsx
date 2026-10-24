@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,13 +8,25 @@ import { useAppContext } from '@/context/app-context';
 
 export function AppHeader() {
   const { state } = useAppContext();
+  const pathname = usePathname();
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAsisten = currentUser?.role === 'asisten';
+  // AppHeader renders at the Tabs level, above each tab's own nested stack,
+  // so it can't see that stack's history via useNavigation(). Derive "is this
+  // a drill-down screen" from the path instead (e.g. /jadwal/s-1).
+  const canGoBack = pathname.split('/').filter(Boolean).length > 1;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.row}>
-        <Text style={styles.title}>SI-PRAKTIKUM 2</Text>
+        <View style={styles.left}>
+          {canGoBack ? (
+            <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backButton}>
+              <Ionicons name="chevron-back" size={20} color={Palette.text} />
+            </Pressable>
+          ) : null}
+          <Text style={styles.title}>SI-PRAKTIKUM 2</Text>
+        </View>
         <View style={styles.right}>
           <View style={styles.badge}>
             <Ionicons name="shield-checkmark" size={12} color={Palette.primary} />
@@ -41,6 +53,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
+  },
+  left: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.one,
+  },
+  backButton: {
+    marginRight: 2,
   },
   title: {
     color: Palette.primary,
