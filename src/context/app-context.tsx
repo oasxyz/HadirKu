@@ -1,7 +1,7 @@
 import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react';
 
 import { dummyAttendances, dummySessions, dummyUsers } from '@/data/dummy';
-import type { AppAction, AppState } from '@/types';
+import type { AppAction, AppState, Attendance } from '@/types';
 
 const initialState: AppState = {
   currentUserId: dummyUsers[0].id,
@@ -18,12 +18,30 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'CLOSE_SESSION':
       // TODO (F3 - Yustinus): ubah status ke 'ditutup'
       return state;
-    case 'SUBMIT_ATTENDANCE':
-      // TODO (F4 - Varissa): validasi kodeSesi & cegah presensi ganda, tambah attendance.
-      // Sejak jadwal difilter per-user (lihat src/types/index.ts: Session.pesertaIds),
-      // presensi juga harus ditolak kalau action.userId tidak ada di
-      // session.pesertaIds sesi terkait, bukan cuma cek kode & duplikat.
-      return state;
+    case 'SUBMIT_ATTENDANCE': {
+      const session = state.sessions.find((s) => s.id === action.sessionId);
+      if (!session) return state;
+      if (session.status !== 'dibuka') return state;
+      if (session.kodeSesi !== action.kodeSesi) return state;
+      if (!session.pesertaIds.includes(action.userId)) return state;
+
+      const sudahHadir = state.attendances.some(
+        (a) => a.sessionId === action.sessionId && a.userId === action.userId
+      );
+      if (sudahHadir) return state;
+
+      const newAttendance: Attendance = {
+        id: `att-${Date.now()}`,
+        sessionId: action.sessionId,
+        userId: action.userId,
+        waktuPresensi: new Date().toISOString(),
+      };
+
+      return {
+        ...state,
+        attendances: [...state.attendances, newAttendance],
+      };
+    }
     case 'SWITCH_USER':
       return { ...state, currentUserId: action.userId };
     default:
