@@ -1,6 +1,7 @@
 import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react';
 
 import { dummyAttendances, dummySessions, dummyUsers } from '@/data/dummy';
+import { closeSession, openSession } from '@/context/reducers/session';
 import type { AppAction, AppState, Attendance } from '@/types';
 
 const initialState: AppState = {
@@ -13,11 +14,9 @@ const initialState: AppState = {
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'OPEN_SESSION':
-      // TODO (F3 - Yustinus): generate kodeSesi 6 digit, ubah status ke 'dibuka'
-      return state;
+      return { ...state, sessions: openSession(state.sessions, action.sessionId) };
     case 'CLOSE_SESSION':
-      // TODO (F3 - Yustinus): ubah status ke 'ditutup'
-      return state;
+      return { ...state, sessions: closeSession(state.sessions, action.sessionId) };
     case 'SUBMIT_ATTENDANCE': {
       const session = state.sessions.find((s) => s.id === action.sessionId);
       if (!session) return state;
