@@ -1,98 +1,164 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { router, type Href } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useAppContext } from '@/context/app-context';
+import { MaxContentWidth, Palette, Spacing } from '@/constants/theme';
+import type { Role, User } from '@/types';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
+function groupByRole(users: User[], role: Role) {
+  return users.filter((user) => user.role === role);
+}
+
+export default function SelectIdentityScreen() {
+  const { state, dispatch } = useAppContext();
+
+  function handleSelect(user: User) {
+    dispatch({ type: 'SWITCH_USER', userId: user.id });
+    // '/jadwal' resolves correctly at runtime (nested index flattening), but
+    // expo-router's typed-routes generator doesn't list it for this folder shape.
+    router.replace('/jadwal' as Href);
   }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+
+  const asisten = groupByRole(state.users, 'asisten');
+  const praktikan = groupByRole(state.users, 'praktikan');
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.logoBadge}>
+            <Ionicons name="shield-checkmark" size={32} color={Palette.primary} />
+          </View>
+          <Text style={styles.appName}>SI-PRAKTIKUM 2</Text>
+          <Text style={styles.subtitle}>PILIH IDENTITAS ANDA</Text>
+        </View>
+
+        <Text style={styles.sectionLabel}>ASISTEN LABORATORIUM</Text>
+        {asisten.map((user) => (
+          <IdentityCard key={user.id} user={user} onPress={() => handleSelect(user)} />
+        ))}
+
+        <Text style={[styles.sectionLabel, styles.sectionLabelSpacing]}>
+          PRAKTIKAN (MAHASISWA)
+        </Text>
+        {praktikan.map((user) => (
+          <IdentityCard key={user.id} user={user} onPress={() => handleSelect(user)} />
+        ))}
+      </View>
+    </SafeAreaView>
   );
 }
 
-export default function HomeScreen() {
+function IdentityCard({ user, onPress }: { user: User; onPress: () => void }) {
+  const isAsisten = user.role === 'asisten';
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
+      <View style={[styles.avatar, isAsisten && styles.avatarAsisten]}>
+        <Ionicons
+          name={isAsisten ? 'shield-checkmark' : 'school'}
+          size={20}
+          color={isAsisten ? Palette.primary : Palette.textSecondary}
+        />
+      </View>
+      <View style={styles.cardInfo}>
+        <Text style={styles.cardName}>{user.nama}</Text>
+        <Text style={styles.cardNim}>{user.nim}</Text>
+      </View>
+      <Ionicons name="person-circle-outline" size={22} color={Palette.textMuted} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    backgroundColor: Palette.background,
   },
-  heroSection: {
+  container: {
+    flex: 1,
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.five,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: Spacing.five,
+  },
+  logoBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: Palette.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    marginBottom: Spacing.three,
   },
-  title: {
-    textAlign: 'center',
+  appName: {
+    color: Palette.primary,
+    fontSize: 26,
+    fontWeight: '800',
+    fontStyle: 'italic',
+    letterSpacing: 0.5,
   },
-  code: {
-    textTransform: 'uppercase',
+  subtitle: {
+    color: Palette.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginTop: Spacing.one,
   },
-  stepContainer: {
+  sectionLabel: {
+    color: Palette.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: Spacing.two,
+  },
+  sectionLabelSpacing: {
+    marginTop: Spacing.four,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Palette.card,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: 14,
+    padding: Spacing.three,
+    marginBottom: Spacing.two,
     gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  },
+  cardPressed: {
+    opacity: 0.7,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Palette.cardMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarAsisten: {
+    backgroundColor: Palette.primaryMuted,
+  },
+  cardInfo: {
+    flex: 1,
+  },
+  cardName: {
+    color: Palette.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  cardNim: {
+    color: Palette.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
   },
 });
