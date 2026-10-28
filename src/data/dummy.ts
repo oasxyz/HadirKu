@@ -46,4 +46,23 @@ export const dummySessions: Session[] = [
   },
 ];
 
-export const dummyAttendances: Attendance[] = [];
+export const dummyAttendances: Attendance[] = [
+  {
+    id: 'att-1',
+    sessionId: 's-2',
+    userId: 'u-varissa',
+    waktuPresensi: '2026-10-28T13:05:00.000Z',
+  },
+  {
+    id: 'att-2',
+    sessionId: 's-3',
+    userId: 'u-varissa',
+    waktuPresensi: '2026-10-29T10:02:00.000Z',
+  },
+  {
+    id: 'att-3',
+    sessionId: 's-3',
+    userId: 'u-yustinus',
+    waktuPresensi: '2026-10-29T10:03:00.000Z',
+  },
+];
