@@ -19,7 +19,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
       // TODO (F3 - Yustinus): ubah status ke 'ditutup'
       return state;
     case 'SUBMIT_ATTENDANCE':
-      // TODO (F4 - Varissa): validasi kodeSesi & cegah presensi ganda, tambah attendance
+      // TODO (F4 - Varissa): validasi kodeSesi & cegah presensi ganda, tambah attendance.
+      // Sejak jadwal difilter per-user (lihat src/types/index.ts: Session.pesertaIds),
+      // presensi juga harus ditolak kalau action.userId tidak ada di
+      // session.pesertaIds sesi terkait, bukan cuma cek kode & duplikat.
       return state;
     case 'SWITCH_USER':
       return { ...state, currentUserId: action.userId };

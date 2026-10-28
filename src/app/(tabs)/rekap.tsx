@@ -16,6 +16,11 @@ export default function RekapScreen() {
   );
 }
 
+// TODO (F5 - Yustinus): Sesi sekarang punya session.pesertaIds (lihat src/types/index.ts).
+// "Ringkasan jumlah hadir dibanding total praktikan" harusnya dihitung dari
+// session.pesertaIds.length (total praktikan terdaftar di SESI itu), bukan dari
+// jumlah semua user berperan praktikan di state.users.
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
