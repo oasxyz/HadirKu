@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import AttendanceAction from '@/components/attendance-action';
 import { EmptyState } from '@/components/empty-state';
 import { StatusBadge } from '@/components/status-badge';
 import { MaxContentWidth, Palette, Spacing } from '@/constants/theme';
@@ -51,7 +52,7 @@ export default function SesiDetailScreen() {
           {isAsisten ? (
             <EmptyState message="Kontrol buka/tutup sesi, kode presensi, dan log kehadiran dikerjakan di fitur F3 (Yustinus)." />
           ) : (
-            <EmptyState message="Form presensi dikerjakan di fitur F4 (Varissa)." />
+            <AttendanceAction sessionId={session.id} />
           )}
         </View>
       </View>
