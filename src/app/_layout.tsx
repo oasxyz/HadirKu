@@ -26,9 +26,18 @@ export default function RootLayout() {
           headerShown: false,
           contentStyle: { backgroundColor: Palette.background },
         }}>
+        {/* ===== PM — layar awal dan navigasi tab ===== */}
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
+
+        {/* ===== SRS001 — Autentikasi (PIC A) ===== */}
+        <Stack.Screen name="login" />
+        <Stack.Screen name="register" />
+
+        {/* ===== SRS002/SRS003/SRS005/SRS008 — sisi asisten (PIC B) ===== */}
         <Stack.Screen name="rekap/[id]" />
+
+        {/* ===== SRS004/SRS005/SRS006/SRS007 — sisi praktikan (PIC C) ===== */}
       </Stack>
     </AppProvider>
   );
