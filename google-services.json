@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "621397636275",
+    "project_id": "hadirku-8aa3e",
+    "storage_bucket": "hadirku-8aa3e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:621397636275:android:84132d2a223ce1c5196cc6",
+        "android_client_info": {
+          "package_name": "com.oasxyz.HadirKu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsCs0K9LDQoIgY_rJ-F4vXZ657HOzFCtw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
