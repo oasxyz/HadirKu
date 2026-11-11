@@ -2,7 +2,7 @@
 
 Melanjutkan HadirKu (Sprint 1) dengan data dinamis: Firebase Authentication, Cloud Firestore, dan klasifikasi alasan izin lewat API AI.
 
-PM: Annis. Programmer: PIC A, PIC B, PIC C (nama diisi PM saat pembagian).
+PM: Annis. Programmer: PIC A (Yoas), PIC B (Yustinus Hendi Setyawan), PIC C (Varissa Nabila Kifli). Pembagian mengikuti pemegang area yang sama di Sprint 1, jadi tiap orang melanjutkan kode yang sudah dikenal.
 
 ## Tujuan Demo
 
@@ -47,13 +47,13 @@ Tipe TypeScript ada di `src/types/index.ts`; nama koleksi dan ID presensi di `sr
 
 ## Fitur dan PIC
 
-Urutan merge dari atas ke bawah. Setiap fitur di branch `feature/<nama-fitur>`.
+Urutan merge dari atas ke bawah; 009 dikerjakan paling akhir setelah bentuk data stabil. Setiap fitur di branch baru dari `main` terbaru dengan nama `feature/s2-<nama-fitur>` (branch Sprint 1 sudah ter-merge).
 
 | SRS | Fitur | PIC | Selesai jika |
 | --- | --- | --- | --- |
 | 001 | Autentikasi dan profil | A | Registrasi, login, logout berjalan; sesi login pulih setelah aplikasi dibuka ulang; layar lain memakai `useCurrentUser()` (disediakan PIC A), bukan `state.currentUserId`; tab mengikuti peran akun |
 | 009 | Rules, validasi, dan error | A | `firestore.rules` terpasang; input tidak valid dan kegagalan login/Firestore menampilkan pesan jelas; praktikan tidak bisa membaca atau mengubah data milik orang lain |
-| 002 | CRUD kelas, peserta, jadwal, sesi (asisten) | B | Asisten bisa tambah, lihat, ubah, hapus; praktikan hanya melihat sesi yang memuat dirinya |
+| 002 | CRUD kelas, peserta, jadwal, sesi (asisten) | A | Asisten bisa tambah, lihat, ubah, hapus; praktikan hanya melihat sesi yang memuat dirinya |
 | 003 | Pengelolaan sesi realtime | B | Buka/tutup sesi mengubah status di semua layar tanpa reload; kode sesi hanya terlihat asisten |
 | 005 | Rekap kehadiran (asisten) | B | Daftar hadir bertambah real time saat praktikan presensi; tetap terlihat setelah sesi ditutup |
 | 008 | Pemeriksaan izin | B | Asisten melihat alasan dan kategori AI, menerima atau menolak; keputusan tersimpan dan terlihat praktikan |
@@ -67,9 +67,11 @@ Urutan merge dari atas ke bawah. Setiap fitur di branch `feature/<nama-fitur>`.
 | Pemilik | Berkas |
 | --- | --- |
 | PM | `src/types/index.ts`, `src/services/firebase.ts`, `package.json`, `app.json`, `src/app/_layout.tsx` dan `src/app/(tabs)/_layout.tsx` (struktur), README, `docs/` |
-| PIC A | `src/app/login.tsx`, `src/app/register.tsx`, `src/app/(tabs)/profil.tsx`, `firestore.rules`, konteks/hook autentikasi |
-| PIC B | `src/app/(tabs)/jadwal/`, `src/app/(tabs)/rekap/`, `src/app/rekap/`, `src/components/session-controls.tsx`, `src/components/izin/pemeriksaan-izin.tsx` |
+| PIC A | `src/app/login.tsx`, `src/app/register.tsx`, `src/app/(tabs)/profil.tsx`, `src/app/(tabs)/jadwal/`, `firestore.rules`, konteks/hook autentikasi |
+| PIC B | `src/app/(tabs)/rekap/`, `src/app/rekap/`, `src/components/session-controls.tsx`, `src/components/izin/pemeriksaan-izin.tsx` |
 | PIC C | `src/components/attendance-action.tsx`, `src/app/(tabs)/catatan.tsx`, `src/components/izin/pengajuan-izin.tsx`, `src/services/ai.ts` |
+
+`src/app/(tabs)/jadwal/[id].tsx` milik PIC A. PIC B dan PIC C hanya mengubah komponen mereka sendiri (`session-controls.tsx`, `attendance-action.tsx`) yang ditampilkan di layar itu.
 
 Mengubah `src/app/_layout.tsx` hanya di blok komentar SRS sendiri. Butuh tipe, paket, atau koleksi baru: lapor PM dulu.
 

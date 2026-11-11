@@ -30,14 +30,14 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
 
-        {/* ===== SRS001 — Autentikasi (PIC A) ===== */}
+        {/* ===== SRS001/SRS002/SRS009 — Autentikasi, CRUD data praktikum, rules (PIC A — Yoas) ===== */}
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
 
-        {/* ===== SRS002/SRS003/SRS005/SRS008 — sisi asisten (PIC B) ===== */}
+        {/* ===== SRS003/SRS005/SRS008 — Sesi realtime, rekap, pemeriksaan izin (PIC B — Yustinus) ===== */}
         <Stack.Screen name="rekap/[id]" />
 
-        {/* ===== SRS004/SRS005/SRS006/SRS007 — sisi praktikan (PIC C) ===== */}
+        {/* ===== SRS004/SRS005/SRS006/SRS007 — Presensi, catatan, izin, AI (PIC C — Varissa) ===== */}
       </Stack>
     </AppProvider>
   );
