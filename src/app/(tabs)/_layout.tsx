@@ -49,6 +49,14 @@ export default function TabsLayout() {
           ),
         }}
       />
+      {/* SRS006/SRS008 — Izin: praktikan mengajukan, asisten memeriksa (isi dipisah per peran). */}
+      <Tabs.Screen
+        name="izin"
+        options={{
+          title: 'Izin',
+          tabBarIcon: ({ color, size }) => <Ionicons name="mail" size={size} color={color} />,
+        }}
+      />
       <Tabs.Screen
         name="profil"
         options={{
