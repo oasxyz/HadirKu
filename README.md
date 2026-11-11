@@ -29,9 +29,11 @@ Peran dipilih pada layar awal dan dapat diganti kapan saja dari tab Profil. Stat
 (`belum_dibuka`, `dibuka`, `ditutup`) tersinkron ke seluruh layar, dan perubahan langsung terlihat
 tanpa memuat ulang.
 
-Seluruh data berada di memori aplikasi sebagai data dummy. Tidak ada backend, sehingga data
-kembali ke kondisi awal setiap aplikasi dibuka. Perilaku ini disengaja agar aplikasi dapat
-didemokan tanpa infrastruktur.
+Sprint 1 memakai data dummy di memori aplikasi. Sprint 2 memindahkan data ke Firebase
+(Authentication dan Cloud Firestore) agar tersinkron real time antar pengguna, dan menambah
+pengajuan izin praktikan dengan klasifikasi alasan lewat API AI. Selama migrasi berlangsung,
+layar yang belum dimigrasi masih memakai data dummy. Rincian ada di
+[SRS Sprint 2](docs/SRS-Sprint-2.md).
 
 ## TechStack
 
@@ -41,9 +43,11 @@ didemokan tanpa infrastruktur.
 | UI | React Native 0.86 + React 19 |
 | Navigasi | Expo Router (Stack + Tabs) |
 | Bahasa | TypeScript (strict) |
-| State | Context + `useReducer` |
+| State | Context + `useReducer` (Sprint 1), listener Firestore (Sprint 2) |
 | Styling | `StyleSheet` + Flexbox |
-| Data | Dummy in-memory |
+| Autentikasi | Firebase Authentication (React Native Firebase) |
+| Data | Cloud Firestore (migrasi dari dummy in-memory) |
+| AI | API model dari pengajar, lewat `src/services/ai.ts` |
 
 ## Struktur Proyek
 
@@ -56,10 +60,15 @@ HadirKu/
 │   ├── context/      # Provider dan reducer state global
 │   ├── data/         # Data dummy
 │   ├── hooks/        # Hook turunan
+│   ├── services/     # Firebase (firebase.ts) dan klien AI (ai.ts)
 │   ├── types/        # Tipe entitas dan state
 │   └── utils/        # Format tanggal/jam, generator kode sesi
+├── docs/             # SRS Sprint 2
+├── plugins/          # Config plugin Expo (Firebase BoM)
 ├── assets/
 ├── app.json
+├── firestore.rules   # Draft security rules
+├── .env.local.example
 └── tsconfig.json     # Path alias @/* → src/*
 ```
 
@@ -70,8 +79,10 @@ diletakkan di luar folder tersebut.
 
 ### Prasyarat
 
-- Node.js LTS (20 atau lebih baru) beserta npm
-- Expo Go di perangkat, atau emulator Android / simulator iOS
+- Node.js LTS (22.11 atau lebih baru) beserta npm
+- Akun Expo (gratis) untuk build EAS
+- Perangkat Android untuk development build. Sprint 2 memakai modul native Firebase, jadi **tidak
+  bisa dijalankan di Expo Go maupun di web**.
 
 ### Instalasi
 
@@ -81,17 +92,26 @@ cd HadirKu
 npm install
 ```
 
+### Konfigurasi sekali di awal
+
+1. Pastikan `google-services.json` (project Firebase bersama) ada di root project. PM yang
+   meng-commit-nya, seperti di proyek contoh. Jangan diganti dengan project Firebase milik sendiri.
+2. Salin `.env.local.example` menjadi `.env.local`, lalu isi `EXPO_PUBLIC_AI_API_KEY` dari asprak.
+   `.env.local` tidak boleh di-commit.
+3. Pasang APK development client. PM membagikan linknya, atau build sendiri:
+
+```bash
+npx eas-cli@latest build --profile development --platform android
+```
+
 ### Menjalankan aplikasi
 
 ```bash
-npm start            # buka Metro bundler dan tampilkan pilihan target
-npm run android      # ke emulator/perangkat Android
-npm run ios          # ke simulator iOS (macOS)
-npm run web          # versi web di browser
+npx expo start --dev-client   # buka aplikasi development client di HP, lalu pilih server atau scan QR
+npx expo start --dev-client --tunnel   # jika HP tidak tersambung
 ```
 
-Setelah Metro berjalan, pindai QR code dengan Expo Go, atau tekan `a` untuk Android dan `i` untuk
-iOS pada terminal.
+Build ulang APK development hanya perlu jika paket native atau `app.json` berubah.
 
 ### Perintah pendukung
 
@@ -105,8 +125,20 @@ npx expo start --clear   # mulai ulang dengan cache bersih
 
 ## Spesifikasi
 
-Rincian sistem — fitur, pemilik fitur, model data, aturan bisnis, kontrak teknis, pembagian berkas,
-dan alur kerja Git — ada pada **SRS Sprint 1** di `../SRS.md` (folder induk proyek).
+Rincian sistem Sprint 2 — fitur, PIC, model data Firestore, aturan bisnis, dan pembagian berkas —
+ada di [docs/SRS-Sprint-2.md](docs/SRS-Sprint-2.md). Spesifikasi Sprint 1 ada di `../SRS.md`.
+
+## Aturan Tim
+
+- Setiap fitur dikerjakan di branch `feature/<nama-fitur>`. Jangan push ke `main` atau `dev`.
+- Format commit: `git commit -m "feat(scope): deskripsi" -m "penjelasan detail"`. Satu commit satu
+  perubahan, tanpa co-author.
+- Kerjakan hanya berkas milik PIC masing-masing (lihat "Pembagian Berkas" di SRS). Di
+  `src/app/_layout.tsx`, edit hanya di blok komentar SRS sendiri, dan taruh `import` di paling atas.
+- Butuh tipe data, koleksi Firestore, atau paket baru: lapor PM dulu. Pasang paket hanya dengan
+  `npx expo install nama-paket`.
+- Jangan menamai komponen `Text`, `View`, `Image`, atau `Button`.
+- Jangan commit `.env.local`, `node_modules/`, atau key apa pun.
 
 ## Lisensi
 
