@@ -1,0 +1,63 @@
+// DRAFT PM (SRS009 menyempurnakan). Belum diuji di emulator; tempel ke Firebase Console > Firestore > Rules.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isAsisten() {
+      return signedIn() && profile().role == 'asisten';
+    }
+    function isPeserta(data) {
+      return signedIn() && request.auth.uid in data.pesertaIds;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAsisten());
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.role in ['asisten', 'praktikan'];
+      // Role tidak boleh diubah setelah registrasi.
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.role == resource.data.role;
+      allow delete: if false;
+    }
+
+    match /classes/{classId} {
+      allow read: if isAsisten() || isPeserta(resource.data);
+      allow write: if isAsisten();
+    }
+
+    // TODO (SRS003/004/009): kodeSesi saat ini ikut terbaca praktikan peserta.
+    // Pindahkan ke dokumen terpisah yang hanya bisa dibaca asisten, lalu cek kode di rule presensi.
+    match /sessions/{sessionId} {
+      allow read: if isAsisten() || isPeserta(resource.data);
+      allow write: if isAsisten();
+    }
+
+    // ID dokumen = sessionId_uid, jadi presensi kedua pada sesi yang sama ditolak (create pada dokumen yang sudah ada = update).
+    match /attendances/{attendanceId} {
+      allow read: if isAsisten() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && attendanceId == request.resource.data.sessionId + '_' + request.auth.uid
+        && get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'dibuka'
+        && request.auth.uid in get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.pesertaIds;
+      allow update, delete: if false;
+    }
+
+    match /leaveRequests/{requestId} {
+      allow read: if isAsisten() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'menunggu';
+      // Hanya asisten yang memutuskan, dan hanya field keputusan yang boleh berubah.
+      allow update: if isAsisten()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'diputuskanOleh', 'diputuskanAt']);
+      allow delete: if false;
+    }
+  }
+}
