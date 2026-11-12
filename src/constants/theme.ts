@@ -64,17 +64,35 @@ export const Spacing = {
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
 
-/** Palet HadirKu: dark + aksen ungu, mengikuti desain mockup SI-Praktikum. */
+/**
+ * Palet HadirKu versi terang: gradien pastel + kartu kaca (semi-transparan) + aksen magenta.
+ * Nama token sama dengan versi gelap, jadi layar yang memakai Palette ikut berubah.
+ * `background` transparan karena latar gradien digambar sekali di root (ScreenBackground).
+ */
 export const Palette = {
-  background: '#0E0E10',
-  card: '#18181B',
-  cardMuted: '#141417',
-  border: '#2F2F35',
-  primary: '#9146FF',
-  primaryMuted: 'rgba(145, 70, 255, 0.16)',
-  text: '#F0F0F3',
-  textSecondary: '#ADADB8',
-  textMuted: '#6B6B76',
-  success: '#22C55E',
-  danger: '#EB0400',
+  background: 'transparent',
+  card: 'rgba(255, 255, 255, 0.72)',
+  cardMuted: 'rgba(255, 255, 255, 0.5)',
+  border: 'rgba(110, 90, 150, 0.16)',
+  primary: '#E21BD0',
+  primaryMuted: 'rgba(222, 31, 203, 0.12)',
+  text: '#131118',
+  textSecondary: '#5E586C',
+  textMuted: '#8F89A0',
+  success: '#16A34A',
+  danger: '#E11D48',
+} as const;
+
+/** Latar gradien lavender ke pink lembut. */
+export const Gradient = 'linear-gradient(165deg, #EEF0F5 0%, #E7E2EE 55%, #E2CEE6 100%)';
+
+/** Gaya kartu kaca: putih semi-transparan, tepi tipis terang, bayangan lembut, sudut besar. */
+export const Glass = {
+  card: {
+    backgroundColor: Palette.card,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 22,
+    borderWidth: 1,
+    boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
+  },
 } as const;
