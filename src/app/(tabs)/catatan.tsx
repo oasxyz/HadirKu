@@ -18,16 +18,13 @@ export default function CatatanScreen() {
         <EmptyNote message="Kamu belum memiliki catatan kehadiran praktikum." />
       ) : (
         <View style={{ gap: 12 }}>
-          {records.map(({ item, session }, index) => (
+          {records.map(({ item, session }) => (
             <ListRow
               key={item.id}
-              icon="checkmark-done-outline"
-              tint={index + 1}
               title={session?.praktikum ?? '-'}
               subtitle={session ? `${formatTanggal(session.tanggal)} · ${session.kelasLab}` : '-'}
               right={
                 <Chip
-                  icon="time-outline"
                   label={new Date(item.waktuPresensi).toLocaleTimeString('id-ID', {
                     hour: '2-digit',
                     minute: '2-digit',

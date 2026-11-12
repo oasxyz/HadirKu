@@ -11,7 +11,6 @@ import {
   Chip,
   EmptyNote,
   GlassCard,
-  IconCircle,
   Screen,
   SectionTitle,
   TopBar,
@@ -66,8 +65,8 @@ export default function SesiDetailScreen() {
           </View>
           <Text style={styles.heroTitle}>{session.praktikum}</Text>
           <View style={styles.heroChips}>
-            <Chip label={formatTanggal(session.tanggal)} icon="calendar-outline" />
-            <Chip label={session.kelasLab} icon="location-outline" />
+            <Chip label={formatTanggal(session.tanggal)} />
+            <Chip label={session.kelasLab} />
           </View>
           <StatusBadge status={session.status} />
         </View>
@@ -94,15 +93,13 @@ export default function SesiDetailScreen() {
           {hadir.length === 0 ? (
             <Text style={styles.empty}>Belum ada praktikan yang presensi.</Text>
           ) : (
-            hadir.map(({ item, user }, index) => (
+            hadir.map(({ item, user }) => (
               <View key={item.id} style={styles.attendee}>
-                <IconCircle icon="person-outline" tint={index} size={44} />
                 <View style={styles.attendeeText}>
                   <Text style={styles.attendeeName}>{user?.nama ?? '-'}</Text>
                   <Text style={styles.attendeeNim}>{user?.nim ?? ''}</Text>
                 </View>
                 <Chip
-                  icon="time-outline"
                   label={new Date(item.waktuPresensi).toLocaleTimeString('id-ID', {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -201,8 +198,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     flexDirection: 'row',
     gap: 10,
-    padding: 6,
+    paddingLeft: 20,
     paddingRight: 8,
+    paddingVertical: 9,
   },
   attendeeText: {
     flex: 1,

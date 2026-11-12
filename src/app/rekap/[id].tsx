@@ -8,12 +8,10 @@ import {
   Chip,
   EmptyNote,
   GlassCard,
-  IconCircle,
   RoundButton,
   Screen,
   SectionTitle,
   TopBar,
-  tints,
 } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useAppContext } from '@/context/app-context';
@@ -51,8 +49,8 @@ export default function RekapDetailScreen() {
       <View style={styles.titleBlock}>
         <Text style={styles.title}>{session.praktikum}</Text>
         <View style={styles.chips}>
-          <Chip icon="calendar-outline" label={formatTanggal(session.tanggal)} />
-          <Chip icon="time-outline" label={formatRentangJam(session.jamMulai, session.jamSelesai)} />
+          <Chip label={formatTanggal(session.tanggal)} />
+          <Chip label={formatRentangJam(session.jamMulai, session.jamSelesai)} />
           <StatusBadge status={session.status} />
         </View>
       </View>
@@ -70,8 +68,8 @@ export default function RekapDetailScreen() {
       </View>
 
       <View style={styles.bars}>
-        <Bar label="Hadir" value={hadir} height={barHeight(hadir)} tint={2} icon="checkmark-done-outline" />
-        <Bar label="Belum hadir" value={belum} height={barHeight(belum)} tint={3} icon="hourglass-outline" />
+        <Bar label="Hadir" value={hadir} height={barHeight(hadir)} color="#EFB4EA" />
+        <Bar label="Belum hadir" value={belum} height={barHeight(belum)} color="#DDD3EC" />
       </View>
 
       <GlassCard style={styles.listCard}>
@@ -79,15 +77,13 @@ export default function RekapDetailScreen() {
         {attendees.length === 0 ? (
           <Text style={styles.empty}>Belum ada praktikan yang melakukan presensi.</Text>
         ) : (
-          attendees.map(({ item, user }, index) => (
+          attendees.map(({ item, user }) => (
             <View key={item.id} style={styles.row}>
-              <IconCircle icon="person-outline" tint={index} size={44} />
               <View style={styles.rowText}>
                 <Text style={styles.rowName}>{user?.nama ?? '-'}</Text>
                 <Text style={styles.rowNim}>{user?.nim ?? ''}</Text>
               </View>
               <Chip
-                icon="time-outline"
                 label={new Date(item.waktuPresensi).toLocaleTimeString('id-ID', {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -107,22 +103,17 @@ function Bar({
   label,
   value,
   height,
-  tint,
-  icon,
+  color,
 }: {
   label: string;
   value: number;
   height: number;
-  tint: number;
-  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
 }) {
   return (
     <View style={styles.barColumn}>
       <View style={styles.barTrack}>
-        <View style={[styles.barFill, { height, backgroundColor: tints[tint].bg }]} />
-        <View style={styles.barIcon}>
-          <Ionicons name={icon} size={16} color={tints[tint].fg} />
-        </View>
+        <View style={[styles.barFill, { height, backgroundColor: color }]} />
       </View>
       <Text style={styles.barLabel}>{label}</Text>
       <Text style={styles.barValue}>{value} orang</Text>
@@ -189,16 +180,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     width: '100%',
   },
-  barIcon: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    bottom: -4,
-    height: 36,
-    justifyContent: 'center',
-    position: 'absolute',
-    width: 36,
-  },
   barLabel: {
     color: Palette.textSecondary,
     fontSize: 12,
@@ -223,8 +204,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     flexDirection: 'row',
     gap: 10,
-    padding: 6,
+    paddingLeft: 20,
     paddingRight: 8,
+    paddingVertical: 9,
   },
   rowText: {
     flex: 1,

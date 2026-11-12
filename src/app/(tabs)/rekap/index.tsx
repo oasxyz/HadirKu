@@ -20,13 +20,11 @@ export default function RekapScreen() {
         <EmptyNote message="Belum ada sesi praktikum untuk direkap." />
       ) : (
         <View style={{ gap: 12 }}>
-          {sessions.map((session, index) => {
+          {sessions.map((session) => {
             const hadir = state.attendances.filter((item) => item.sessionId === session.id).length;
             return (
               <ListRow
                 key={session.id}
-                icon="flask-outline"
-                tint={index}
                 title={session.praktikum}
                 subtitle={`${formatTanggal(session.tanggal)} · Hadir ${hadir}/${session.pesertaIds.length}`}
                 right={<StatusBadge status={session.status} />}

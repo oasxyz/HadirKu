@@ -24,23 +24,13 @@ export default function ProfilScreen() {
       <View style={styles.header}>
         <Avatar nama={currentUser.nama} size={104} />
         <Text style={styles.name}>{currentUser.nama}</Text>
-        <Badge label={isAsisten ? 'Asisten Laboratorium' : 'Praktikan'} tone="pink" />
+        <Badge label={isAsisten ? 'Asisten Laboratorium' : 'Praktikan'} tone="outline" />
       </View>
 
       <View style={styles.list}>
-        <ListRow icon="card-outline" tint={0} title="NIM" subtitle={currentUser.nim} />
-        <ListRow
-          icon="mail-outline"
-          tint={1}
-          title="Email Institusi"
-          subtitle={`${currentUser.nim}@univ.ac.id`}
-        />
-        <ListRow
-          icon="information-circle-outline"
-          tint={3}
-          title="Versi Aplikasi"
-          subtitle="1.0.0 (Sprint 1)"
-        />
+        <ListRow title="NIM" subtitle={currentUser.nim} />
+        <ListRow title="Email Institusi" subtitle={`${currentUser.nim}@univ.ac.id`} />
+        <ListRow title="Versi Aplikasi" subtitle="1.0.0 (Sprint 1)" />
       </View>
 
       <Pressable
@@ -69,7 +59,7 @@ const styles = StyleSheet.create({
   },
   logout: {
     alignItems: 'center',
-    backgroundColor: '#17151C',
+    backgroundColor: Palette.ink,
     borderRadius: 999,
     flexDirection: 'row',
     gap: 8,

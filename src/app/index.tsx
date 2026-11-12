@@ -30,9 +30,9 @@ export default function SelectIdentityScreen() {
   return (
     <Screen withTabBar={false}>
       <View style={styles.hero}>
-        <View style={[styles.arc, { width: 330, height: 330, top: 6, borderColor: '#CBD0DC' }]} />
-        <View style={[styles.arc, { width: 256, height: 256, top: 43, borderColor: '#86D5AC' }]} />
-        <View style={[styles.arc, { width: 182, height: 182, top: 80, borderColor: '#F5A97F' }]} />
+        <View style={[styles.arc, { width: 330, height: 330, top: 6, borderColor: '#DDD6EA' }]} />
+        <View style={[styles.arc, { width: 256, height: 256, top: 43, borderColor: '#C5B1E2' }]} />
+        <View style={[styles.arc, { width: 182, height: 182, top: 80, borderColor: '#EDA9E6' }]} />
         <View style={styles.heroBadge}>
           <Ionicons name="school" size={36} color={Palette.primary} />
         </View>
@@ -59,13 +59,11 @@ export default function SelectIdentityScreen() {
 
         <Text style={styles.label}>Identitas</Text>
         <View style={styles.list}>
-          {users.map((user, index) => {
+          {users.map((user) => {
             const selected = user.id === selectedId;
             return (
               <ListRow
                 key={user.id}
-                icon={role === 'asisten' ? 'shield-checkmark-outline' : 'school-outline'}
-                tint={index + (role === 'asisten' ? 0 : 2)}
                 title={user.nama}
                 subtitle={user.nim}
                 onPress={() => setSelectedId(user.id)}

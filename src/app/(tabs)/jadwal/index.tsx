@@ -4,16 +4,7 @@ import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import {
-  Avatar,
-  EmptyNote,
-  GlassCard,
-  IconCircle,
-  Screen,
-  SectionTitle,
-  shadow,
-  tints,
-} from '@/components/ui';
+import { Avatar, EmptyNote, GlassCard, Screen, SectionTitle, shadow } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useAppContext } from '@/context/app-context';
 import type { Session } from '@/types';
@@ -143,13 +134,12 @@ export default function BerandaJadwalScreen() {
         <EmptyNote message="Tidak ada sesi pada tanggal ini." />
       ) : (
         <View style={styles.timeline}>
-          {daySessions.map((session, index) => (
+          {daySessions.map((session) => (
             <View key={session.id} style={styles.timelineRow}>
               <Text style={styles.timelineHour}>{session.jamMulai}</Text>
               <Pressable
                 onPress={() => openDetail(session)}
                 style={({ pressed }) => [styles.timelineChip, pressed && styles.pressed]}>
-                <IconCircle icon="flask-outline" tint={index} size={38} />
                 <View style={styles.timelineText}>
                   <Text style={styles.timelineTitle} numberOfLines={1}>
                     {session.praktikum}
@@ -185,9 +175,9 @@ function FeaturedCard({ session }: { session: Session }) {
               {
                 backgroundColor:
                   session.status === 'dibuka'
-                    ? Palette.success
+                    ? Palette.primary
                     : session.status === 'ditutup'
-                      ? Palette.danger
+                      ? Palette.ink
                       : '#B9B5C6',
               },
             ]}
@@ -212,8 +202,8 @@ function FeaturedCard({ session }: { session: Session }) {
         </Pressable>
       </View>
       <View style={styles.art}>
-        <View style={[styles.artBlob, { backgroundColor: tints[3].bg, top: 6, right: 4 }]} />
-        <View style={[styles.artBlob, styles.artBlobSmall, { backgroundColor: tints[0].bg }]} />
+        <View style={[styles.artBlob, { backgroundColor: Palette.lavender, top: 6, right: 4 }]} />
+        <View style={[styles.artBlob, styles.artBlobSmall, { backgroundColor: Palette.lilac }]} />
         <Ionicons name="easel" size={56} color={Palette.primary} />
       </View>
     </GlassCard>
@@ -383,8 +373,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     gap: 10,
-    padding: 7,
+    paddingHorizontal: 20,
     paddingRight: 16,
+    paddingVertical: 11,
   },
   timelineText: {
     flex: 1,
