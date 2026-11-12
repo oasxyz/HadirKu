@@ -41,6 +41,12 @@
           "bom": "34.19.0"
         }
       ],
+      [
+        "./plugins/withKotlinGradlePlugin.js",
+        {
+          "version": "2.2.21"
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
       [
