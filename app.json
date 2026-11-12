@@ -42,7 +42,15 @@
         }
       ],
       "@react-native-firebase/app",
-      "@react-native-firebase/auth"
+      "@react-native-firebase/auth",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "2.2.21"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
