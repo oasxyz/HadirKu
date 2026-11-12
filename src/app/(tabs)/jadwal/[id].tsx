@@ -1,3 +1,4 @@
+// SRS002 (PIC A — Yoas): detail sesi. SessionControls milik PIC B, AttendanceAction milik PIC C.
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';

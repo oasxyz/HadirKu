@@ -1,3 +1,4 @@
+// Data dummy Sprint 1; tiap PIC memigrasikan bagiannya ke Firestore lewat hook di src/hooks/, lapor PM sebelum mengubah berkas ini.
 import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react';
 
 import { dummyAttendances, dummySessions, dummyUsers } from '@/data/dummy';

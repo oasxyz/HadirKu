@@ -1,3 +1,4 @@
+// SRS003 (PIC B — Yustinus): buka/tutup sesi, pindahkan ke Firestore dengan listener realtime.
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';

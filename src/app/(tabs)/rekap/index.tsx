@@ -1,3 +1,4 @@
+// SRS005 rekap (PIC B — Yustinus): daftar sesi untuk direkap, kehadiran realtime dari Firestore.
 import { router, type Href } from 'expo-router';
 import { View } from 'react-native';
 

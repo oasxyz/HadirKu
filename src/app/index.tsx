@@ -1,3 +1,4 @@
+// SRS001 (PIC A — Yoas): layar pilih identitas Sprint 1, akan digantikan login Firebase.
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';

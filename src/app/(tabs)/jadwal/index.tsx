@@ -1,3 +1,4 @@
+// SRS002 (PIC A — Yoas): beranda jadwal; data dari Firestore, CRUD sesi untuk asisten.
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';

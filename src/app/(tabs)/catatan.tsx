@@ -1,3 +1,4 @@
+// SRS005 catatan (PIC C — Varissa): riwayat kehadiran milik pengguna yang login, dari Firestore.
 import { View } from 'react-native';
 
 import { Chip, EmptyNote, ListRow, Screen, TopBar } from '@/components/ui';

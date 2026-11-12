@@ -1,3 +1,4 @@
+// SRS005 rekap (PIC B — Yustinus): detail kehadiran per sesi, realtime dari Firestore.
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';

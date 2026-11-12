@@ -1,3 +1,4 @@
+// SRS004 (PIC C — Varissa): presensi; simpan ke Firestore dengan ID dokumen sessionId_uid.
 import React, { useState } from 'react';
 import {
   View,
