@@ -8,6 +8,7 @@ import {
   Modal,
   StyleSheet,
 } from 'react-native';
+import { DigitBoxes, Illustration } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
 import { useAppContext } from '@/context/app-context';
 
@@ -30,7 +31,6 @@ export default function AttendanceAction({ sessionId }: { sessionId: string }) {
   if (session.status === 'belum_dibuka') {
     return (
       <View style={styles.banner}>
-        <Text style={styles.bannerIcon}>🔒</Text>
         <Text style={styles.bannerText}>Presensi belum dibuka oleh asisten</Text>
       </View>
     );
@@ -40,8 +40,7 @@ export default function AttendanceAction({ sessionId }: { sessionId: string }) {
   if (session.status === 'ditutup') {
     return (
       <View style={[styles.banner, styles.closedBorder]}>
-        <Text style={styles.bannerIcon}>🚫</Text>
-        <Text style={[styles.bannerText, { color: Palette.danger }]}>
+        <Text style={[styles.bannerText, { color: Palette.ink }]}>
           Sesi praktikum telah ditutup
         </Text>
       </View>
@@ -59,8 +58,8 @@ export default function AttendanceAction({ sessionId }: { sessionId: string }) {
 
     return (
       <View style={[styles.banner, styles.successBorder]}>
-        <Text style={{ fontSize: 32, color: Palette.success }}>✓</Text>
-        <Text style={[styles.bannerText, { color: Palette.success, fontWeight: '600' }]}>
+        <Illustration icon="checkmark" />
+        <Text style={[styles.bannerText, { color: Palette.primary, fontWeight: '600' }]}>
           Sudah Hadir
         </Text>
         <Text style={{ fontSize: 13, color: Palette.textSecondary }}>
@@ -107,15 +106,19 @@ export default function AttendanceAction({ sessionId }: { sessionId: string }) {
     <View>
       <Text style={styles.label}>Masukkan Kode Sesi</Text>
 
-      <TextInput
-        style={styles.input}
-        value={kode}
-        onChangeText={setKode}
-        placeholder="Contoh: 123456"
-        placeholderTextColor={Palette.textMuted}
-        keyboardType="number-pad"
-        maxLength={6}
-      />
+      {/* Kotak digit hanya tampilan; input aslinya transparan di atasnya supaya ketukan membuka keyboard. */}
+      <View style={styles.codeField}>
+        <DigitBoxes value={kode} error={errorMsg !== null} />
+        <TextInput
+          style={styles.hiddenInput}
+          value={kode}
+          onChangeText={(text) => setKode(text.replace(/\D/g, ''))}
+          keyboardType="number-pad"
+          maxLength={6}
+          caretHidden
+          accessibilityLabel="Kode sesi 6 digit"
+        />
+      </View>
 
       {errorMsg && <Text style={styles.errorText}>{errorMsg}</Text>}
 
@@ -131,8 +134,8 @@ export default function AttendanceAction({ sessionId }: { sessionId: string }) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={{ fontSize: 48, marginBottom: 12 }}>✅</Text>
-            <Text style={styles.modalTitle}>Presensi Berhasil Dicatat!</Text>
+            <Illustration icon="checkmark" />
+            <Text style={[styles.modalTitle, { marginTop: 12 }]}>Presensi Berhasil Dicatat!</Text>
             <Text style={styles.modalSubtitle}>Kehadiran Anda telah tercatat.</Text>
             <TouchableOpacity
               style={styles.modalButton}
@@ -158,9 +161,8 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
   },
-  closedBorder: { borderColor: Palette.danger },
-  successBorder: { borderColor: Palette.success },
-  bannerIcon: { fontSize: 24 },
+  closedBorder: { borderColor: 'rgba(23, 21, 28, 0.3)' },
+  successBorder: { borderColor: 'rgba(226, 27, 208, 0.45)' },
   bannerText: { fontSize: 14, color: Palette.textSecondary, textAlign: 'center' },
   label: {
     fontSize: 14,
@@ -168,17 +170,16 @@ const styles = StyleSheet.create({
     color: Palette.text,
     marginBottom: Spacing.two,
   },
-  input: {
-    backgroundColor: Palette.card,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    borderRadius: 14,
-    padding: 12,
-    fontSize: 18,
-    color: Palette.text,
-    textAlign: 'center',
-    letterSpacing: 8,
+  codeField: {
     marginBottom: Spacing.two,
+  },
+  hiddenInput: {
+    bottom: 0,
+    left: 0,
+    opacity: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   errorText: {
     color: Palette.danger,

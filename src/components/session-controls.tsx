@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { DigitBoxes } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
 import { useAppContext } from '@/context/app-context';
 
@@ -33,9 +34,6 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
   if (session.status === 'ditutup') {
     return (
       <View style={[styles.card, styles.closedCard]}>
-        <View style={styles.statusIcon}>
-          <Ionicons name="lock-closed-outline" size={22} color={Palette.danger} />
-        </View>
         <View style={styles.statusCopy}>
           <Text style={styles.cardTitle}>Sesi telah berakhir</Text>
           <Text style={styles.cardDescription}>
@@ -50,21 +48,16 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
     return (
       <>
         <View style={[styles.card, styles.openCard]}>
-          <View style={styles.openHeader}>
-            <View style={styles.statusIcon}>
-              <Ionicons name="key-outline" size={22} color={Palette.success} />
-            </View>
-            <View style={styles.statusCopy}>
-              <Text style={styles.cardTitle}>Sesi sedang dibuka</Text>
-              <Text style={styles.cardDescription}>
-                Bagikan kode ini kepada praktikan untuk melakukan presensi.
-              </Text>
-            </View>
+          <View style={styles.statusCopy}>
+            <Text style={styles.cardTitle}>Sesi sedang dibuka</Text>
+            <Text style={styles.cardDescription}>
+              Bagikan kode ini kepada praktikan untuk melakukan presensi.
+            </Text>
           </View>
 
           <View style={styles.codeBox}>
             <Text style={styles.codeLabel}>KODE SESI</Text>
-            <Text style={styles.code}>{session.kodeSesi}</Text>
+            <DigitBoxes value={session.kodeSesi ?? ''} color={Palette.primary} />
           </View>
 
           <View style={styles.attendanceSummary}>
@@ -97,9 +90,6 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
   return (
     <>
       <View style={styles.card}>
-        <View style={styles.statusIcon}>
-          <Ionicons name="lock-open-outline" size={22} color={Palette.primary} />
-        </View>
         <View style={styles.statusCopy}>
           <Text style={styles.cardTitle}>Sesi belum dibuka</Text>
           <Text style={styles.cardDescription}>
@@ -146,13 +136,6 @@ function ConfirmationModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-          <View style={[styles.modalIcon, destructive && styles.modalIconDanger]}>
-            <Ionicons
-              name={destructive ? 'warning-outline' : 'lock-open-outline'}
-              size={24}
-              color={destructive ? Palette.danger : Palette.primary}
-            />
-          </View>
           <Text style={styles.modalTitle}>{title}</Text>
           <Text style={styles.modalMessage}>{message}</Text>
           <View style={styles.modalActions}>
@@ -182,27 +165,12 @@ const styles = StyleSheet.create({
     boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
   },
   openCard: {
-    borderColor: 'rgba(34, 197, 94, 0.55)',
+    borderColor: 'rgba(226, 27, 208, 0.45)',
   },
   closedCard: {
-    borderColor: 'rgba(235, 4, 0, 0.5)',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  openHeader: {
-    flexDirection: 'row',
-    gap: Spacing.three,
-  },
-  statusIcon: {
-    alignItems: 'center',
-    backgroundColor: Palette.primaryMuted,
-    borderRadius: 999,
-    height: 42,
-    justifyContent: 'center',
-    width: 42,
+    borderColor: 'rgba(23, 21, 28, 0.3)',
   },
   statusCopy: {
-    flex: 1,
     gap: Spacing.one,
   },
   cardTitle: {
@@ -221,6 +189,7 @@ const styles = StyleSheet.create({
     borderColor: Palette.border,
     borderRadius: 14,
     borderWidth: 1,
+    paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.three,
   },
   codeLabel: {
@@ -228,13 +197,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.5,
-    marginBottom: Spacing.one,
-  },
-  code: {
-    color: Palette.success,
-    fontSize: 34,
-    fontWeight: '800',
-    letterSpacing: 8,
+    marginBottom: Spacing.two,
   },
   attendanceSummary: {
     alignItems: 'center',
@@ -256,7 +219,7 @@ const styles = StyleSheet.create({
   },
   dangerButton: {
     alignItems: 'center',
-    backgroundColor: Palette.danger,
+    backgroundColor: Palette.ink,
     borderRadius: 999,
     flexDirection: 'row',
     gap: Spacing.two,
@@ -286,19 +249,6 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     width: '100%',
     boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
-  },
-  modalIcon: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: Palette.primaryMuted,
-    borderRadius: 14,
-    height: 48,
-    justifyContent: 'center',
-    marginBottom: Spacing.three,
-    width: 48,
-  },
-  modalIconDanger: {
-    backgroundColor: 'rgba(235, 4, 0, 0.14)',
   },
   modalTitle: {
     color: Palette.text,
@@ -341,6 +291,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   confirmDanger: {
-    backgroundColor: Palette.danger,
+    backgroundColor: Palette.ink,
   },
 });
