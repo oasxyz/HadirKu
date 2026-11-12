@@ -7,6 +7,7 @@ import { Chip, GlassCard, PrimaryButton, Screen, TopBar } from '@/components/ui'
 import { Palette } from '@/constants/theme';
 import { useSessions } from '@/hooks/use-sessions';
 import { usePraktikanList } from '@/hooks/use-users';
+import { getAuthErrorMessage } from '@/utils/auth-error';
 
 export default function JadwalFormScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -103,7 +104,7 @@ export default function JadwalFormScreen() {
 
       router.back();
     } catch (e: any) {
-      setError(e?.message || 'Terjadi kesalahan saat menyimpan sesi');
+      setError(getAuthErrorMessage(e));
     } finally {
       setLoading(false);
     }

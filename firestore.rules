@@ -1,62 +1,96 @@
 // DRAFT PM (SRS009 menyempurnakan). Belum diuji di emulator; tempel ke Firebase Console > Firestore > Rules.
+// ERROR HANDLING VERSI PIC A (BISA DICEK KEMBALI DI PENGEMBANGAN SELANJUTNYA).
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper functions
     function signedIn() {
       return request.auth != null;
     }
-    function profile() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-    function isAsisten() {
-      return signedIn() && profile().role == 'asisten';
-    }
-    function isPeserta(data) {
-      return signedIn() && request.auth.uid in data.pesertaIds;
+
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
     }
 
+    function currentUserRole() {
+      return userDoc(request.auth.uid).role;
+    }
+
+    function isAsisten() {
+      return signedIn() && currentUserRole() == 'asisten';
+    }
+
+    function isPeserta(data) {
+      return signedIn() && (request.auth.uid in data.pesertaIds);
+    }
+
+    // Koleksi Users
     match /users/{uid} {
+      // User bisa membaca profilnya sendiri; Asisten bisa membaca daftar user untuk rekap/peserta
       allow read: if signedIn() && (request.auth.uid == uid || isAsisten());
+      
+      // Buat akun baru hanya untuk UID milik sendiri dengan role yang diizinkan
       allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.role in ['asisten', 'praktikan'];
-      // Role tidak boleh diubah setelah registrasi.
+        && request.resource.data.role in ['asisten', 'praktikan']
+        && request.resource.data.nama is string
+        && request.resource.data.nim is string;
+
+      // Role tidak boleh diubah setelah registrasi
       allow update: if signedIn() && request.auth.uid == uid
         && request.resource.data.role == resource.data.role;
+
       allow delete: if false;
     }
 
+    // Koleksi Classes
     match /classes/{classId} {
       allow read: if isAsisten() || isPeserta(resource.data);
-      allow write: if isAsisten();
+      allow create, update, delete: if isAsisten();
     }
 
-    // TODO (SRS003/004/009): kodeSesi saat ini ikut terbaca praktikan peserta.
-    // Pindahkan ke dokumen terpisah yang hanya bisa dibaca asisten, lalu cek kode di rule presensi.
+    // Koleksi Sessions
     match /sessions/{sessionId} {
+      // Praktikan hanya bisa membaca sesi yang memuat dirinya di pesertaIds
       allow read: if isAsisten() || isPeserta(resource.data);
-      allow write: if isAsisten();
+      
+      // Asisten hanya bisa membuat sesi untuk dirinya sendiri
+      allow create: if isAsisten()
+        && request.resource.data.asistenId == request.auth.uid;
+      
+      // Hanya asisten pembuat sesi yang bisa mengubah atau menghapus sesinya
+      allow update: if isAsisten()
+        && (resource.data.asistenId == request.auth.uid);
+      allow delete: if isAsisten()
+        && (resource.data.asistenId == request.auth.uid);
     }
 
-    // ID dokumen = sessionId_uid, jadi presensi kedua pada sesi yang sama ditolak (create pada dokumen yang sudah ada = update).
+    // Koleksi Attendances
+    // ID dokumen = sessionId_uid, sehingga presensi ganda otomatis ditolak
     match /attendances/{attendanceId} {
       allow read: if isAsisten() || (signedIn() && resource.data.userId == request.auth.uid);
+      
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && attendanceId == request.resource.data.sessionId + '_' + request.auth.uid
         && get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'dibuka'
         && request.auth.uid in get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.pesertaIds;
+        
       allow update, delete: if false;
     }
 
+    // Koleksi Leave Requests
     match /leaveRequests/{requestId} {
       allow read: if isAsisten() || (signedIn() && resource.data.userId == request.auth.uid);
+      
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'menunggu';
-      // Hanya asisten yang memutuskan, dan hanya field keputusan yang boleh berubah.
+      
+      // Hanya asisten yang bisa mengubah status keputusan
       allow update: if isAsisten()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'diputuskanOleh', 'diputuskanAt']);
+        
       allow delete: if false;
     }
   }
