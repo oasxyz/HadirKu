@@ -145,6 +145,17 @@ Label di atas input: 12, `Palette.textMuted`. Pesan error di bawah input: 12, `P
 
 Kode sesi tidak memakai input biasa, tetapi `DigitBoxes` dengan `TextInput` transparan di atasnya (contoh: `attendance-action.tsx`).
 
+### 5.4 Pemilih bagian dan filter
+
+| Pola | Tampilan | Dipakai di |
+|---|---|---|
+| Pemilih dua bagian | wadah pil putih transparan (padding 5); tiap bagian `flex: 1`, teks 13/600; yang aktif pil hitam berteks putih | Izin praktikan: "Izin saya / Buat izin" |
+| Pilihan cara | dua `Chip`, terpilih = hitam | Presensi: "Pindai QR / Ketik kode" |
+| Filter | deret `Chip`, terpilih = hitam | Pemeriksaan izin: "Hari ini / Minggu ini / Semua" |
+| Kotak ringkasan | tiga `GlassCard` kecil sejajar (radius 22): angka 24/700 di atas, label 12 di bawah | Izin saya |
+
+Pemilih dua bagian belum ada komponennya. PIC C membuatnya saat mengerjakan SRS006; kalau dipakai di layar lain, pindahkan ke `ui.tsx` lewat PM.
+
 ---
 
 ## 6. Ilustrasi
@@ -158,9 +169,19 @@ Dipakai hanya bila gambar membuat keadaan lebih cepat ditangkap daripada teks. S
 | Kartu sesi terdekat (bulatan + papan) | sudah ada | beranda | — |
 | Diagram batang hadir / belum | sudah ada | rekap detail | — |
 | Cincin kehadiran "9/10" + deret titik per pertemuan | **belum ada** | Catatan (ringkasan di atas daftar) | PIC C |
-| Pelacak tiga langkah: Diajukan, Diperiksa, Diputuskan | **belum ada** | status pengajuan izin | PIC C |
+| Pelacak tiga langkah: Diajukan, Diperiksa, Diputuskan | **belum ada** | detail pengajuan izin | PIC C |
+| QR kode sesi | **belum ada** | kartu sesi dibuka (asisten) | PIC B |
+| Bingkai pindai QR (kamera) | **belum ada** | presensi praktikan | PIC C |
 
-Cincin kehadiran butuh `react-native-svg`. Lapor PM sebelum memakainya, karena bisa memerlukan build ulang APK. Pelacak langkah cukup dari `View` biasa.
+Pelacak langkah cukup dari `View` biasa. Tiga lainnya butuh paket native, jadi **lapor PM dulu** dan jangan memasang sendiri:
+
+| Kebutuhan | Paket | Akibat |
+|---|---|---|
+| Cincin kehadiran | `react-native-svg` | perlu dipastikan sudah ada di APK |
+| Menampilkan QR | pembuat QR di atas `react-native-svg` | sama |
+| Memindai QR | `expo-camera` + izin kamera di `app.json` | **build ulang APK** oleh PM, lalu semua memasang APK baru |
+
+Sampai APK baru dibagikan, QR dan pindai tidak bisa dijalankan; kerjakan dulu jalur ketik kode.
 
 Form (login, register, tambah sesi, ajukan izin) tidak diberi ilustrasi tambahan.
 
@@ -232,16 +253,21 @@ Pesan ditulis bahasa Indonesia, bukan kode mentah Firebase:
 `SessionControls` (ada). Kartu status tanpa ikon:
 
 - `belum_dibuka`: "Sesi belum dibuka" + tombol magenta "Buka Sesi" (dengan dialog konfirmasi).
-- `dibuka`: tepi kartu magenta, "Sesi sedang dibuka", kotak "KODE SESI" berisi `DigitBoxes` magenta, "x praktikan sudah hadir", tombol hitam "Tutup Sesi" (dengan dialog konfirmasi).
+- `dibuka` (ubah): tepi kartu magenta, "Sesi sedang dibuka", **QR** di kotak putih (QR hitam, di tengah), lalu kotak "ATAU KETIK KODE" berisi `DigitBoxes` magenta sebagai cadangan, "x praktikan sudah hadir", tombol hitam "Tutup Sesi" (dengan dialog konfirmasi). Keterangan: "Minta praktikan memindai QR ini. Kalau kameranya bermasalah, bacakan kode di bawahnya."
 - `ditutup`: "Sesi telah berakhir", tanpa tombol.
 
-Kode sesi hanya dirender untuk asisten. Perubahan status tampil di semua layar tanpa reload.
+Isi QR adalah kode sesi 6 digit yang sama, jadi aturan presensi tidak berubah. QR dan kode hanya dirender untuk asisten. Perubahan status tampil di semua layar tanpa reload.
+
+Saat ini kode hanya menampilkan `DigitBoxes`; QR adalah tambahan Sprint 2 dan butuh paket pembuat QR (lihat bagian 6).
 
 ### SRS004 — Presensi (PIC C)
 
-`AttendanceAction` (ada):
+`AttendanceAction` (ada, ubah untuk QR). Saat sesi `dibuka` dan belum presensi, ada dua cara yang dipilih lewat dua `Chip` di atas: **Pindai QR** (bawaan) dan **Ketik kode**.
 
-- `dibuka`, belum presensi: "Masukkan Kode Sesi", `DigitBoxes` (tepi merah saat salah), pesan error merah di bawahnya, tombol "Kirim Presensi". Pesan: "Masukkan kode sesi terlebih dahulu", "Kode sesi harus 6 digit", "Kode sesi tidak sesuai", "Anda bukan peserta sesi ini".
+- **Pindai QR** (baru): bingkai kamera gelap bersudut membulat (radius 24, tinggi sekitar 250) dengan empat siku putih dan garis pindai magenta, teks "Arahkan kamera ke QR di layar asisten.", tautan "Kamera bermasalah? Ketik kode". QR terbaca langsung mengirim presensi tanpa tombol tambahan.
+- **Kamera tidak bisa dipakai** (baru): izin ditolak atau kamera rusak menampilkan `Illustration`, "Kamera tidak bisa diakses. Izinkan kamera di pengaturan, atau ketik kode sesi.", dan tombol "Ketik kode". Jangan biarkan layar hitam kosong.
+- **Ketik kode** (ada): "Masukkan Kode Sesi", `DigitBoxes` (tepi merah saat salah), pesan error merah di bawahnya, tombol "Kirim Presensi". Pesan: "Masukkan kode sesi terlebih dahulu", "Kode sesi harus 6 digit", "Kode sesi tidak sesuai", "Anda bukan peserta sesi ini".
+- QR yang bukan milik sesi ini memakai pesan yang sama: "Kode sesi tidak sesuai".
 - Sudah presensi: kartu bertepi magenta, `Illustration icon="checkmark"`, "Sudah Hadir", "Tercatat pukul …".
 - `belum_dibuka`: kartu teks "Presensi belum dibuka oleh asisten".
 - `ditutup`: kartu teks "Sesi praktikum telah ditutup".
@@ -252,15 +278,31 @@ Kode sesi hanya dirender untuk asisten. Perubahan status tampil di semua layar t
 - **Rekap detail** (`rekap/[id].tsx`, ada, tanpa tab bar). Nama praktikum besar, chip tanggal dan jam, `StatusBadge`, "Praktikan Hadir x / y", dua batang (Hadir pink-ungu, Belum hadir ungu muda), kartu "Daftar Kehadiran" berisi baris nama, NIM, dan chip jam.
 - **Catatan** (`(tabs)/catatan.tsx`, ubah). Baris per sesi: nama praktikum, "tanggal · lab", chip jam presensi. Tambahan Sprint 2: kartu ringkasan (cincin kehadiran + deret titik, bagian 6) di atas daftar, dan baris izin dengan `Badge` "Izin diterima".
 
+Presensi lewat QR dan lewat ketik kode tercatat sama, jadi rekap dan catatan tidak membedakannya.
+
 ### SRS006 — Pengajuan izin (PIC C)
 
-`components/izin/pengajuan-izin.tsx` (baru), tab Izin untuk praktikan.
+`components/izin/pengajuan-izin.tsx` (baru), tab Izin untuk praktikan. Di bawah `TopBar` "Izin" ada pemilih dua bagian (lihat 5.4): **Izin saya** (bawaan) dan **Buat izin**.
 
-- `GlassCard` form: Sesi (deret `Chip`), Alasan (input multibaris), `PrimaryButton` "Ajukan izin".
-- Sesi yang sudah punya pengajuan `menunggu`: `Chip` redup dan keterangan "… sudah diajukan, menunggu keputusan."
-- Alasan kosong: "Alasan wajib diisi".
-- `SectionTitle` "Pengajuan saya" + `ListRow` per pengajuan: nama praktikum, "tanggal · kategori", `Badge` status.
-- Kartu detail pengajuan: alasan, "Kategori AI" + `Badge`, pelacak tiga langkah, keterangan pemutus dan waktu.
+**Izin saya**
+
+- Tiga kotak ringkasan sejajar: jumlah Menunggu, Diterima (angka magenta), Ditolak.
+- `SectionTitle` "Pengajuan saya" + `ListRow` per pengajuan: nama praktikum, "hari, tanggal · kategori AI", `Badge` status.
+- Mengetuk satu baris membuka **Detail Izin** (`TopBar` dengan tombol kembali): nama praktikum + `Badge` status, tanggal, jam, dan lab, alasan lengkap, "Kategori AI" + `Badge`, pelacak tiga langkah, "Diputuskan <nama> · <waktu>".
+- Kosong: `EmptyNote` "Kamu belum pernah mengajukan izin."
+
+**Buat izin**
+
+Satu `GlassCard`, urut dari atas:
+
+1. **Tanggal**: kalender mingguan yang sama dengan beranda (hari terpilih magenta, titik menandai hari yang ada praktikumnya) dengan pil bulan di kanan label.
+2. **Praktikum pada <hari, tanggal>**: deret `Chip` berisi praktikum praktikan pada tanggal itu ("Basis Data · 13:00"), terpilih = hitam.
+   - Sudah punya pengajuan `menunggu`: `Chip` redup dan keterangan "… sudah diajukan, menunggu keputusan."
+   - Tidak ada praktikum: teks "Tidak ada praktikum pada tanggal ini. Pilih tanggal yang bertitik."
+3. **Alasan**: input multibaris. Kosong saat kirim: "Alasan wajib diisi".
+4. `PrimaryButton` "Ajukan izin", `disabled` sampai praktikum dipilih.
+
+Pilih tanggal hanya cara mencari sesi. Yang disimpan tetap `sessionId`, jadi struktur `leaveRequests` tidak berubah. Setelah berhasil, pindah ke "Izin saya".
 
 ### SRS007 — Klasifikasi AI (PIC C)
 
@@ -275,10 +317,12 @@ Tidak punya layar sendiri:
 
 `components/izin/pemeriksaan-izin.tsx` (baru), tab Izin untuk asisten.
 
-- Daftar `GlassCard`, yang `menunggu` di atas. Isi: `Avatar` + nama, "sesi · tanggal", `Badge` status, alasan lengkap, "Saran AI" + `Badge`.
+- **Filter waktu** di bawah `TopBar`: tiga `Chip` "Hari ini" (bawaan), "Minggu ini", "Semua"; terpilih = hitam. Filter memakai tanggal pengajuan (`createdAt`).
+- Hasil dikelompokkan per hari pengajuan. Tiap kelompok punya baris judul: tanggal di kiri ("Kamis, 12 Nov 2026"), keterangan di kanan ("2 menunggu" atau "selesai"). Kelompok yang masih punya pengajuan `menunggu` di atas.
+- Tiap pengajuan satu `GlassCard`: `Avatar` + nama, "praktikum · tanggal sesi", `Badge` status, alasan lengkap, "Saran AI" + `Badge`.
 - Dua tombol berdampingan: "Tolak" (sekunder) dan "Terima" (utama). Keputusan lewat dialog konfirmasi singkat.
 - Setelah diputuskan: tombol hilang, tampil "Diputuskan <nama> · <waktu>".
-- Kosong: `EmptyNote` "Belum ada pengajuan izin".
+- Kosong, pesannya mengikuti filter: "Tidak ada pengajuan izin hari ini." / "… minggu ini." / "Belum ada pengajuan izin."
 
 ### SRS009 — Rules, validasi, dan error (PIC A)
 
