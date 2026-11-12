@@ -1,164 +1,146 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { Chip, GlassCard, ListRow, PrimaryButton, Screen } from '@/components/ui';
+import { Palette } from '@/constants/theme';
 import { useAppContext } from '@/context/app-context';
-import { MaxContentWidth, Palette, Spacing } from '@/constants/theme';
-import type { Role, User } from '@/types';
-
-function groupByRole(users: User[], role: Role) {
-  return users.filter((user) => user.role === role);
-}
+import type { Role } from '@/types';
 
 export default function SelectIdentityScreen() {
   const { state, dispatch } = useAppContext();
+  const [role, setRole] = useState<Role>('asisten');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  function handleSelect(user: User) {
-    dispatch({ type: 'SWITCH_USER', userId: user.id });
-    // '/jadwal' resolves correctly at runtime (nested index flattening), but
-    // expo-router's typed-routes generator doesn't list it for this folder shape.
+  const users = state.users.filter((user) => user.role === role);
+
+  function pilihPeran(next: Role) {
+    setRole(next);
+    setSelectedId(null);
+  }
+
+  function lanjut() {
+    if (!selectedId) return;
+    dispatch({ type: 'SWITCH_USER', userId: selectedId });
     router.replace('/jadwal' as Href);
   }
 
-  const asisten = groupByRole(state.users, 'asisten');
-  const praktikan = groupByRole(state.users, 'praktikan');
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.logoBadge}>
-            <Ionicons name="shield-checkmark" size={32} color={Palette.primary} />
-          </View>
-          <Text style={styles.appName}>SI-PRAKTIKUM 2</Text>
-          <Text style={styles.subtitle}>PILIH IDENTITAS ANDA</Text>
+    <Screen withTabBar={false}>
+      <View style={styles.hero}>
+        <View style={[styles.arc, { width: 330, height: 330, top: 6, borderColor: '#CBD0DC' }]} />
+        <View style={[styles.arc, { width: 256, height: 256, top: 43, borderColor: '#86D5AC' }]} />
+        <View style={[styles.arc, { width: 182, height: 182, top: 80, borderColor: '#F5A97F' }]} />
+        <View style={styles.heroBadge}>
+          <Ionicons name="school" size={36} color={Palette.primary} />
+        </View>
+      </View>
+
+      <GlassCard style={styles.sheet}>
+        <Text style={styles.heading}>
+          Siap Mengikuti{'\n'}Praktikum{'\n'}
+          <Text style={styles.headingBold}>Hari Ini!</Text>
+        </Text>
+        <Text style={styles.subtitle}>
+          Pilih peran dan identitasmu untuk masuk ke HadirKu.
+        </Text>
+
+        <Text style={styles.label}>Peran</Text>
+        <View style={styles.chips}>
+          <Chip label="Asisten" selected={role === 'asisten'} onPress={() => pilihPeran('asisten')} />
+          <Chip
+            label="Praktikan"
+            selected={role === 'praktikan'}
+            onPress={() => pilihPeran('praktikan')}
+          />
         </View>
 
-        <Text style={styles.sectionLabel}>ASISTEN LABORATORIUM</Text>
-        {asisten.map((user) => (
-          <IdentityCard key={user.id} user={user} onPress={() => handleSelect(user)} />
-        ))}
+        <Text style={styles.label}>Identitas</Text>
+        <View style={styles.list}>
+          {users.map((user, index) => {
+            const selected = user.id === selectedId;
+            return (
+              <ListRow
+                key={user.id}
+                icon={role === 'asisten' ? 'shield-checkmark-outline' : 'school-outline'}
+                tint={index + (role === 'asisten' ? 0 : 2)}
+                title={user.nama}
+                subtitle={user.nim}
+                onPress={() => setSelectedId(user.id)}
+                right={
+                  <Ionicons
+                    name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={26}
+                    color={selected ? Palette.primary : '#CFCBD9'}
+                  />
+                }
+              />
+            );
+          })}
+        </View>
 
-        <Text style={[styles.sectionLabel, styles.sectionLabelSpacing]}>
-          PRAKTIKAN (MAHASISWA)
-        </Text>
-        {praktikan.map((user) => (
-          <IdentityCard key={user.id} user={user} onPress={() => handleSelect(user)} />
-        ))}
-      </View>
-    </SafeAreaView>
-  );
-}
-
-function IdentityCard({ user, onPress }: { user: User; onPress: () => void }) {
-  const isAsisten = user.role === 'asisten';
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
-      <View style={[styles.avatar, isAsisten && styles.avatarAsisten]}>
-        <Ionicons
-          name={isAsisten ? 'shield-checkmark' : 'school'}
-          size={20}
-          color={isAsisten ? Palette.primary : Palette.textSecondary}
-        />
-      </View>
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardName}>{user.nama}</Text>
-        <Text style={styles.cardNim}>{user.nim}</Text>
-      </View>
-      <Ionicons name="person-circle-outline" size={22} color={Palette.textMuted} />
-    </Pressable>
+        <PrimaryButton label="Lanjut" onPress={lanjut} disabled={!selectedId} />
+      </GlassCard>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Palette.background,
-  },
-  container: {
-    flex: 1,
-    alignSelf: 'center',
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.five,
-  },
-  header: {
+  hero: {
     alignItems: 'center',
-    marginBottom: Spacing.five,
+    height: 196,
+    overflow: 'hidden',
   },
-  logoBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: Palette.primaryMuted,
+  arc: {
+    borderRadius: 999,
+    borderWidth: 26,
+    position: 'absolute',
+  },
+  heroBadge: {
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    height: 84,
     justifyContent: 'center',
-    marginBottom: Spacing.three,
+    position: 'absolute',
+    top: 102,
+    width: 84,
   },
-  appName: {
-    color: Palette.primary,
-    fontSize: 26,
-    fontWeight: '800',
-    fontStyle: 'italic',
-    letterSpacing: 0.5,
+  sheet: {
+    borderRadius: 36,
+    gap: 14,
+    marginTop: -18,
+    padding: 24,
+  },
+  heading: {
+    color: Palette.text,
+    fontSize: 30,
+    fontWeight: '400',
+    lineHeight: 37,
+    textAlign: 'center',
+  },
+  headingBold: {
+    fontWeight: '700',
   },
   subtitle: {
     color: Palette.textSecondary,
     fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 1,
-    marginTop: Spacing.one,
+    lineHeight: 19,
+    textAlign: 'center',
   },
-  sectionLabel: {
+  label: {
     color: Palette.textMuted,
     fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: Spacing.two,
+    marginTop: 4,
   },
-  sectionLabelSpacing: {
-    marginTop: Spacing.four,
-  },
-  card: {
+  chips: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Palette.card,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    borderRadius: 14,
-    padding: Spacing.three,
-    marginBottom: Spacing.two,
-    gap: Spacing.three,
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  cardPressed: {
-    opacity: 0.7,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: Palette.cardMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarAsisten: {
-    backgroundColor: Palette.primaryMuted,
-  },
-  cardInfo: {
-    flex: 1,
-  },
-  cardName: {
-    color: Palette.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  cardNim: {
-    color: Palette.textSecondary,
-    fontSize: 12,
-    marginTop: 2,
+  list: {
+    gap: 10,
+    marginBottom: 6,
   },
 });
