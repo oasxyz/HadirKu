@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { shadow, type IconName } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useAppContext } from '@/context/app-context';
+import { useCurrentUser } from '@/context/auth-context';
 
 const TAB_META: Record<string, { label: string; icon: IconName }> = {
   jadwal: { label: 'Beranda', icon: 'home-outline' },
@@ -22,8 +23,8 @@ type TabBarProps = {
 // Tab aktif berupa pill magenta berlabel; tab lain hanya ikon bulat.
 export function FloatingTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
-  const { state: app } = useAppContext();
-  const role = app.users.find((user) => user.id === app.currentUserId)?.role;
+  const currentUser = useCurrentUser();
+  const role = currentUser?.role;
   const hidden = role === 'asisten' ? 'catatan' : 'rekap';
   // Folder tanpa _layout (mis. rekap/index) bernama "rekap/index"; samakan ke nama tab-nya.
   const tabKey = (name: string) => name.replace(/\/index$/, '');

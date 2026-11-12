@@ -1,145 +1,53 @@
-// SRS001 (PIC A — Yoas): layar pilih identitas Sprint 1, akan digantikan login Firebase.
-import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { Chip, GlassCard, ListRow, PrimaryButton, Screen } from '@/components/ui';
+import { GlassCard, Screen } from '@/components/ui';
 import { Palette } from '@/constants/theme';
-import { useAppContext } from '@/context/app-context';
-import type { Role } from '@/types';
+import { useAuth } from '@/context/auth-context';
 
-export default function SelectIdentityScreen() {
-  const { state, dispatch } = useAppContext();
-  const [role, setRole] = useState<Role>('asisten');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+export default function EntryScreen() {
+  const { firebaseUser, currentUser, loading } = useAuth();
 
-  const users = state.users.filter((user) => user.role === role);
-
-  function pilihPeran(next: Role) {
-    setRole(next);
-    setSelectedId(null);
-  }
-
-  function lanjut() {
-    if (!selectedId) return;
-    dispatch({ type: 'SWITCH_USER', userId: selectedId });
-    router.replace('/jadwal' as Href);
-  }
+  useEffect(() => {
+    if (!loading) {
+      if (firebaseUser) {
+        router.replace('/jadwal' as Href);
+      } else {
+        router.replace('/login' as Href);
+      }
+    }
+  }, [loading, firebaseUser]);
 
   return (
     <Screen withTabBar={false}>
-      <View style={styles.hero}>
-        <View style={[styles.arc, { width: 330, height: 330, top: 6, borderColor: '#DDD6EA' }]} />
-        <View style={[styles.arc, { width: 256, height: 256, top: 43, borderColor: '#C5B1E2' }]} />
-        <View style={[styles.arc, { width: 182, height: 182, top: 80, borderColor: '#EDA9E6' }]} />
-        <View style={styles.heroBadge}>
-          <Ionicons name="school" size={36} color={Palette.primary} />
-        </View>
+      <View style={styles.center}>
+        <GlassCard style={styles.card}>
+          <ActivityIndicator size="large" color={Palette.primary} />
+          <Text style={styles.text}>Memuat…</Text>
+        </GlassCard>
       </View>
-
-      <GlassCard style={styles.sheet}>
-        <Text style={styles.heading}>
-          Siap Mengikuti{'\n'}Praktikum{'\n'}
-          <Text style={styles.headingBold}>Hari Ini!</Text>
-        </Text>
-        <Text style={styles.subtitle}>
-          Pilih peran dan identitasmu untuk masuk ke HadirKu.
-        </Text>
-
-        <Text style={styles.label}>Peran</Text>
-        <View style={styles.chips}>
-          <Chip label="Asisten" selected={role === 'asisten'} onPress={() => pilihPeran('asisten')} />
-          <Chip
-            label="Praktikan"
-            selected={role === 'praktikan'}
-            onPress={() => pilihPeran('praktikan')}
-          />
-        </View>
-
-        <Text style={styles.label}>Identitas</Text>
-        <View style={styles.list}>
-          {users.map((user) => {
-            const selected = user.id === selectedId;
-            return (
-              <ListRow
-                key={user.id}
-                title={user.nama}
-                subtitle={user.nim}
-                onPress={() => setSelectedId(user.id)}
-                right={
-                  <Ionicons
-                    name={selected ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={26}
-                    color={selected ? Palette.primary : '#CFCBD9'}
-                  />
-                }
-              />
-            );
-          })}
-        </View>
-
-        <PrimaryButton label="Lanjut" onPress={lanjut} disabled={!selectedId} />
-      </GlassCard>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: {
+  center: {
     alignItems: 'center',
-    height: 196,
-    overflow: 'hidden',
-  },
-  arc: {
-    borderRadius: 999,
-    borderWidth: 26,
-    position: 'absolute',
-  },
-  heroBadge: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    height: 84,
+    flex: 1,
     justifyContent: 'center',
-    position: 'absolute',
-    top: 102,
-    width: 84,
+    minHeight: 400,
   },
-  sheet: {
-    borderRadius: 36,
-    gap: 14,
-    marginTop: -18,
-    padding: 24,
+  card: {
+    alignItems: 'center',
+    borderRadius: 24,
+    gap: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 24,
   },
-  heading: {
-    color: Palette.text,
-    fontSize: 30,
-    fontWeight: '400',
-    lineHeight: 37,
-    textAlign: 'center',
-  },
-  headingBold: {
-    fontWeight: '700',
-  },
-  subtitle: {
+  text: {
     color: Palette.textSecondary,
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: 'center',
-  },
-  label: {
-    color: Palette.textMuted,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  list: {
-    gap: 10,
-    marginBottom: 6,
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

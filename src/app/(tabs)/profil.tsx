@@ -1,21 +1,28 @@
-// SRS001 (PIC A — Yoas): profil; tombol Ganti Peran diganti logout Firebase.
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { router, type Href } from 'expo-router';
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar, Badge, ListRow, Screen, TopBar } from '@/components/ui';
 import { Palette } from '@/constants/theme';
-import { useAppContext } from '@/context/app-context';
+import { useAuth, useCurrentUser } from '@/context/auth-context';
 
 export default function ProfilScreen() {
-  const { state } = useAppContext();
-  const currentUser = state.users.find((user) => user.id === state.currentUserId);
+  const currentUser = useCurrentUser();
+  const { signOut } = useAuth();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   if (!currentUser) {
     return null;
   }
 
   const isAsisten = currentUser.role === 'asisten';
+
+  async function handleLogout() {
+    setShowLogoutConfirm(false);
+    await signOut();
+    router.replace('/login' as Href);
+  }
 
   return (
     <Screen>
@@ -24,21 +31,52 @@ export default function ProfilScreen() {
       <View style={styles.header}>
         <Avatar nama={currentUser.nama} size={104} />
         <Text style={styles.name}>{currentUser.nama}</Text>
-        <Badge label={isAsisten ? 'Asisten Laboratorium' : 'Praktikan'} tone="outline" />
+        <Badge
+          label={isAsisten ? 'Asisten Laboratorium' : 'Praktikan'}
+          tone="outline"
+        />
       </View>
 
       <View style={styles.list}>
         <ListRow title="NIM" subtitle={currentUser.nim} />
-        <ListRow title="Email Institusi" subtitle={`${currentUser.nim}@univ.ac.id`} />
-        <ListRow title="Versi Aplikasi" subtitle="1.0.0 (Sprint 1)" />
+        <ListRow title="Email Institusi" subtitle={currentUser.email || `${currentUser.nim}@univ.ac.id`} />
+        <ListRow title="Versi Aplikasi" subtitle="2.0.0 (Sprint 2)" />
       </View>
 
       <Pressable
-        onPress={() => router.replace('/')}
+        onPress={() => setShowLogoutConfirm(true)}
         style={({ pressed }) => [styles.logout, pressed && { opacity: 0.7 }]}>
         <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
-        <Text style={styles.logoutText}>Ganti Peran / Keluar</Text>
+        <Text style={styles.logoutText}>Keluar</Text>
       </Pressable>
+
+      {/* Modal Dialog Konfirmasi Logout */}
+      <Modal
+        visible={showLogoutConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLogoutConfirm(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Keluar dari akun?</Text>
+            <Text style={styles.modalDesc}>
+              Anda harus masuk kembali menggunakan email dan kata sandi untuk mengakses jadwal praktikum.
+            </Text>
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => setShowLogoutConfirm(false)}
+                style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}>
+                <Text style={styles.cancelBtnText}>Batal</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleLogout}
+                style={({ pressed }) => [styles.confirmBtn, pressed && { opacity: 0.7 }]}>
+                <Text style={styles.confirmBtnText}>Keluar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -53,6 +91,7 @@ const styles = StyleSheet.create({
     color: Palette.text,
     fontSize: 26,
     fontWeight: '600',
+    textAlign: 'center',
   },
   list: {
     gap: 12,
@@ -65,10 +104,70 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 56,
     justifyContent: 'center',
+    marginTop: 8,
   },
   logoutText: {
     color: '#FFFFFF',
     fontSize: 15,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    gap: 14,
+    maxWidth: 360,
+    padding: 24,
+    width: '100%',
+  },
+  modalTitle: {
+    color: Palette.text,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  modalDesc: {
+    color: Palette.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 6,
+  },
+  cancelBtn: {
+    alignItems: 'center',
+    borderColor: Palette.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flex: 1,
+    height: 48,
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    color: Palette.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  confirmBtn: {
+    alignItems: 'center',
+    backgroundColor: Palette.ink,
+    borderRadius: 999,
+    flex: 1,
+    height: 48,
+    justifyContent: 'center',
+  },
+  confirmBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '600',
   },
 });
