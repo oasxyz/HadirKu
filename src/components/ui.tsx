@@ -12,12 +12,10 @@ export type IconName = keyof typeof Ionicons.glyphMap;
 /** Ruang di bawah konten agar tidak tertutup tab bar melayang. */
 export const TAB_BAR_SPACE = 104;
 
-/** Warna lembut untuk ikon bulat pada daftar, dipakai bergiliran. */
+/** Dua bidang lembut (ungu muda, pink-ungu) untuk ilustrasi dan ikon bulat. Tidak ada warna lain. */
 export const tints = [
-  { bg: '#F3DDCD', fg: '#C4855A' },
-  { bg: '#D2EAE2', fg: '#4F9C88' },
-  { bg: '#EBD3DF', fg: '#B3688A' },
-  { bg: '#D6E4F2', fg: '#5F8AB8' },
+  { bg: Palette.lavender, fg: Palette.text },
+  { bg: Palette.lilac, fg: Palette.text },
 ] as const;
 
 export const shadow = '0 10px 30px rgba(90, 70, 130, 0.10)';
@@ -183,16 +181,30 @@ export function Avatar({ nama, size = 48 }: { nama: string; size?: number }) {
   );
 }
 
-export function Badge({ label, tone }: { label: string; tone: 'green' | 'red' | 'grey' | 'pink' }) {
-  const background =
-    tone === 'green' ? '#1FAF6B' : tone === 'red' ? '#F0303C' : tone === 'pink' ? Palette.primary : '#B9B5C6';
+/**
+ * primary = aktif/berhasil (magenta), dark = selesai/ditolak (hitam),
+ * muted = belum/menunggu (abu keunguan), outline = keterangan netral (putih bergaris).
+ */
+export type BadgeTone = 'primary' | 'dark' | 'muted' | 'outline';
+
+const BADGE_BACKGROUND: Record<BadgeTone, string> = {
+  primary: Palette.primary,
+  dark: Palette.ink,
+  muted: '#B9B5C6',
+  outline: '#FFFFFF',
+};
+
+export function Badge({ label, tone }: { label: string; tone: BadgeTone }) {
+  const outline = tone === 'outline';
   return (
-    <View style={[styles.badge, { backgroundColor: background }]}>
-      <Text style={styles.badgeText}>{label}</Text>
+    <View
+      style={[styles.badge, { backgroundColor: BADGE_BACKGROUND[tone] }, outline && styles.badgeOutline]}>
+      <Text style={[styles.badgeText, outline && styles.badgeTextOutline]}>{label}</Text>
     </View>
   );
 }
 
+/** Baris daftar berbentuk pil. Tanpa ikon secara bawaan; `icon` hanya bila benar-benar menambah arti. */
 export function ListRow({
   icon,
   tint,
@@ -201,7 +213,7 @@ export function ListRow({
   right,
   onPress,
 }: {
-  icon: IconName;
+  icon?: IconName;
   tint?: number;
   title: string;
   subtitle?: string;
@@ -212,8 +224,8 @@ export function ListRow({
     <Pressable
       onPress={onPress}
       disabled={!onPress}
-      style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}>
-      <IconCircle icon={icon} tint={tint} />
+      style={({ pressed }) => [styles.listRow, !icon && styles.listRowPlain, pressed && styles.pressed]}>
+      {icon ? <IconCircle icon={icon} tint={tint} /> : null}
       <View style={styles.listRowText}>
         <Text style={styles.listRowTitle} numberOfLines={1}>
           {title}
@@ -255,10 +267,50 @@ export function PrimaryButton({
   );
 }
 
-export function EmptyNote({ message }: { message: string }) {
+/** Ilustrasi kecil: ikon magenta di atas dua bulatan ungu. Dipakai untuk keadaan kosong, berhasil, gagal. */
+export function Illustration({ icon }: { icon: IconName }) {
+  return (
+    <View style={styles.illustration}>
+      <View style={styles.illustrationBig} />
+      <View style={styles.illustrationSmall} />
+      <Ionicons name={icon} size={46} color={Palette.primary} />
+    </View>
+  );
+}
+
+/** Deret kotak digit untuk kode sesi. `value` boleh lebih pendek dari `length` (kotak sisanya kosong). */
+export function DigitBoxes({
+  value,
+  length = 6,
+  color = Palette.text,
+  error = false,
+}: {
+  value: string;
+  length?: number;
+  color?: string;
+  error?: boolean;
+}) {
+  return (
+    <View style={styles.digits}>
+      {Array.from({ length }, (_, index) => (
+        <View key={index} style={[styles.digitBox, error && styles.digitBoxError]}>
+          <Text style={[styles.digitText, { color }]}>{value[index] ?? ''}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function EmptyNote({
+  message,
+  icon = 'file-tray-outline',
+}: {
+  message: string;
+  icon?: IconName;
+}) {
   return (
     <GlassCard style={styles.emptyNote}>
-      <Ionicons name="file-tray-outline" size={26} color={Palette.textMuted} />
+      <Illustration icon={icon} />
       <Text style={styles.emptyNoteText}>{message}</Text>
     </GlassCard>
   );
@@ -331,7 +383,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   chipSelected: {
-    backgroundColor: '#17151C',
+    backgroundColor: Palette.ink,
   },
   chipLabel: {
     color: Palette.text,
@@ -370,6 +422,65 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '600',
+  },
+  badgeOutline: {
+    borderColor: 'rgba(110, 90, 150, 0.3)',
+    borderWidth: 1,
+    paddingVertical: 4,
+  },
+  badgeTextOutline: {
+    color: Palette.ink,
+  },
+  listRowPlain: {
+    paddingLeft: 24,
+    paddingVertical: 13,
+  },
+  illustration: {
+    alignItems: 'center',
+    height: 96,
+    justifyContent: 'center',
+    width: 118,
+  },
+  illustrationBig: {
+    backgroundColor: Palette.lavender,
+    borderRadius: 999,
+    height: 80,
+    position: 'absolute',
+    right: 8,
+    top: 0,
+    width: 80,
+  },
+  illustrationSmall: {
+    backgroundColor: Palette.lilac,
+    borderRadius: 999,
+    bottom: 0,
+    height: 42,
+    left: 8,
+    position: 'absolute',
+    width: 42,
+  },
+  digits: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  digitBox: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: Palette.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexShrink: 1,
+    height: 54,
+    justifyContent: 'center',
+    width: 44,
+  },
+  digitBoxError: {
+    borderColor: Palette.danger,
+  },
+  digitText: {
+    fontSize: 24,
+    fontWeight: '800',
   },
   listRow: {
     alignItems: 'center',

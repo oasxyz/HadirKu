@@ -1,4 +1,4 @@
-import { Badge } from '@/components/ui';
+import { Badge, type BadgeTone } from '@/components/ui';
 import type { SessionStatus } from '@/types';
 
 const LABELS: Record<SessionStatus, string> = {
@@ -7,10 +7,10 @@ const LABELS: Record<SessionStatus, string> = {
   ditutup: 'Ditutup',
 };
 
-const TONES: Record<SessionStatus, 'grey' | 'green' | 'red'> = {
-  belum_dibuka: 'grey',
-  dibuka: 'green',
-  ditutup: 'red',
+const TONES: Record<SessionStatus, BadgeTone> = {
+  belum_dibuka: 'muted',
+  dibuka: 'primary',
+  ditutup: 'dark',
 };
 
 export function StatusBadge({ status }: { status: SessionStatus }) {

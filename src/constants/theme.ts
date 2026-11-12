@@ -79,7 +79,14 @@ export const Palette = {
   text: '#131118',
   textSecondary: '#5E586C',
   textMuted: '#8F89A0',
-  success: '#16A34A',
+  /** Hitam untuk tombol/status "berat" (tutup, tolak, hapus) dan chip terpilih. */
+  ink: '#17151C',
+  /** Ungu muda dan pink-ungu untuk ilustrasi dan bidang lembut. */
+  lavender: '#E4DAF1',
+  lilac: '#F4CFEF',
+  /** Tema tanpa hijau: status berhasil memakai magenta yang sama dengan primary. */
+  success: '#E21BD0',
+  /** Merah hanya untuk pesan error dan tepi input yang salah. */
   danger: '#E11D48',
 } as const;
 
