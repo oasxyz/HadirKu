@@ -1,14 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { ScreenBackground } from '@/components/screen-background';
 import { AppProvider } from '@/context/app-context';
-import { Palette } from '@/constants/theme';
 
 SplashScreen.preventAutoHideAsync();
+
+// Tema navigasi transparan: kalau tidak, React Navigation menutup gradien dengan latar abu-abu bawaannya.
+const transparentTheme = {
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, background: 'transparent', card: 'transparent' },
+};
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({ ...Ionicons.font });
@@ -19,26 +26,33 @@ export default function RootLayout() {
 
   return (
     <AppProvider>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <AnimatedSplashOverlay />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: Palette.background },
-        }}>
-        {/* ===== PM — layar awal dan navigasi tab ===== */}
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(tabs)" />
+      <View style={{ flex: 1 }}>
+        <ScreenBackground />
+        {/* Layar transparan agar gradien terlihat; fade mencegah dua layar saling menumpuk saat transisi. */}
+        <ThemeProvider value={transparentTheme}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: 'fade',
+            contentStyle: { backgroundColor: 'transparent' },
+          }}>
+          {/* ===== PM — layar awal dan navigasi tab ===== */}
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(tabs)" />
 
-        {/* ===== SRS001/SRS002/SRS009 — Autentikasi, CRUD data praktikum, rules (PIC A — Yoas) ===== */}
-        <Stack.Screen name="login" />
-        <Stack.Screen name="register" />
+          {/* ===== SRS001/SRS002/SRS009 — Autentikasi, CRUD data praktikum, rules (PIC A — Yoas) ===== */}
+          <Stack.Screen name="login" />
+          <Stack.Screen name="register" />
 
-        {/* ===== SRS003/SRS005/SRS008 — Sesi realtime, rekap, pemeriksaan izin (PIC B — Yustinus) ===== */}
-        <Stack.Screen name="rekap/[id]" />
+          {/* ===== SRS003/SRS005/SRS008 — Sesi realtime, rekap, pemeriksaan izin (PIC B — Yustinus) ===== */}
+          <Stack.Screen name="rekap/[id]" />
 
-        {/* ===== SRS004/SRS005/SRS006/SRS007 — Presensi, catatan, izin, AI (PIC C — Varissa) ===== */}
-      </Stack>
+          {/* ===== SRS004/SRS005/SRS006/SRS007 — Presensi, catatan, izin, AI (PIC C — Varissa) ===== */}
+        </Stack>
+        </ThemeProvider>
+      </View>
     </AppProvider>
   );
 }
