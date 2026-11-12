@@ -173,11 +173,12 @@ function ConfirmationModal({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Palette.card,
-    borderColor: Palette.border,
-    borderRadius: 16,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 24,
     borderWidth: 1,
     padding: Spacing.three,
     gap: Spacing.three,
+    boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
   },
   openCard: {
     borderColor: 'rgba(34, 197, 94, 0.55)',
@@ -194,7 +195,7 @@ const styles = StyleSheet.create({
   statusIcon: {
     alignItems: 'center',
     backgroundColor: Palette.primaryMuted,
-    borderRadius: 12,
+    borderRadius: 999,
     height: 42,
     justifyContent: 'center',
     width: 42,
@@ -246,7 +247,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     alignItems: 'center',
     backgroundColor: Palette.primary,
-    borderRadius: 12,
+    borderRadius: 999,
     flexDirection: 'row',
     gap: Spacing.two,
     justifyContent: 'center',
@@ -255,7 +256,7 @@ const styles = StyleSheet.create({
   dangerButton: {
     alignItems: 'center',
     backgroundColor: Palette.danger,
-    borderRadius: 12,
+    borderRadius: 999,
     flexDirection: 'row',
     gap: Spacing.two,
     justifyContent: 'center',
@@ -271,18 +272,19 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: 'rgba(30, 20, 50, 0.4)',
     flex: 1,
     justifyContent: 'center',
     padding: Spacing.four,
   },
   modalCard: {
-    backgroundColor: Palette.card,
-    borderColor: Palette.border,
-    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 24,
     borderWidth: 1,
     padding: Spacing.four,
     width: '100%',
+    boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
   },
   modalIcon: {
     alignItems: 'center',
@@ -318,7 +320,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     alignItems: 'center',
     borderColor: Palette.border,
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
@@ -332,7 +334,7 @@ const styles = StyleSheet.create({
   confirmButton: {
     alignItems: 'center',
     backgroundColor: Palette.primary,
-    borderRadius: 12,
+    borderRadius: 999,
     flex: 1,
     justifyContent: 'center',
     paddingVertical: 12,

@@ -150,11 +150,12 @@ const styles = StyleSheet.create({
   banner: {
     backgroundColor: Palette.card,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
     padding: Spacing.three,
-    borderRadius: 14,
+    borderRadius: 24,
     alignItems: 'center',
     gap: Spacing.one,
+    boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
   },
   closedBorder: { borderColor: Palette.danger },
   successBorder: { borderColor: Palette.success },
@@ -186,7 +187,7 @@ const styles = StyleSheet.create({
   submitButton: {
     backgroundColor: Palette.primary,
     padding: 14,
-    borderRadius: 14,
+    borderRadius: 999,
     alignItems: 'center',
   },
   submitButtonText: {
@@ -196,18 +197,19 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(30,20,50,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: Palette.card,
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: Palette.primary,
     padding: Spacing.four,
     width: '80%',
     alignItems: 'center',
+    boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
   },
   modalTitle: {
     fontSize: 18,
@@ -225,7 +227,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.primary,
     paddingVertical: 10,
     paddingHorizontal: 32,
-    borderRadius: 14,
+    borderRadius: 999,
   },
   modalButtonText: {
     color: '#FFFFFF',
