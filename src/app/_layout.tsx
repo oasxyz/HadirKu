@@ -39,11 +39,16 @@ export default function RootLayout() {
                 animation: 'fade',
                 contentStyle: { backgroundColor: 'transparent' },
               }}>
+               {/* ===== PM — layar awal dan navigasi tab ===== */}
               <Stack.Screen name="index" />
               <Stack.Screen name="(tabs)" />
+              {/* ===== RS001/SRS002/SRS009 — Autentikasi, CRUD data praktikum, rules (PIC A — Yoas) ===== */}
               <Stack.Screen name="login" />
               <Stack.Screen name="register" />
+              <Stack.Screen name="jadwal-form" />
+              {/* ===== SRS003/SRS005/SRS008 — Sesi realtime, rekap, pemeriksaan izin (PIC B — Yustinus) ===== */}
               <Stack.Screen name="rekap/[id]" />
+              {/* ===== SRS004/SRS005/SRS006/SRS007 — Presensi, catatan, izin, AI (PIC C — Varissa) ===== */}
             </Stack>
           </ThemeProvider>
         </View>

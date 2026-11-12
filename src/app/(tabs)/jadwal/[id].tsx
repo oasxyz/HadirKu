@@ -1,7 +1,7 @@
-// SRS002 (PIC A — Yoas): detail sesi. SessionControls milik PIC B, AttendanceAction milik PIC C.
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import AttendanceAction from '@/components/attendance-action';
 import SessionControls from '@/components/session-controls';
@@ -11,46 +11,90 @@ import {
   Chip,
   EmptyNote,
   GlassCard,
+  RoundButton,
   Screen,
   SectionTitle,
   TopBar,
 } from '@/components/ui';
 import { Palette } from '@/constants/theme';
-import { useAppContext } from '@/context/app-context';
+import { useCurrentUser } from '@/context/auth-context';
+import { useSessions } from '@/hooks/use-sessions';
+import { usePraktikanList } from '@/hooks/use-users';
 import { formatRentangJam, formatTanggal } from '@/utils/format';
 
 export default function SesiDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state } = useAppContext();
+  const currentUser = useCurrentUser();
+  const { sessions, attendances, deleteSession } = useSessions();
+  const { praktikanList } = usePraktikanList();
 
-  const session = state.sessions.find((item) => item.id === id);
-  const currentUser = state.users.find((user) => user.id === state.currentUserId);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const session = sessions.find((item) => item.id === id);
+  const isAsisten = currentUser?.role === 'asisten';
 
   if (!session) {
     return (
       <Screen>
-        <TopBar title="Detail Sesi" back />
-        <EmptyNote message="Sesi tidak ditemukan." />
+        <TopBar title="Detail Sesi" back fallback="/jadwal" />
+        <EmptyNote message="Sesi praktikum tidak ditemukan atau telah dihapus." />
       </Screen>
     );
   }
 
-  const asisten = state.users.find((user) => user.id === session.asistenId);
-  const isAsisten = currentUser?.role === 'asisten';
-  const hadir = state.attendances
+  // Cari nama asisten (jika asisten sendiri atau dari user saat ini)
+  const asistenName = session.asistenId === currentUser?.id ? currentUser?.nama : 'Asisten Lab';
+
+  // Rekap kehadiran realtime
+  const hadir = attendances
     .filter((item) => item.sessionId === session.id)
-    .map((item) => ({ item, user: state.users.find((user) => user.id === item.userId) }));
+    .map((item) => {
+      const user = praktikanList.find((p) => p.id === item.userId);
+      return { item, user };
+    });
+
+  async function handleDelete() {
+    if (!session) return;
+    
+    try {
+      setDeleting(true);
+      await deleteSession(session.id);
+      setShowDeleteModal(false);
+      router.replace('/jadwal' as Href);
+    } catch (e) {
+      console.error('Gagal menghapus sesi:', e);
+      setDeleting(false);
+    }
+  }
 
   return (
     <Screen>
-      <TopBar title="Detail Sesi" back />
+      <TopBar
+        title="Detail Sesi"
+        back
+        fallback="/jadwal"
+        right={
+          isAsisten && session.status !== 'ditutup' ? (
+            <RoundButton
+              icon="create-outline"
+              onPress={() =>
+                router.push({
+                  pathname: '/jadwal-form' as any,
+                  params: { id: session.id },
+                })
+              }
+            />
+          ) : null
+        }
+      />
 
       <View style={styles.person}>
         <View style={styles.personText}>
-          <Text style={styles.personRole}>Asisten</Text>
-          <Text style={styles.personName}>{asisten?.nama ?? '-'}</Text>
+          <Text style={styles.personRole}>Asisten Pembimbing</Text>
+          <Text style={styles.personName}>{asistenName}</Text>
         </View>
-        <Avatar nama={asisten?.nama ?? '?'} size={68} />
+        <Avatar nama={asistenName} size={64} />
       </View>
 
       <View style={styles.hero}>
@@ -73,6 +117,7 @@ export default function SesiDetailScreen() {
         <Ionicons name="flask" size={64} color="rgba(226, 27, 208, 0.35)" />
       </View>
 
+      {/* Komponen Sesi & Presensi (PIC B & C) */}
       <SectionTitle title={isAsisten ? 'Kelola Sesi' : 'Presensi'} />
       {isAsisten ? (
         <SessionControls sessionId={session.id} />
@@ -80,6 +125,7 @@ export default function SesiDetailScreen() {
         <AttendanceAction sessionId={session.id} />
       )}
 
+      {/* Rekap Kehadiran untuk Asisten */}
       {isAsisten ? (
         <GlassCard style={styles.listCard}>
           <SectionTitle
@@ -96,7 +142,7 @@ export default function SesiDetailScreen() {
             hadir.map(({ item, user }) => (
               <View key={item.id} style={styles.attendee}>
                 <View style={styles.attendeeText}>
-                  <Text style={styles.attendeeName}>{user?.nama ?? '-'}</Text>
+                  <Text style={styles.attendeeName}>{user?.nama ?? 'Praktikan'}</Text>
                   <Text style={styles.attendeeNim}>{user?.nim ?? ''}</Text>
                 </View>
                 <Chip
@@ -110,6 +156,48 @@ export default function SesiDetailScreen() {
           )}
         </GlassCard>
       ) : null}
+
+      {/* Tombol Hapus Sesi (Hanya Asisten) */}
+      {isAsisten ? (
+        <Pressable
+          onPress={() => setShowDeleteModal(true)}
+          style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]}>
+          <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+          <Text style={styles.deleteBtnText}>Hapus Sesi</Text>
+        </Pressable>
+      ) : null}
+
+      {/* Dialog Konfirmasi Hapus Sesi */}
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Hapus sesi ini?</Text>
+            <Text style={styles.modalDesc}>
+              Sesi {session.praktikum} akan dihapus secara permanen beserta data kehadiran yang terkait.
+            </Text>
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}>
+                <Text style={styles.cancelBtnText}>Batal</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleDelete}
+                disabled={deleting}
+                style={({ pressed }) => [styles.confirmDeleteBtn, pressed && { opacity: 0.7 }]}>
+                <Text style={styles.confirmDeleteBtnText}>
+                  {deleting ? 'Menghapus…' : 'Hapus'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -129,9 +217,9 @@ const styles = StyleSheet.create({
   },
   personName: {
     color: Palette.text,
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: '600',
-    lineHeight: 36,
+    lineHeight: 32,
   },
   hero: {
     alignItems: 'center',
@@ -213,5 +301,79 @@ const styles = StyleSheet.create({
   attendeeNim: {
     color: Palette.textMuted,
     fontSize: 11,
+  },
+  deleteBtn: {
+    alignItems: 'center',
+    backgroundColor: Palette.ink,
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 8,
+    height: 52,
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  deleteBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    gap: 14,
+    maxWidth: 360,
+    padding: 24,
+    width: '100%',
+  },
+  modalTitle: {
+    color: Palette.text,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  modalDesc: {
+    color: Palette.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 6,
+  },
+  cancelBtn: {
+    alignItems: 'center',
+    borderColor: Palette.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flex: 1,
+    height: 48,
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    color: Palette.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  confirmDeleteBtn: {
+    alignItems: 'center',
+    backgroundColor: Palette.ink,
+    borderRadius: 999,
+    flex: 1,
+    height: 48,
+    justifyContent: 'center',
+  },
+  confirmDeleteBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
