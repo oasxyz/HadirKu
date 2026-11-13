@@ -1,20 +1,20 @@
 // SRS003 (PIC B — Yustinus): buka/tutup sesi, pindahkan ke Firestore dengan listener realtime.
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import * as Location from 'expo-location';
+import QRCode from 'react-native-qrcode-svg';
 
 import { DigitBoxes } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
 import { useSessions } from '@/hooks/use-sessions';
-// QR Component is commented out pending PM APK build with react-native-svg and QR package
-// import QRCode from 'react-native-qrcode-svg';
 
 type Confirmation = 'open' | 'close' | null;
 
 export default function SessionControls({ sessionId }: { sessionId: string }) {
   const { sessions, attendances, updateSession } = useSessions();
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
-  const [copied, setCopied] = useState(false);
+  const [processing, setProcessing] = useState(false);
   
   const session = sessions.find((item) => item.id === sessionId);
 
@@ -22,30 +22,34 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
     return null;
   }
 
-  async function handleShareOrCopy() {
-    if (!session?.kodeSesi) return;
-    try {
-      await Share.share({
-        message: session.kodeSesi,
-        title: `Kode Sesi Praktikum: ${session.kodeSesi}`,
-      });
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
-    } catch (_) {}
-  }
-
   const attendanceCount = attendances.filter(
     (attendance) => attendance.sessionId === sessionId,
   ).length;
 
   async function confirmAction() {
+    if (processing) return;
     try {
+      setProcessing(true);
       if (confirmation === 'open') {
+        let asistenCoords = null;
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+            asistenCoords = { lat: location.coords.latitude, lng: location.coords.longitude };
+          }
+        } catch (locErr) {
+          console.warn('Gagal mendapatkan lokasi asisten:', locErr);
+          // Graceful degradation: lanjut buka sesi walau GPS gagal
+        }
+
         const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+        // Gunakan type assertion (any) sementara menunggu PM update type Session di index.ts
         await updateSession(sessionId, {
           status: 'dibuka',
           kodeSesi: generatedCode,
-        });
+          asistenCoords,
+        } as any);
       } else if (confirmation === 'close') {
         await updateSession(sessionId, {
           status: 'ditutup',
@@ -54,6 +58,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
     } catch (error) {
       console.error('Gagal memperbarui status sesi:', error);
     } finally {
+      setProcessing(false);
       setConfirmation(null);
     }
   }
@@ -83,36 +88,21 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
           </View>
 
           <View style={styles.qrContainer}>
-             {/* <QRCode value={session.kodeSesi ?? ''} size={150} color={Palette.ink} /> */}
-             <Text style={styles.qrPlaceholderText}>[QR CODE BELUM TERPASANG DI APK]</Text>
+             <QRCode 
+               value={session.kodeSesi ?? '000000'} 
+               size={160} 
+               color={Palette.ink}
+               backgroundColor="#FFFFFF"
+               quietZone={16}
+             />
           </View>
 
           <View style={styles.codeBox}>
             <Text style={styles.codeLabel}>ATAU KETIK KODE</Text>
             <DigitBoxes value={session.kodeSesi ?? ''} color={Palette.primary} />
-
-            {/* Kode teks yang bisa ditekan lama (long-press) untuk copy langsung */}
-            <Text selectable={true} style={styles.rawCodeText}>
-              {session.kodeSesi}
-            </Text>
-
-            {/* Tombol Bagikan / Salin ke Clipboard */}
-            <Pressable
-              onPress={handleShareOrCopy}
-              style={({ pressed }) => [styles.copyBtn, pressed && styles.pressed]}>
-              <Ionicons
-                name={copied ? 'checkmark-circle-outline' : 'copy-outline'}
-                size={16}
-                color={Palette.primary}
-              />
-              <Text style={styles.copyBtnText}>
-                {copied ? 'Kode Siap Dibagikan' : 'Salin / Bagikan Kode'}
-              </Text>
-            </Pressable>
           </View>
 
           <View style={styles.attendanceSummary}>
-            <Ionicons name="people-outline" size={18} color={Palette.textSecondary} />
             <Text style={styles.attendanceText}>
               {attendanceCount} praktikan sudah hadir
             </Text>
@@ -132,6 +122,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
           onCancel={() => setConfirmation(null)}
           onConfirm={confirmAction}
           destructive
+          processing={processing}
         />
       </>
     );
@@ -159,6 +150,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
         confirmLabel="Buka Sesi"
         onCancel={() => setConfirmation(null)}
         onConfirm={confirmAction}
+        processing={processing}
       />
     </>
   );
@@ -172,6 +164,7 @@ function ConfirmationModal({
   onCancel,
   onConfirm,
   destructive = false,
+  processing = false,
 }: {
   visible: boolean;
   title: string;
@@ -180,6 +173,7 @@ function ConfirmationModal({
   onCancel: () => void;
   onConfirm: () => void;
   destructive?: boolean;
+  processing?: boolean;
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -188,13 +182,18 @@ function ConfirmationModal({
           <Text style={styles.modalTitle}>{title}</Text>
           <Text style={styles.modalMessage}>{message}</Text>
           <View style={styles.modalActions}>
-            <Pressable onPress={onCancel} style={styles.cancelButton}>
+            <Pressable onPress={onCancel} disabled={processing} style={styles.cancelButton}>
               <Text style={styles.cancelText}>Batal</Text>
             </Pressable>
             <Pressable
               onPress={onConfirm}
+              disabled={processing}
               style={[styles.confirmButton, destructive && styles.confirmDanger]}>
-              <Text style={styles.buttonText}>{confirmLabel}</Text>
+              {processing ? (
+                 <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                 <Text style={styles.buttonText}>{confirmLabel}</Text>
+              )}
             </Pressable>
           </View>
         </View>
@@ -236,49 +235,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    padding: Spacing.three,
     justifyContent: 'center',
     alignSelf: 'center',
-    width: 200,
-    height: 200,
-  },
-  qrPlaceholderText: {
-    color: Palette.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
+    overflow: 'hidden',
   },
   codeBox: {
     alignItems: 'center',
-    backgroundColor: Palette.cardMuted,
+    backgroundColor: Palette.primaryMuted,
     borderColor: Palette.border,
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.three,
-  },
-  rawCodeText: {
-    color: Palette.textMuted,
-    fontSize: 12,
-    letterSpacing: 2,
-    marginTop: Spacing.one,
-  },
-  copyBtn: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(226, 27, 208, 0.08)',
-    borderColor: 'rgba(226, 27, 208, 0.25)',
-    borderRadius: 999,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: Spacing.two,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-  },
-  copyBtnText: {
-    color: Palette.primary,
-    fontSize: 12,
-    fontWeight: '600',
   },
   codeLabel: {
     color: Palette.textMuted,
