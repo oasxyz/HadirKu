@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { doc, getDoc } from '@react-native-firebase/firestore';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import AttendanceAction from '@/components/attendance-action';
@@ -20,6 +21,7 @@ import { Palette } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useSessions } from '@/hooks/use-sessions';
 import { usePraktikanList } from '@/hooks/use-users';
+import { db, COLLECTIONS } from '@/services/firebase';
 import { formatRentangJam, formatTanggal } from '@/utils/format';
 
 export default function SesiDetailScreen() {
@@ -30,9 +32,38 @@ export default function SesiDetailScreen() {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [asistenPembimbing, setAsistenPembimbing] = useState<string | null>(null);
 
   const session = sessions.find((item) => item.id === id);
   const isAsisten = currentUser?.role === 'asisten';
+
+  // Fetch nama asisten asli jika user yang melihat adalah praktikan
+  useEffect(() => {
+    if (!session) return;
+
+    if (session.asistenId === currentUser?.id) {
+      setAsistenPembimbing(currentUser?.nama ?? 'Asisten Lab');
+      return;
+    }
+
+    let isMounted = true;
+    async function fetchAsisten() {
+      try {
+        const asistenDoc = await getDoc(doc(db, COLLECTIONS.users, session!.asistenId));
+        if (asistenDoc.exists() && isMounted) {
+          const data = asistenDoc.data();
+          setAsistenPembimbing(data?.nama ?? 'Asisten Lab');
+        }
+      } catch (err) {
+        console.warn('Gagal mengambil profil asisten:', err);
+      }
+    }
+
+    fetchAsisten();
+    return () => {
+      isMounted = false;
+    };
+  }, [session, currentUser]);
 
   if (!session) {
     return (
@@ -43,8 +74,8 @@ export default function SesiDetailScreen() {
     );
   }
 
-  // Cari nama asisten (jika asisten sendiri atau dari user saat ini)
-  const asistenName = session.asistenId === currentUser?.id ? currentUser?.nama : 'Asisten Lab';
+  // Nama asisten pembimbing
+  const asistenName = asistenPembimbing || (session.asistenId === currentUser?.id ? currentUser?.nama : 'Asisten Lab');
 
   // Rekap kehadiran realtime (diurutkan dari yang paling baru presensi)
   const hadir = attendances
