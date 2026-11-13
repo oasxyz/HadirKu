@@ -12,7 +12,20 @@
           "package_name": "com.oasxyz.HadirKu"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "621397636275-vvftgis03edkmeq8q2cquo3q44okeuo5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.oasxyz.HadirKu",
+            "certificate_hash": "63365cd6a8245cdb382d727b19e51f1af41dc996"
+          }
+        },
+        {
+          "client_id": "621397636275-keaukjep38c5gnel3qhbpqdi6rg562n8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDsCs0K9LDQoIgY_rJ-F4vXZ657HOzFCtw"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "621397636275-keaukjep38c5gnel3qhbpqdi6rg562n8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
