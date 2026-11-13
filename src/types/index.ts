@@ -21,6 +21,12 @@ export interface Kelas {
 
 export type SessionStatus = 'belum_dibuka' | 'dibuka' | 'ditutup';
 
+// Titik lokasi dalam derajat desimal (WGS84).
+export interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
 export interface Session {
   id: string;
   kelasId?: string;
@@ -33,6 +39,12 @@ export interface Session {
   pesertaIds: string[];
   kodeSesi: string | null;
   status: SessionStatus;
+  // Nama asisten, disalin saat sesi dibuat agar praktikan tidak perlu membaca dokumen `users` asisten
+  // (rules melarang praktikan membaca data pengguna lain). Sesi lama belum punya field ini.
+  asistenNama?: string;
+  // Lokasi asisten saat sesi dibuka, acuan jarak presensi. Null jika izin ditolak atau GPS gagal.
+  // Dikosongkan (null) saat sesi ditutup karena dokumen sesi terbaca oleh peserta.
+  asistenCoords?: Coordinates | null;
 }
 
 // Sprint 2: ID dokumen presensi = `${sessionId}_${userId}` (lihat services/firebase.ts)
@@ -42,6 +54,9 @@ export interface Attendance {
   sessionId: string;
   userId: string;
   waktuPresensi: string;
+  // Jarak praktikan ke asisten saat presensi, dalam meter (dibulatkan). Hanya jarak, bukan koordinat.
+  // Kosong jika lokasi tidak tersedia; kosong berarti tidak ditandai, bukan di luar batas.
+  jarakMeter?: number | null;
 }
 
 // Nilai enum di bawah sudah ditetapkan di SRS Sprint 2; jangan menambah nilai sendiri.

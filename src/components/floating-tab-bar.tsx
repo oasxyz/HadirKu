@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { shadow, type IconName } from '@/components/ui';
 import { Palette } from '@/constants/theme';
-import { useAppContext } from '@/context/app-context';
 import { useCurrentUser } from '@/context/auth-context';
 
 const TAB_META: Record<string, { label: string; icon: IconName }> = {
