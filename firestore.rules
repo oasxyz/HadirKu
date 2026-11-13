@@ -27,8 +27,8 @@ service cloud.firestore {
 
     // Koleksi Users
     match /users/{uid} {
-      // User bisa membaca profilnya sendiri; Asisten bisa membaca daftar user untuk rekap/peserta
-      allow read: if signedIn() && (request.auth.uid == uid || isAsisten());
+      // User bisa membaca profilnya sendiri; User yang signed-in bisa membaca profil asisten/praktikan untuk relasi jadwal/rekap
+      allow read: if signedIn();
       
       // Buat akun baru hanya untuk UID milik sendiri dengan role yang diizinkan
       allow create: if signedIn() && request.auth.uid == uid
