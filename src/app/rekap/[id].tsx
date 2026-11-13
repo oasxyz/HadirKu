@@ -82,6 +82,7 @@ export default function RekapDetailScreen() {
 
   const attendees = attendances
     .filter((item) => item.sessionId === session.id)
+    .sort((a, b) => new Date(b.waktuPresensi).getTime() - new Date(a.waktuPresensi).getTime())
     .map((item) => ({
       item,
       user: praktikanList.find((user) => user.id === item.userId),

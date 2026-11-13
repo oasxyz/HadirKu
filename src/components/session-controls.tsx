@@ -1,7 +1,7 @@
 // SRS003 (PIC B — Yustinus): buka/tutup sesi, pindahkan ke Firestore dengan listener realtime.
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { DigitBoxes } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
@@ -14,11 +14,24 @@ type Confirmation = 'open' | 'close' | null;
 export default function SessionControls({ sessionId }: { sessionId: string }) {
   const { sessions, attendances, updateSession } = useSessions();
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
+  const [copied, setCopied] = useState(false);
   
   const session = sessions.find((item) => item.id === sessionId);
 
   if (!session) {
     return null;
+  }
+
+  async function handleShareOrCopy() {
+    if (!session?.kodeSesi) return;
+    try {
+      await Share.share({
+        message: session.kodeSesi,
+        title: `Kode Sesi Praktikum: ${session.kodeSesi}`,
+      });
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch (_) {}
   }
 
   const attendanceCount = attendances.filter(
@@ -77,6 +90,25 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
           <View style={styles.codeBox}>
             <Text style={styles.codeLabel}>ATAU KETIK KODE</Text>
             <DigitBoxes value={session.kodeSesi ?? ''} color={Palette.primary} />
+
+            {/* Kode teks yang bisa ditekan lama (long-press) untuk copy langsung */}
+            <Text selectable={true} style={styles.rawCodeText}>
+              {session.kodeSesi}
+            </Text>
+
+            {/* Tombol Bagikan / Salin ke Clipboard */}
+            <Pressable
+              onPress={handleShareOrCopy}
+              style={({ pressed }) => [styles.copyBtn, pressed && styles.pressed]}>
+              <Ionicons
+                name={copied ? 'checkmark-circle-outline' : 'copy-outline'}
+                size={16}
+                color={Palette.primary}
+              />
+              <Text style={styles.copyBtnText}>
+                {copied ? 'Kode Siap Dibagikan' : 'Salin / Bagikan Kode'}
+              </Text>
+            </Pressable>
           </View>
 
           <View style={styles.attendanceSummary}>
@@ -224,6 +256,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.three,
+  },
+  rawCodeText: {
+    color: Palette.textMuted,
+    fontSize: 12,
+    letterSpacing: 2,
+    marginTop: Spacing.one,
+  },
+  copyBtn: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(226, 27, 208, 0.08)',
+    borderColor: 'rgba(226, 27, 208, 0.25)',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: Spacing.two,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+  },
+  copyBtnText: {
+    color: Palette.primary,
+    fontSize: 12,
+    fontWeight: '600',
   },
   codeLabel: {
     color: Palette.textMuted,

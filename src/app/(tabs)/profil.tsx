@@ -8,15 +8,14 @@ import { Palette } from '@/constants/theme';
 import { useAuth, useCurrentUser } from '@/context/auth-context';
 
 export default function ProfilScreen() {
-  const currentUser = useCurrentUser();
-  const { signOut } = useAuth();
+  const { firebaseUser, currentUser, signOut } = useAuth();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  if (!currentUser) {
-    return null;
-  }
-
-  const isAsisten = currentUser.role === 'asisten';
+  const displayName = currentUser?.nama || firebaseUser?.displayName || 'Pengguna';
+  const isAsisten = currentUser?.role === 'asisten';
+  const roleLabel = currentUser ? (isAsisten ? 'Asisten Laboratorium' : 'Praktikan') : 'Profil Belum Lengkap';
+  const emailDisplay = currentUser?.email || firebaseUser?.email || '-';
+  const nimDisplay = currentUser?.nim || 'Belum diisi';
 
   async function handleLogout() {
     setShowLogoutConfirm(false);
@@ -29,17 +28,17 @@ export default function ProfilScreen() {
       <TopBar title="Profil" />
 
       <View style={styles.header}>
-        <Avatar nama={currentUser.nama} size={104} />
-        <Text style={styles.name}>{currentUser.nama}</Text>
+        <Avatar nama={displayName} size={104} />
+        <Text style={styles.name}>{displayName}</Text>
         <Badge
-          label={isAsisten ? 'Asisten Laboratorium' : 'Praktikan'}
+          label={roleLabel}
           tone="outline"
         />
       </View>
 
       <View style={styles.list}>
-        <ListRow title="NIM" subtitle={currentUser.nim} />
-        <ListRow title="Email Institusi" subtitle={currentUser.email || `${currentUser.nim}@univ.ac.id`} />
+        <ListRow title="NIM" subtitle={nimDisplay} />
+        <ListRow title="Email Institusi" subtitle={emailDisplay} />
         <ListRow title="Versi Aplikasi" subtitle="2.0.0 (Sprint 2)" />
       </View>
 

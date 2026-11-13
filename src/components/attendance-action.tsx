@@ -1,28 +1,43 @@
 // SRS004 (PIC C — Varissa): presensi; simpan ke Firestore dengan ID dokumen sessionId_uid.
+import { doc, setDoc } from '@react-native-firebase/firestore';
 import React, { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Modal,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  Modal,
-  StyleSheet,
+  View,
 } from 'react-native';
+
 import { DigitBoxes, Illustration } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
-import { useAppContext } from '@/context/app-context';
+import { useCurrentUser } from '@/context/auth-context';
+import { useSessions } from '@/hooks/use-sessions';
+import { db, COLLECTIONS } from '@/services/firebase';
+import type { Session } from '@/types';
 
-export default function AttendanceAction({ sessionId }: { sessionId: string }) {
-  const { state, dispatch } = useAppContext();
+export default function AttendanceAction({
+  sessionId,
+  session: propSession,
+}: {
+  sessionId: string;
+  session?: Session;
+}) {
+  const currentUser = useCurrentUser();
+  const { sessions, attendances } = useSessions();
+
   const [kode, setKode] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const session = state.sessions.find((s) => s.id === sessionId);
-  const currentUserId = state.currentUserId;
+  const session = propSession ?? sessions.find((s) => s.id === sessionId);
+  const currentUserId = currentUser?.id ?? '';
 
-  const existingAttendance = state.attendances.find(
-    (a) => a.sessionId === sessionId && a.userId === currentUserId
+  const existingAttendance = attendances.find(
+    (a) => a.sessionId === sessionId && a.userId === currentUserId,
   );
 
   if (!session) return null;
@@ -70,10 +85,14 @@ export default function AttendanceAction({ sessionId }: { sessionId: string }) {
   }
 
   // === KONDISI 4: Sesi dibuka, belum hadir ===
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setErrorMsg(null);
     const trimmed = kode.trim();
 
+    if (!currentUser) {
+      setErrorMsg('Pengguna belum masuk');
+      return;
+    }
     if (trimmed.length === 0) {
       setErrorMsg('Masukkan kode sesi terlebih dahulu');
       return;
@@ -91,15 +110,26 @@ export default function AttendanceAction({ sessionId }: { sessionId: string }) {
       return;
     }
 
-    dispatch({
-      type: 'SUBMIT_ATTENDANCE',
-      sessionId,
-      userId: currentUserId,
-      kodeSesi: trimmed,
-    });
+    try {
+      setSubmitting(true);
+      // Format ID: sessionId_uid sesuai aturan firestore.rules
+      const attendanceId = `${sessionId}_${currentUserId}`;
+      const attendanceRef = doc(db, COLLECTIONS.attendances, attendanceId);
 
-    setKode('');
-    setShowSuccess(true);
+      await setDoc(attendanceRef, {
+        sessionId,
+        userId: currentUserId,
+        waktuPresensi: new Date().toISOString(),
+      });
+
+      setKode('');
+      setShowSuccess(true);
+    } catch (err: any) {
+      console.error('Gagal mencatat presensi Firestore:', err);
+      setErrorMsg(err?.message ?? 'Gagal mencatat presensi');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -112,26 +142,36 @@ export default function AttendanceAction({ sessionId }: { sessionId: string }) {
         <TextInput
           style={styles.hiddenInput}
           value={kode}
-          onChangeText={(text) => setKode(text.replace(/\D/g, ''))}
+          onChangeText={(text) => {
+            setKode(text.replace(/\D/g, ''));
+            if (errorMsg) setErrorMsg(null);
+          }}
           keyboardType="number-pad"
           maxLength={6}
           caretHidden
           accessibilityLabel="Kode sesi 6 digit"
+          editable={!submitting}
         />
       </View>
 
       {errorMsg && <Text style={styles.errorText}>{errorMsg}</Text>}
 
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.submitButtonText}>Kirim Presensi</Text>
+      <TouchableOpacity
+        style={[styles.submitButton, submitting && { opacity: 0.7 }]}
+        onPress={handleSubmit}
+        disabled={submitting}>
+        {submitting ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <Text style={styles.submitButtonText}>Kirim Presensi</Text>
+        )}
       </TouchableOpacity>
 
       <Modal
         visible={showSuccess}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowSuccess(false)}
-      >
+        onRequestClose={() => setShowSuccess(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Illustration icon="checkmark" />
@@ -139,8 +179,7 @@ export default function AttendanceAction({ sessionId }: { sessionId: string }) {
             <Text style={styles.modalSubtitle}>Kehadiran Anda telah tercatat.</Text>
             <TouchableOpacity
               style={styles.modalButton}
-              onPress={() => setShowSuccess(false)}
-            >
+              onPress={() => setShowSuccess(false)}>
               <Text style={styles.modalButtonText}>OK</Text>
             </TouchableOpacity>
           </View>

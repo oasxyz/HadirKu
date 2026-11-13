@@ -46,9 +46,10 @@ export default function SesiDetailScreen() {
   // Cari nama asisten (jika asisten sendiri atau dari user saat ini)
   const asistenName = session.asistenId === currentUser?.id ? currentUser?.nama : 'Asisten Lab';
 
-  // Rekap kehadiran realtime
+  // Rekap kehadiran realtime (diurutkan dari yang paling baru presensi)
   const hadir = attendances
     .filter((item) => item.sessionId === session.id)
+    .sort((a, b) => new Date(b.waktuPresensi).getTime() - new Date(a.waktuPresensi).getTime())
     .map((item) => {
       const user = praktikanList.find((p) => p.id === item.userId);
       return { item, user };
@@ -122,7 +123,7 @@ export default function SesiDetailScreen() {
       {isAsisten ? (
         <SessionControls sessionId={session.id} />
       ) : (
-        <AttendanceAction sessionId={session.id} />
+        <AttendanceAction sessionId={session.id} session={session} />
       )}
 
       {/* Rekap Kehadiran untuk Asisten */}

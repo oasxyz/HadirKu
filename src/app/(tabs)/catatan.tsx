@@ -1,20 +1,30 @@
 // SRS005 catatan (PIC C — Varissa): riwayat kehadiran milik pengguna yang login, dari Firestore.
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
-import { Chip, EmptyNote, ListRow, Screen, TopBar } from '@/components/ui';
-import { useAppContext } from '@/context/app-context';
+import { Chip, EmptyNote, GlassCard, ListRow, Screen, TopBar } from '@/components/ui';
+import { Palette } from '@/constants/theme';
+import { useCurrentUser } from '@/context/auth-context';
+import { useSessions } from '@/hooks/use-sessions';
 import { formatTanggal } from '@/utils/format';
 
 export default function CatatanScreen() {
-  const { state } = useAppContext();
-  const records = state.attendances
-    .filter((item) => item.userId === state.currentUserId)
-    .map((item) => ({ item, session: state.sessions.find((s) => s.id === item.sessionId) }));
+  const currentUser = useCurrentUser();
+  const { sessions, attendances, loading } = useSessions();
+
+  const currentUserId = currentUser?.id ?? '';
+  const records = attendances
+    .filter((item) => item.userId === currentUserId)
+    .sort((a, b) => new Date(b.waktuPresensi).getTime() - new Date(a.waktuPresensi).getTime())
+    .map((item) => ({ item, session: sessions.find((s) => s.id === item.sessionId) }));
 
   return (
     <Screen>
       <TopBar title="Catatan Kehadiran" />
-      {records.length === 0 ? (
+      {loading ? (
+        <GlassCard style={{ padding: 24, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Palette.primary} />
+        </GlassCard>
+      ) : records.length === 0 ? (
         <EmptyNote message="Kamu belum memiliki catatan kehadiran praktikum." />
       ) : (
         <View style={{ gap: 12 }}>

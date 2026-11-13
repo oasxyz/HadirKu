@@ -10,7 +10,7 @@ import { useAuth } from '@/context/auth-context';
 import { getAuthErrorMessage } from '@/utils/auth-error';
 
 export default function LoginScreen() {
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,6 +35,30 @@ export default function LoginScreen() {
       setLoading(false);
     }
   }
+
+  async function handleGoogleLogin() {
+  try {
+    setError(null);
+    setLoading(true);
+    const { isNewUser } = await signInWithGoogle();
+
+    if (isNewUser) {
+      // User Google baru -> wajib isi NIM & Peran terlebih dahulu
+      router.replace('/lengkapi-profil' as Href);
+    } else {
+      // User lama yang profilnya sudah ada di Firestore -> langsung ke jadwal
+      router.replace('/jadwal' as Href);
+    }
+  } catch (err: any) {
+    // Abaikan jika user menutup/membatalkan popup Google Sign In
+    if (err?.code === 'SIGN_IN_CANCELLED' || err?.message?.includes('cancelled')) {
+      return;
+    }
+    setError(getAuthErrorMessage(err));
+  } finally {
+    setLoading(false);
+  }
+}
 
   return (
     <Screen withTabBar={false}>
@@ -99,6 +123,16 @@ export default function LoginScreen() {
             disabled={loading}
           />
 
+          <Pressable
+            onPress={handleGoogleLogin}
+            disabled={loading}
+            style={({ pressed }) => [styles.googleBtn, pressed && { opacity: 0.7 }]}>
+            <Ionicons name="logo-google" size={18} color="#EA4335" />
+            <Text style={styles.googleBtnText}>
+              {loading ? 'Menghubungkan…' : 'Masuk dengan Google'}
+            </Text>
+          </Pressable>
+          
           <View style={styles.footer}>
             <Text style={styles.footerText}>Belum punya akun? </Text>
             <Pressable onPress={() => router.push('/register' as Href)}>
@@ -170,6 +204,23 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: 12,
+  },
+  googleBtn: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(110, 90, 150, 0.2)',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    height: 56,
+    justifyContent: 'center',
+    marginTop: -4,
+  },
+  googleBtnText: {
+    color: Palette.text,
+    fontSize: 15,
+    fontWeight: '600',
   },
   footer: {
     alignItems: 'center',

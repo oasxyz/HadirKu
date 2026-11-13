@@ -46,6 +46,7 @@ export default function RootLayout() {
               <Stack.Screen name="login" />
               <Stack.Screen name="register" />
               <Stack.Screen name="jadwal-form" />
+              <Stack.Screen name="lengkapi-profil" />
               {/* ===== SRS003/SRS005/SRS008 — Sesi realtime, rekap, pemeriksaan izin (PIC B — Yustinus) ===== */}
               <Stack.Screen name="rekap/[id]" />
               {/* ===== SRS004/SRS005/SRS006/SRS007 — Presensi, catatan, izin, AI (PIC C — Varissa) ===== */}
