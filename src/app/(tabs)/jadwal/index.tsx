@@ -1,13 +1,22 @@
-// SRS002 (PIC A — Yoas): beranda jadwal; data dari Firestore, CRUD sesi untuk asisten.
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Avatar, EmptyNote, GlassCard, Screen, SectionTitle, shadow } from '@/components/ui';
+import {
+  Avatar,
+  EmptyNote,
+  GlassCard,
+  Illustration,
+  RoundButton,
+  Screen,
+  SectionTitle,
+  shadow,
+} from '@/components/ui';
 import { Palette } from '@/constants/theme';
-import { useAppContext } from '@/context/app-context';
-import type { Session } from '@/types';
+import { useCurrentUser } from '@/context/auth-context';
+import { useSessions } from '@/hooks/use-sessions';
+import type { Attendance, Session } from '@/types';
 
 const HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -43,25 +52,49 @@ function openDetail(session: Session) {
 }
 
 export default function BerandaJadwalScreen() {
-  const { state } = useAppContext();
-  const currentUser = state.users.find((user) => user.id === state.currentUserId);
+  const currentUser = useCurrentUser();
+  const { sessions, attendances, loading, error } = useSessions();
+
   const isAsisten = currentUser?.role === 'asisten';
 
-  const sessions = state.sessions
-    .filter((session) =>
-      isAsisten
-        ? session.asistenId === currentUser?.id
-        : session.pesertaIds.includes(currentUser?.id ?? ''),
-    )
-    .sort((a, b) => (a.tanggal + a.jamMulai).localeCompare(b.tanggal + b.jamMulai));
+  // Urutkan sesi berdasarkan tanggal dan jam mulai
+  const sortedSessions = [...sessions].sort((a, b) =>
+    (a.tanggal + a.jamMulai).localeCompare(b.tanggal + b.jamMulai),
+  );
 
-  const featured = sessions.find((session) => session.status !== 'ditutup') ?? sessions[0];
+  const featured = sortedSessions.find((session) => session.status !== 'ditutup') ?? sortedSessions[0];
   const anchor = featured?.tanggal ?? toIso(new Date());
   const [selectedDate, setSelectedDate] = useState(anchor);
   const week = weekOf(anchor);
-  const sessionDates = new Set(sessions.map((session) => session.tanggal));
-  const daySessions = sessions.filter((session) => session.tanggal === selectedDate);
+  const sessionDates = new Set(sortedSessions.map((session) => session.tanggal));
+  const daySessions = sortedSessions.filter((session) => session.tanggal === selectedDate);
   const anchorDate = fromIso(anchor);
+
+  if (loading) {
+    return (
+      <Screen>
+        <View style={styles.loadingContainer}>
+          <GlassCard style={styles.loadingCard}>
+            <ActivityIndicator size="large" color={Palette.primary} />
+            <Text style={styles.loadingText}>Memuat jadwal praktikum…</Text>
+          </GlassCard>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (error) {
+    return (
+      <Screen>
+        <View style={styles.loadingContainer}>
+          <GlassCard style={styles.loadingCard}>
+            <Illustration icon="cloud-offline-outline" />
+            <Text style={styles.loadingText}>{error}</Text>
+          </GlassCard>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
@@ -72,19 +105,28 @@ export default function BerandaJadwalScreen() {
             {currentUser?.nama ?? '-'}
           </Text>
         </View>
-        <Pressable onPress={() => router.push('/profil' as Href)}>
-          <Avatar nama={currentUser?.nama ?? '?'} size={52} />
-        </Pressable>
+
+        <View style={styles.headerActions}>
+          {isAsisten ? (
+            <RoundButton
+              icon="add"
+              onPress={() => router.push('/jadwal-form' as Href)}
+            />
+          ) : null}
+          <Pressable onPress={() => router.push('/profil' as Href)}>
+            <Avatar nama={currentUser?.nama ?? '?'} size={48} />
+          </Pressable>
+        </View>
       </View>
 
       <SectionTitle title="Sesi Terdekat" />
       {featured ? (
-        <FeaturedCard session={featured} />
+        <FeaturedCard session={featured} attendances={attendances} />
       ) : (
         <EmptyNote
           message={
             isAsisten
-              ? 'Kamu belum menjadi asisten di sesi mana pun.'
+              ? 'Kamu belum membuat sesi praktikum mana pun. Tekan tombol + untuk menambahkan.'
               : 'Kamu belum terdaftar di sesi praktikum mana pun.'
           }
         />
@@ -158,9 +200,14 @@ export default function BerandaJadwalScreen() {
   );
 }
 
-function FeaturedCard({ session }: { session: Session }) {
-  const { state } = useAppContext();
-  const hadir = state.attendances.filter((item) => item.sessionId === session.id).length;
+function FeaturedCard({
+  session,
+  attendances,
+}: {
+  session: Session;
+  attendances: Attendance[];
+}) {
+  const hadir = attendances.filter((item) => item.sessionId === session.id).length;
   const total = session.pesertaIds.length;
   const ratio = total === 0 ? 0 : hadir / total;
   const tanggal = fromIso(session.tanggal);
@@ -222,6 +269,11 @@ const styles = StyleSheet.create({
   greeting: {
     flex: 1,
   },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
   hello: {
     color: Palette.textMuted,
     fontSize: 13,
@@ -230,6 +282,22 @@ const styles = StyleSheet.create({
     color: Palette.text,
     fontSize: 22,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 300,
+  },
+  loadingCard: {
+    alignItems: 'center',
+    borderRadius: 24,
+    gap: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 24,
+  },
+  loadingText: {
+    color: Palette.textSecondary,
+    fontSize: 14,
   },
   featured: {
     flexDirection: 'row',

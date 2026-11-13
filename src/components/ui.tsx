@@ -43,6 +43,7 @@ export function Screen({
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={true}
         contentContainerStyle={[
           styles.content,
           {
@@ -271,9 +272,7 @@ export function PrimaryButton({
 export function Illustration({ icon }: { icon: IconName }) {
   return (
     <View style={styles.illustration}>
-      <View style={styles.illustrationBig} />
-      <View style={styles.illustrationSmall} />
-      <Ionicons name={icon} size={46} color={Palette.primary} />
+      <Ionicons name={icon} size={42} color={Palette.primary} />
     </View>
   );
 }
@@ -437,27 +436,11 @@ const styles = StyleSheet.create({
   },
   illustration: {
     alignItems: 'center',
-    height: 96,
-    justifyContent: 'center',
-    width: 118,
-  },
-  illustrationBig: {
     backgroundColor: Palette.lavender,
     borderRadius: 999,
-    height: 80,
-    position: 'absolute',
-    right: 8,
-    top: 0,
-    width: 80,
-  },
-  illustrationSmall: {
-    backgroundColor: Palette.lilac,
-    borderRadius: 999,
-    bottom: 0,
-    height: 42,
-    left: 8,
-    position: 'absolute',
-    width: 42,
+    height: 76,
+    justifyContent: 'center',
+    width: 76,
   },
   digits: {
     flexDirection: 'row',
