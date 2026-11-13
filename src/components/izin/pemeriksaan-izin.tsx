@@ -1,31 +1,57 @@
-import { useState, useEffect } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
-import { router, type Href } from 'expo-router';
+import { useState, useEffect } from "react";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  ActivityIndicator,
+} from "react-native";
+import { router, type Href } from "expo-router";
 
-import { Avatar, Badge, Chip, EmptyNote, GlassCard, Illustration, Screen, TopBar } from '@/components/ui';
-import { Palette, Spacing } from '@/constants/theme';
-import { useCurrentUser } from '@/context/auth-context';
-import { useSessions } from '@/hooks/use-sessions';
-import { usePraktikanList } from '@/hooks/use-users';
-import { useLeaveRequests } from '@/hooks/use-leave-requests';
-import { formatTanggal } from '@/utils/format';
+import {
+  Avatar,
+  Badge,
+  Chip,
+  EmptyNote,
+  GlassCard,
+  Illustration,
+  Screen,
+  TopBar,
+} from "@/components/ui";
+import { Palette, Spacing } from "@/constants/theme";
+import { useCurrentUser } from "@/context/auth-context";
+import { useSessions } from "@/hooks/use-sessions";
+import { usePraktikanList } from "@/hooks/use-users";
+import { useLeaveRequests } from "@/hooks/use-leave-requests";
+import { formatTanggal } from "@/utils/format";
 
-type FilterWaktu = 'hari_ini' | 'minggu_ini' | 'semua';
-type Decision = { id: string; action: 'diterima' | 'ditolak' } | null;
+type FilterWaktu = "hari_ini" | "minggu_ini" | "semua";
+type Decision = { id: string; action: "diterima" | "ditolak" } | null;
 
 export function PemeriksaanIzin() {
   const currentUser = useCurrentUser();
-  const { sessions, loading: sessionsLoading, error: sessionsError } = useSessions();
+  const {
+    sessions,
+    loading: sessionsLoading,
+    error: sessionsError,
+  } = useSessions();
   const { praktikanList, loading: usersLoading } = usePraktikanList();
-  const { leaveRequests, loading: leaveLoading, error: leaveError, updateLeaveStatus } = useLeaveRequests();
-  
-  const [filter, setFilter] = useState<FilterWaktu>('hari_ini');
+  const {
+    leaveRequests,
+    loading: leaveLoading,
+    error: leaveError,
+    updateLeaveStatus,
+  } = useLeaveRequests();
+
+  const [filter, setFilter] = useState<FilterWaktu>("hari_ini");
   const [decision, setDecision] = useState<Decision>(null);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     if (!currentUser) {
-      router.replace('/login' as Href);
+      router.replace("/login" as Href);
     }
   }, [currentUser]);
 
@@ -47,9 +73,9 @@ export function PemeriksaanIzin() {
     return (
       <Screen>
         <TopBar title="Pemeriksaan Izin" />
-        <EmptyNote 
-          icon={<Illustration icon="cloud-offline-outline" />}
-          message="Tidak ada koneksi internet. Terjadi kesalahan, coba lagi." 
+        <EmptyNote
+          icon="cloud-offline-outline"
+          message="Tidak ada koneksi internet. Terjadi kesalahan, coba lagi."
         />
       </Screen>
     );
@@ -57,31 +83,38 @@ export function PemeriksaanIzin() {
 
   // 1. Filter by Assistant's Sessions
   const assistantSessionIds = new Set(
-    sessions.filter((s) => s.asistenId === currentUser.id).map((s) => s.id)
+    sessions.filter((s) => s.asistenId === currentUser.id).map((s) => s.id),
   );
-  const assistantRequests = leaveRequests.filter((req) => assistantSessionIds.has(req.sessionId));
+  const assistantRequests = leaveRequests.filter((req) =>
+    assistantSessionIds.has(req.sessionId),
+  );
 
   // 2. Filter by Time
   const now = new Date();
-  const todayString = now.toISOString().split('T')[0];
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const todayString = now.toISOString().split("T")[0];
+  const oneWeekAgo = new Date(
+    now.getTime() - 7 * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
   const filteredRequests = assistantRequests.filter((req) => {
-    if (filter === 'hari_ini') return req.createdAt.startsWith(todayString);
-    if (filter === 'minggu_ini') return req.createdAt >= oneWeekAgo;
+    if (filter === "hari_ini") return req.createdAt.startsWith(todayString);
+    if (filter === "minggu_ini") return req.createdAt >= oneWeekAgo;
     return true;
   });
 
   // 3. Group by Date
-  const grouped = filteredRequests.reduce((acc, req) => {
-    const dateStr = formatTanggal(req.createdAt.split('T')[0]);
-    if (!acc[dateStr]) acc[dateStr] = [];
-    acc[dateStr].push(req);
-    return acc;
-  }, {} as Record<string, typeof filteredRequests>);
+  const grouped = filteredRequests.reduce(
+    (acc, req) => {
+      const dateStr = formatTanggal(req.createdAt.split("T")[0]);
+      if (!acc[dateStr]) acc[dateStr] = [];
+      acc[dateStr].push(req);
+      return acc;
+    },
+    {} as Record<string, typeof filteredRequests>,
+  );
 
   const groupEntries = Object.entries(grouped).map(([date, reqs]) => {
-    const menungguCount = reqs.filter((r) => r.status === 'menunggu').length;
+    const menungguCount = reqs.filter((r) => r.status === "menunggu").length;
     return { date, reqs, menungguCount, rawDate: reqs[0].createdAt };
   });
 
@@ -97,7 +130,7 @@ export function PemeriksaanIzin() {
       setProcessing(true);
       await updateLeaveStatus(decision.id, decision.action, currentUser!.nama);
     } catch (err) {
-      console.error('Gagal memperbarui status izin:', err);
+      console.error("Gagal memperbarui status izin:", err);
     } finally {
       setProcessing(false);
       setDecision(null);
@@ -105,25 +138,41 @@ export function PemeriksaanIzin() {
   }
 
   const getEmptyMessage = () => {
-    if (filter === 'hari_ini') return 'Tidak ada pengajuan izin hari ini.';
-    if (filter === 'minggu_ini') return 'Tidak ada pengajuan izin minggu ini.';
-    return 'Belum ada pengajuan izin.';
+    if (filter === "hari_ini") return "Tidak ada pengajuan izin hari ini.";
+    if (filter === "minggu_ini") return "Tidak ada pengajuan izin minggu ini.";
+    return "Belum ada pengajuan izin.";
   };
 
   const renderBadgeStatus = (status: string) => {
-    if (status === 'diterima') return <Badge label="Diterima" tone="primary" />;
-    if (status === 'ditolak') return <Badge label="Ditolak" tone="dark" />;
+    if (status === "diterima") return <Badge label="Diterima" tone="primary" />;
+    if (status === "ditolak") return <Badge label="Ditolak" tone="dark" />;
     return <Badge label="Menunggu" tone="muted" />;
   };
 
   return (
     <Screen>
       <TopBar title="Pemeriksaan Izin" />
-      
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContainer}>
-        <Chip label="Hari ini" selected={filter === 'hari_ini'} onPress={() => setFilter('hari_ini')} />
-        <Chip label="Minggu ini" selected={filter === 'minggu_ini'} onPress={() => setFilter('minggu_ini')} />
-        <Chip label="Semua" selected={filter === 'semua'} onPress={() => setFilter('semua')} />
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterContainer}
+      >
+        <Chip
+          label="Hari ini"
+          selected={filter === "hari_ini"}
+          onPress={() => setFilter("hari_ini")}
+        />
+        <Chip
+          label="Minggu ini"
+          selected={filter === "minggu_ini"}
+          onPress={() => setFilter("minggu_ini")}
+        />
+        <Chip
+          label="Semua"
+          selected={filter === "semua"}
+          onPress={() => setFilter("semua")}
+        />
       </ScrollView>
 
       {groupEntries.length === 0 ? (
@@ -135,26 +184,34 @@ export function PemeriksaanIzin() {
               <View style={styles.groupHeader}>
                 <Text style={styles.groupDate}>{group.date}</Text>
                 <Text style={styles.groupCount}>
-                  {group.menungguCount > 0 ? `${group.menungguCount} menunggu` : 'Selesai'}
+                  {group.menungguCount > 0
+                    ? `${group.menungguCount} menunggu`
+                    : "Selesai"}
                 </Text>
               </View>
 
               {group.reqs.map((req) => {
-                const praktikan = praktikanList.find((p) => p.id === req.userId);
+                const praktikan = praktikanList.find(
+                  (p) => p.id === req.userId,
+                );
                 const session = sessions.find((s) => s.id === req.sessionId);
-                const aiBadgeTone = req.kategoriAi ? 'outline' : 'muted';
-                const aiBadgeLabel = req.kategoriAi 
-                  ? req.kategoriAi.charAt(0).toUpperCase() + req.kategoriAi.slice(1) 
-                  : 'Belum terklasifikasi';
+                const aiBadgeTone = req.kategoriAi ? "outline" : "muted";
+                const aiBadgeLabel = req.kategoriAi
+                  ? req.kategoriAi.charAt(0).toUpperCase() +
+                    req.kategoriAi.slice(1)
+                  : "Belum terklasifikasi";
 
                 return (
                   <GlassCard key={req.id} style={styles.reqCard}>
                     <View style={styles.reqHeader}>
-                      <Avatar nama={praktikan?.nama ?? '?'} size={40} />
+                      <Avatar nama={praktikan?.nama ?? "?"} size={40} />
                       <View style={styles.reqInfo}>
-                        <Text style={styles.reqName}>{praktikan?.nama ?? 'Praktikan'}</Text>
+                        <Text style={styles.reqName}>
+                          {praktikan?.nama ?? "Praktikan"}
+                        </Text>
                         <Text style={styles.reqSession}>
-                          {session?.praktikum ?? ''} · {session ? formatTanggal(session.tanggal) : ''}
+                          {session?.praktikum ?? ""} ·{" "}
+                          {session ? formatTanggal(session.tanggal) : ""}
                         </Text>
                       </View>
                       {renderBadgeStatus(req.status)}
@@ -167,22 +224,38 @@ export function PemeriksaanIzin() {
                       <Badge label={aiBadgeLabel} tone={aiBadgeTone} />
                     </View>
 
-                    {req.status === 'menunggu' ? (
+                    {req.status === "menunggu" ? (
                       <View style={styles.actionButtons}>
-                        <Pressable 
-                          style={({ pressed }) => [styles.btnSecondary, pressed && styles.btnPressed]}
-                          onPress={() => setDecision({ id: req.id, action: 'ditolak' })}>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.btnSecondary,
+                            pressed && styles.btnPressed,
+                          ]}
+                          onPress={() =>
+                            setDecision({ id: req.id, action: "ditolak" })
+                          }
+                        >
                           <Text style={styles.btnSecondaryText}>Tolak</Text>
                         </Pressable>
-                        <Pressable 
-                          style={({ pressed }) => [styles.btnPrimary, pressed && styles.btnPressed]}
-                          onPress={() => setDecision({ id: req.id, action: 'diterima' })}>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.btnPrimary,
+                            pressed && styles.btnPressed,
+                          ]}
+                          onPress={() =>
+                            setDecision({ id: req.id, action: "diterima" })
+                          }
+                        >
                           <Text style={styles.btnPrimaryText}>Terima</Text>
                         </Pressable>
                       </View>
                     ) : (
                       <Text style={styles.decisionText}>
-                        Diputuskan {req.diputuskanOleh} · {new Date(req.diputuskanAt!).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                        Diputuskan {req.diputuskanOleh} ·{" "}
+                        {new Date(req.diputuskanAt!).toLocaleTimeString(
+                          "id-ID",
+                          { hour: "2-digit", minute: "2-digit" },
+                        )}
                       </Text>
                     )}
                   </GlassCard>
@@ -194,28 +267,43 @@ export function PemeriksaanIzin() {
       )}
 
       {/* Confirmation Modal */}
-      <Modal visible={!!decision} transparent animationType="fade" onRequestClose={() => setDecision(null)}>
+      <Modal
+        visible={!!decision}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDecision(null)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>
-              {decision?.action === 'diterima' ? 'Terima Izin?' : 'Tolak Izin?'}
+              {decision?.action === "diterima" ? "Terima Izin?" : "Tolak Izin?"}
             </Text>
             <Text style={styles.modalMessage}>
-              Keputusan ini akan disimpan dan dapat dilihat langsung oleh praktikan.
+              Keputusan ini akan disimpan dan dapat dilihat langsung oleh
+              praktikan.
             </Text>
             <View style={styles.modalActions}>
-              <Pressable 
-                onPress={() => setDecision(null)} 
+              <Pressable
+                onPress={() => setDecision(null)}
                 disabled={processing}
-                style={styles.cancelButton}>
+                style={styles.cancelButton}
+              >
                 <Text style={styles.cancelText}>Batal</Text>
               </Pressable>
               <Pressable
                 onPress={handleConfirm}
                 disabled={processing}
-                style={[styles.confirmButton, decision?.action === 'ditolak' && styles.confirmDanger]}>
+                style={[
+                  styles.confirmButton,
+                  decision?.action === "ditolak" && styles.confirmDanger,
+                ]}
+              >
                 <Text style={styles.confirmText}>
-                  {processing ? 'Memproses...' : (decision?.action === 'diterima' ? 'Terima' : 'Tolak')}
+                  {processing
+                    ? "Memproses..."
+                    : decision?.action === "diterima"
+                      ? "Terima"
+                      : "Tolak"}
                 </Text>
               </Pressable>
             </View>
@@ -228,7 +316,7 @@ export function PemeriksaanIzin() {
 
 const styles = StyleSheet.create({
   centerCard: {
-    alignItems: 'center',
+    alignItems: "center",
     padding: Spacing.four,
     gap: Spacing.two,
   },
@@ -247,15 +335,15 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   groupHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: Spacing.one,
   },
   groupDate: {
     color: Palette.text,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   groupCount: {
     color: Palette.textSecondary,
@@ -265,8 +353,8 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   reqHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.two,
   },
   reqInfo: {
@@ -275,7 +363,7 @@ const styles = StyleSheet.create({
   reqName: {
     color: Palette.text,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   reqSession: {
     color: Palette.textSecondary,
@@ -285,30 +373,30 @@ const styles = StyleSheet.create({
     color: Palette.text,
     fontSize: 14,
     lineHeight: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
     padding: Spacing.two,
     borderRadius: 12,
   },
   aiSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.two,
   },
   aiLabel: {
     color: Palette.textSecondary,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   actionButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Spacing.two,
     marginTop: Spacing.one,
   },
   btnSecondary: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
     borderColor: Palette.border,
     borderWidth: 1,
     borderRadius: 999,
@@ -317,20 +405,20 @@ const styles = StyleSheet.create({
   btnSecondaryText: {
     color: Palette.text,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   btnPrimary: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: Palette.primary,
     borderRadius: 999,
     paddingVertical: 12,
   },
   btnPrimaryText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   btnPressed: {
     opacity: 0.7,
@@ -338,69 +426,69 @@ const styles = StyleSheet.create({
   decisionText: {
     color: Palette.textSecondary,
     fontSize: 13,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: Spacing.one,
   },
   modalOverlay: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(30, 20, 50, 0.4)',
+    alignItems: "center",
+    backgroundColor: "rgba(30, 20, 50, 0.4)",
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: Spacing.four,
   },
   modalCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 24,
     padding: Spacing.four,
-    width: '100%',
-    boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
+    width: "100%",
+    boxShadow: "0 8px 24px rgba(110, 70, 160, 0.10)",
   },
   modalTitle: {
     color: Palette.text,
     fontSize: 18,
-    fontWeight: '800',
-    textAlign: 'center',
+    fontWeight: "800",
+    textAlign: "center",
   },
   modalMessage: {
     color: Palette.textSecondary,
     fontSize: 14,
     lineHeight: 21,
     marginTop: Spacing.two,
-    textAlign: 'center',
+    textAlign: "center",
   },
   modalActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Spacing.two,
     marginTop: Spacing.four,
   },
   cancelButton: {
-    alignItems: 'center',
+    alignItems: "center",
     borderColor: Palette.border,
     borderRadius: 999,
     borderWidth: 1,
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingVertical: 12,
   },
   cancelText: {
     color: Palette.textSecondary,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   confirmButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: Palette.primary,
     borderRadius: 999,
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingVertical: 12,
   },
   confirmDanger: {
     backgroundColor: Palette.ink,
   },
   confirmText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });
