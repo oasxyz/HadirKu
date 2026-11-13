@@ -1,21 +1,15 @@
 // SRS003 (PIC B — Yustinus): buka/tutup sesi, pindahkan ke Firestore dengan listener realtime.
-import { useState, useEffect } from "react";
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  ActivityIndicator,
-} from "react-native";
-import * as Location from "expo-location";
-import QRCode from "react-native-qrcode-svg";
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as Location from 'expo-location';
+import QRCode from 'react-native-qrcode-svg';
 
-import { DigitBoxes } from "@/components/ui";
-import { Palette, Spacing } from "@/constants/theme";
-import { useSessions } from "@/hooks/use-sessions";
+import { DigitBoxes } from '@/components/ui';
+import { Palette, Spacing } from '@/constants/theme';
+import { useSessions } from '@/hooks/use-sessions';
+import { getBatasTutupSesi, sesiSudahBerakhir } from '@/utils/sesi';
 
-type Confirmation = "open" | "close" | null;
+type Confirmation = 'open' | 'close' | null;
 
 export default function SessionControls({ sessionId }: { sessionId: string }) {
   const { sessions, attendances, updateSession } = useSessions();
@@ -24,28 +18,33 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
 
   const session = sessions.find((item) => item.id === sessionId);
 
-  // Implementasi 2: Auto-close session jika waktu sudah melewati jamSelesai
-  useEffect(() => {
-    if (session && session.status === "dibuka") {
-      const [year, month, day] = session.tanggal.split("-").map(Number);
-      const [endHour, endMin] = session.jamSelesai.split(":").map(Number);
-      const endTime = new Date(year, month - 1, day, endHour, endMin);
-      const now = new Date();
+  const tutupSesi = useCallback(async () => {
+    await updateSession(sessionId, {
+      status: 'ditutup',
+      asistenCoords: null,
+    });
+  }, [sessionId, updateSession]);
 
-      if (now.getTime() > endTime.getTime()) {
-        // Jika asisten login kembali dan sesi sudah kedaluwarsa, otomatis update ke 'ditutup'
-        updateSession(session.id, { status: "ditutup" }).catch(console.error);
-      } else {
-        // Pasang timer agar otomatis tertutup jika asisten tetap berada di layar ini sampai waktu habis
-        const timeUntilClose = endTime.getTime() - now.getTime();
-        const timer = setTimeout(() => {
-          updateSession(session.id, { status: "ditutup" }).catch(console.error);
-        }, timeUntilClose);
-        return () => clearTimeout(timer);
-      }
+  useEffect(() => {
+    if (!session || session.status !== 'dibuka') return;
+
+    if (sesiSudahBerakhir(session)) {
+      tutupSesi().catch((error) => {
+        console.error('Gagal menutup sesi otomatis:', error);
+      });
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.status, session?.tanggal, session?.jamSelesai, session?.id]);
+
+    const batasTutup = getBatasTutupSesi(session);
+    const sisaWaktu = Math.max(0, batasTutup.getTime() - Date.now());
+    const timer = setTimeout(() => {
+      tutupSesi().catch((error) => {
+        console.error('Gagal menutup sesi otomatis:', error);
+      });
+    }, sisaWaktu);
+
+    return () => clearTimeout(timer);
+  }, [session, tutupSesi]);
 
   if (!session) return null;
 
@@ -57,11 +56,11 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
     if (processing) return;
     try {
       setProcessing(true);
-      if (confirmation === "open") {
-        let asistenCoords = null;
+      if (confirmation === 'open') {
+        let asistenCoords: { lat: number; lng: number } | null = null;
         try {
           const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status === "granted") {
+          if (status === 'granted') {
             const location = await Location.getCurrentPositionAsync({
               accuracy: Location.Accuracy.High,
             });
@@ -71,31 +70,27 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
             };
           }
         } catch (locErr) {
-          console.warn("Gagal mendapatkan lokasi asisten:", locErr);
+          console.warn('Gagal mendapatkan lokasi asisten:', locErr);
         }
 
-        const generatedCode = Math.floor(
-          100000 + Math.random() * 900000,
-        ).toString();
+        const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
         await updateSession(sessionId, {
-          status: "dibuka",
+          status: 'dibuka',
           kodeSesi: generatedCode,
           asistenCoords,
-        } as any);
-      } else if (confirmation === "close") {
-        await updateSession(sessionId, {
-          status: "ditutup",
         });
+      } else if (confirmation === 'close') {
+        await tutupSesi();
       }
     } catch (error) {
-      console.error("Gagal memperbarui status sesi:", error);
+      console.error('Gagal memperbarui status sesi:', error);
     } finally {
       setProcessing(false);
       setConfirmation(null);
     }
   }
 
-  if (session.status === "ditutup") {
+  if (session.status === 'ditutup') {
     return (
       <View style={[styles.card, styles.closedCard]}>
         <View style={styles.statusCopy}>
@@ -108,34 +103,32 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
     );
   }
 
-  if (session.status === "dibuka") {
+  if (session.status === 'dibuka') {
     return (
       <>
         <View style={[styles.card, styles.openCard]}>
           <View style={styles.statusCopy}>
             <Text style={styles.cardTitle}>Sesi sedang dibuka</Text>
             <Text style={styles.cardDescription}>
-              Minta praktikan memindai QR ini. Kalau kameranya bermasalah,
-              bacakan kode di bawahnya.
+              Minta praktikan memindai QR ini. Kalau kameranya bermasalah, bacakan kode di bawahnya.
             </Text>
           </View>
 
-          <View style={styles.qrContainer}>
-            <QRCode
-              value={session.kodeSesi ?? "000000"}
-              size={160}
-              color={Palette.ink}
-              backgroundColor="#FFFFFF"
-              quietZone={16}
-            />
-          </View>
+          {session.kodeSesi ? (
+            <View style={styles.qrContainer}>
+              <QRCode
+                value={session.kodeSesi}
+                size={160}
+                color={Palette.ink}
+                backgroundColor="#FFFFFF"
+                quietZone={16}
+              />
+            </View>
+          ) : null}
 
           <View style={styles.codeBox}>
             <Text style={styles.codeLabel}>ATAU KETIK KODE</Text>
-            <DigitBoxes
-              value={session.kodeSesi ?? ""}
-              color={Palette.primary}
-            />
+            <DigitBoxes value={session.kodeSesi ?? ''} color={Palette.primary} />
           </View>
 
           <View style={styles.attendanceSummary}>
@@ -145,18 +138,14 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
           </View>
 
           <Pressable
-            onPress={() => setConfirmation("close")}
-            style={({ pressed }) => [
-              styles.dangerButton,
-              pressed && styles.pressed,
-            ]}
-          >
+            onPress={() => setConfirmation('close')}
+            style={({ pressed }) => [styles.dangerButton, pressed && styles.pressed]}>
             <Text style={styles.buttonText}>Tutup Sesi</Text>
           </Pressable>
         </View>
 
         <ConfirmationModal
-          visible={confirmation === "close"}
+          visible={confirmation === 'close'}
           title="Tutup sesi praktikum?"
           message={`Sebanyak ${attendanceCount} praktikan sudah tercatat hadir. Setelah ditutup, sesi tidak dapat dibuka kembali.`}
           confirmLabel="Tutup Sesi"
@@ -175,24 +164,19 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
         <View style={styles.statusCopy}>
           <Text style={styles.cardTitle}>Sesi belum dibuka</Text>
           <Text style={styles.cardDescription}>
-            Buka sesi untuk membuat kode presensi dan menerima kehadiran
-            praktikan.
+            Buka sesi untuk membuat kode presensi dan menerima kehadiran praktikan.
           </Text>
         </View>
 
         <Pressable
-          onPress={() => setConfirmation("open")}
-          style={({ pressed }) => [
-            styles.primaryButton,
-            pressed && styles.pressed,
-          ]}
-        >
+          onPress={() => setConfirmation('open')}
+          style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
           <Text style={styles.buttonText}>Buka Sesi</Text>
         </Pressable>
       </View>
 
       <ConfirmationModal
-        visible={confirmation === "open"}
+        visible={confirmation === 'open'}
         title="Buka sesi praktikum?"
         message="Kode sesi 6 digit akan dibuat dan praktikan dapat mulai melakukan presensi."
         confirmLabel="Buka Sesi"
@@ -224,32 +208,19 @@ function ConfirmationModal({
   processing?: boolean;
 }) {
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onCancel}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>{title}</Text>
           <Text style={styles.modalMessage}>{message}</Text>
           <View style={styles.modalActions}>
-            <Pressable
-              onPress={onCancel}
-              disabled={processing}
-              style={styles.cancelButton}
-            >
+            <Pressable onPress={onCancel} disabled={processing} style={styles.cancelButton}>
               <Text style={styles.cancelText}>Batal</Text>
             </Pressable>
             <Pressable
               onPress={onConfirm}
               disabled={processing}
-              style={[
-                styles.confirmButton,
-                destructive && styles.confirmDanger,
-              ]}
-            >
+              style={[styles.confirmButton, destructive && styles.confirmDanger]}>
               {processing ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
@@ -266,18 +237,18 @@ function ConfirmationModal({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Palette.card,
-    borderColor: "rgba(255, 255, 255, 0.9)",
+    borderColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 24,
     borderWidth: 1,
     padding: Spacing.three,
     gap: Spacing.three,
-    boxShadow: "0 8px 24px rgba(110, 70, 160, 0.10)",
+    boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
   },
   openCard: {
     borderColor: Palette.primary,
   },
   closedCard: {
-    borderColor: "rgba(23, 21, 28, 0.3)",
+    borderColor: 'rgba(23, 21, 28, 0.3)',
   },
   statusCopy: {
     gap: Spacing.one,
@@ -285,7 +256,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     color: Palette.text,
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   cardDescription: {
     color: Palette.textSecondary,
@@ -293,15 +264,15 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   qrContainer: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    justifyContent: "center",
-    alignSelf: "center",
-    overflow: "hidden",
+    justifyContent: 'center',
+    alignSelf: 'center',
+    overflow: 'hidden',
   },
   codeBox: {
-    alignItems: "center",
+    alignItems: 'center',
     backgroundColor: Palette.primaryMuted,
     borderColor: Palette.border,
     borderRadius: 14,
@@ -312,13 +283,13 @@ const styles = StyleSheet.create({
   codeLabel: {
     color: Palette.textMuted,
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: '700',
     letterSpacing: 1.5,
     marginBottom: Spacing.two,
   },
   attendanceSummary: {
-    alignItems: "center",
-    flexDirection: "row",
+    alignItems: 'center',
+    flexDirection: 'row',
     gap: Spacing.two,
   },
   attendanceText: {
@@ -326,85 +297,85 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   primaryButton: {
-    alignItems: "center",
+    alignItems: 'center',
     backgroundColor: Palette.primary,
     borderRadius: 999,
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: Spacing.two,
-    justifyContent: "center",
+    justifyContent: 'center',
     paddingVertical: 13,
   },
   dangerButton: {
-    alignItems: "center",
+    alignItems: 'center',
     backgroundColor: Palette.ink,
     borderRadius: 999,
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: Spacing.two,
-    justifyContent: "center",
+    justifyContent: 'center',
     paddingVertical: 13,
   },
   buttonText: {
-    color: "#FFFFFF",
+    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   pressed: {
     opacity: 0.75,
   },
   modalOverlay: {
-    alignItems: "center",
-    backgroundColor: "rgba(30, 20, 50, 0.4)",
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 20, 50, 0.4)',
     flex: 1,
-    justifyContent: "center",
+    justifyContent: 'center',
     padding: Spacing.four,
   },
   modalCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "rgba(255, 255, 255, 0.9)",
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 24,
     borderWidth: 1,
     padding: Spacing.four,
-    width: "100%",
-    boxShadow: "0 8px 24px rgba(110, 70, 160, 0.10)",
+    width: '100%',
+    boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
   },
   modalTitle: {
     color: Palette.text,
     fontSize: 18,
-    fontWeight: "800",
-    textAlign: "center",
+    fontWeight: '800',
+    textAlign: 'center',
   },
   modalMessage: {
     color: Palette.textSecondary,
     fontSize: 14,
     lineHeight: 21,
     marginTop: Spacing.two,
-    textAlign: "center",
+    textAlign: 'center',
   },
   modalActions: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: Spacing.two,
     marginTop: Spacing.four,
   },
   cancelButton: {
-    alignItems: "center",
+    alignItems: 'center',
     borderColor: Palette.border,
     borderRadius: 999,
     borderWidth: 1,
     flex: 1,
-    justifyContent: "center",
+    justifyContent: 'center',
     paddingVertical: 12,
   },
   cancelText: {
     color: Palette.textSecondary,
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   confirmButton: {
-    alignItems: "center",
+    alignItems: 'center',
     backgroundColor: Palette.primary,
     borderRadius: 999,
     flex: 1,
-    justifyContent: "center",
+    justifyContent: 'center',
     paddingVertical: 12,
   },
   confirmDanger: {

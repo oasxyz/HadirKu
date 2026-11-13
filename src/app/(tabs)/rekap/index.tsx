@@ -9,7 +9,6 @@ import {
   ListRow,
   Screen,
   TopBar,
-  Illustration,
 } from "@/components/ui";
 import { Palette } from "@/constants/theme";
 import { useCurrentUser } from "@/context/auth-context";

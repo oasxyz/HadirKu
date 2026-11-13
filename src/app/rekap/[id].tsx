@@ -14,6 +14,7 @@ import {
   SectionTitle,
   TopBar,
 } from '@/components/ui';
+import { BATAS_JARAK_METER } from '@/constants/lokasi';
 import { Palette } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useSessions } from '@/hooks/use-sessions';
@@ -35,7 +36,7 @@ export default function RekapDetailScreen() {
   }, [currentUser]);
 
   if (!currentUser) {
-    return null; 
+    return null;
   }
 
   if (sessionsLoading || usersLoading) {
@@ -54,9 +55,9 @@ export default function RekapDetailScreen() {
     return (
       <Screen withTabBar={false}>
         <TopBar title="Rekap" back fallback="/rekap" />
-        <EmptyNote 
+        <EmptyNote
           icon="cloud-offline-outline"
-          message="Tidak ada koneksi internet. Terjadi kesalahan, coba lagi." 
+          message="Tidak ada koneksi internet. Terjadi kesalahan, coba lagi."
         />
       </Screen>
     );
@@ -75,8 +76,12 @@ export default function RekapDetailScreen() {
 
   const attendees = attendances
     .filter((item) => item.sessionId === session.id)
+    .sort(
+      (a, b) =>
+        new Date(b.waktuPresensi).getTime() - new Date(a.waktuPresensi).getTime(),
+    )
     .map((item) => ({ item, user: praktikanList.find((user) => user.id === item.userId) }));
-    
+
   const total = session.pesertaIds.length;
   const hadir = attendees.length;
   const belum = Math.max(total - hadir, 0);
@@ -119,10 +124,12 @@ export default function RekapDetailScreen() {
           <Text style={styles.empty}>Belum ada praktikan yang melakukan presensi.</Text>
         ) : (
           attendees.map(({ item, user }) => {
-            // Gunakan (any) untuk akses jarakMeter sampai PM menambahkan tipe ini ke Attendance interface.
-            const jarakMeter = (item as any).jarakMeter;
-            const isSuspicious = jarakMeter !== undefined && jarakMeter !== null && jarakMeter > 60;
-            
+            const jarakMeter = item.jarakMeter;
+            const isSuspicious =
+              jarakMeter !== undefined &&
+              jarakMeter !== null &&
+              jarakMeter > BATAS_JARAK_METER;
+
             return (
               <View key={item.id} style={styles.row}>
                 <View style={styles.rowText}>

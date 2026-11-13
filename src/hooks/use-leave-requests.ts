@@ -14,14 +14,20 @@ import type { LeaveRequest } from '@/types';
 
 export function useLeaveRequests() {
   const currentUser = useCurrentUser();
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<{
+    userId: string | null;
+    leaveRequests: LeaveRequest[];
+    loading: boolean;
+    error: string | null;
+  }>({
+    userId: null,
+    leaveRequests: [],
+    loading: true,
+    error: null,
+  });
 
   useEffect(() => {
     if (!currentUser) {
-      setLeaveRequests([]);
-      setLoading(false);
       return;
     }
 
@@ -52,14 +58,21 @@ export function useLeaveRequests() {
             diputuskanAt: data.diputuskanAt ?? null,
           });
         });
-        setLeaveRequests(list);
-        setLoading(false);
-        setError(null);
+        setState({
+          userId: currentUser.id,
+          leaveRequests: list,
+          loading: false,
+          error: null,
+        });
       },
       (err) => {
         console.error('Gagal mengambil data izin Firestore:', err);
-        setError('Gagal memuat data pengajuan izin');
-        setLoading(false);
+        setState({
+          userId: currentUser.id,
+          leaveRequests: [],
+          loading: false,
+          error: 'Gagal memuat data pengajuan izin',
+        });
       },
     );
 
@@ -74,6 +87,11 @@ export function useLeaveRequests() {
       diputuskanAt: new Date().toISOString(),
     });
   }
+
+  const isSynced = currentUser !== null && state.userId === currentUser.id;
+  const leaveRequests = isSynced ? state.leaveRequests : [];
+  const loading = currentUser === null ? false : isSynced ? state.loading : true;
+  const error = isSynced ? state.error : null;
 
   return { leaveRequests, loading, error, updateLeaveStatus };
 }

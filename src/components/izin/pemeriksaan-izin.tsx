@@ -16,7 +16,6 @@ import {
   Chip,
   EmptyNote,
   GlassCard,
-  Illustration,
   Screen,
   TopBar,
 } from "@/components/ui";
@@ -29,6 +28,24 @@ import { formatTanggal } from "@/utils/format";
 
 type FilterWaktu = "hari_ini" | "minggu_ini" | "semua";
 type Decision = { id: string; action: "diterima" | "ditolak" } | null;
+
+function toLocalDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getLocalDateKeyFromIso(isoOrDateStr: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoOrDateStr)) {
+    return isoOrDateStr;
+  }
+  const parsed = new Date(isoOrDateStr);
+  if (Number.isNaN(parsed.getTime())) {
+    return isoOrDateStr.split("T")[0];
+  }
+  return toLocalDateKey(parsed);
+}
 
 export function PemeriksaanIzin() {
   const currentUser = useCurrentUser();
@@ -69,13 +86,19 @@ export function PemeriksaanIzin() {
     );
   }
 
-  if (sessionsError || leaveError) {
+  const loadError = sessionsError || leaveError;
+  if (loadError) {
+    const isOffline = /offline|network|internet|koneksi|unavailable/i.test(loadError);
     return (
       <Screen>
         <TopBar title="Pemeriksaan Izin" />
         <EmptyNote
-          icon="cloud-offline-outline"
-          message="Tidak ada koneksi internet. Terjadi kesalahan, coba lagi."
+          icon={isOffline ? "cloud-offline-outline" : "alert-circle-outline"}
+          message={
+            isOffline
+              ? "Tidak ada koneksi internet. Periksa jaringan lalu coba lagi."
+              : `${loadError}. Coba muat ulang halaman.`
+          }
         />
       </Screen>
     );
@@ -89,23 +112,26 @@ export function PemeriksaanIzin() {
     assistantSessionIds.has(req.sessionId),
   );
 
-  // 2. Filter by Time
+  // 2. Filter by Time (menggunakan tanggal lokal perangkat, bukan UTC)
   const now = new Date();
-  const todayString = now.toISOString().split("T")[0];
-  const oneWeekAgo = new Date(
-    now.getTime() - 7 * 24 * 60 * 60 * 1000,
-  ).toISOString();
+  const todayLocalKey = toLocalDateKey(now);
+  const oneWeekAgoMs = now.getTime() - 7 * 24 * 60 * 60 * 1000;
 
   const filteredRequests = assistantRequests.filter((req) => {
-    if (filter === "hari_ini") return req.createdAt.startsWith(todayString);
-    if (filter === "minggu_ini") return req.createdAt >= oneWeekAgo;
+    if (filter === "hari_ini") {
+      return getLocalDateKeyFromIso(req.createdAt) === todayLocalKey;
+    }
+    if (filter === "minggu_ini") {
+      const createdMs = new Date(req.createdAt).getTime();
+      return !Number.isNaN(createdMs) && createdMs >= oneWeekAgoMs;
+    }
     return true;
   });
 
-  // 3. Group by Date
+  // 3. Group by Local Date
   const grouped = filteredRequests.reduce(
     (acc, req) => {
-      const dateStr = formatTanggal(req.createdAt.split("T")[0]);
+      const dateStr = formatTanggal(getLocalDateKeyFromIso(req.createdAt));
       if (!acc[dateStr]) acc[dateStr] = [];
       acc[dateStr].push(req);
       return acc;
@@ -251,11 +277,13 @@ export function PemeriksaanIzin() {
                       </View>
                     ) : (
                       <Text style={styles.decisionText}>
-                        Diputuskan {req.diputuskanOleh} ·{" "}
-                        {new Date(req.diputuskanAt!).toLocaleTimeString(
-                          "id-ID",
-                          { hour: "2-digit", minute: "2-digit" },
-                        )}
+                        Diputuskan {req.diputuskanOleh ?? "Asisten"}
+                        {req.diputuskanAt
+                          ? ` · ${new Date(req.diputuskanAt).toLocaleTimeString(
+                              "id-ID",
+                              { hour: "2-digit", minute: "2-digit" },
+                            )}`
+                          : ""}
                       </Text>
                     )}
                   </GlassCard>
