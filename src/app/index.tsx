@@ -12,12 +12,17 @@ export default function EntryScreen() {
   useEffect(() => {
     if (!loading) {
       if (firebaseUser) {
-        router.replace('/jadwal' as Href);
+        if (!currentUser) {
+          // Akun login terdeteksi tapi belum melengkapi profil di Firestore
+          router.replace('/lengkapi-profil' as Href);
+        } else {
+          router.replace('/jadwal' as Href);
+        }
       } else {
         router.replace('/login' as Href);
       }
     }
-  }, [loading, firebaseUser]);
+  }, [loading, firebaseUser, currentUser]);
 
   return (
     <Screen withTabBar={false}>

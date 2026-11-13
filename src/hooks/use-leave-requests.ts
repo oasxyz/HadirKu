@@ -1,16 +1,39 @@
-import { collection, doc, onSnapshot, updateDoc } from '@react-native-firebase/firestore';
+import {
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  updateDoc,
+  where,
+} from '@react-native-firebase/firestore';
 import { useEffect, useState } from 'react';
 
+import { useCurrentUser } from '@/context/auth-context';
 import { db, COLLECTIONS } from '@/services/firebase';
 import type { LeaveRequest } from '@/types';
 
 export function useLeaveRequests() {
+  const currentUser = useCurrentUser();
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const q = collection(db, COLLECTIONS.leaveRequests);
+    if (!currentUser) {
+      setLeaveRequests([]);
+      setLoading(false);
+      return;
+    }
+
+    const isAsisten = currentUser.role === 'asisten';
+    const leaveRequestsCol = collection(db, COLLECTIONS.leaveRequests);
+
+    // Sesuai firestore.rules:
+    // Asisten membaca seluruh pengajuan izin; Praktikan hanya membaca pengajuan miliknya sendiri
+    const q = isAsisten
+      ? query(leaveRequestsCol)
+      : query(leaveRequestsCol, where('userId', '==', currentUser.id));
+
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -41,7 +64,7 @@ export function useLeaveRequests() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]);
 
   async function updateLeaveStatus(id: string, status: 'diterima' | 'ditolak', asistenNama: string) {
     const ref = doc(db, COLLECTIONS.leaveRequests, id);

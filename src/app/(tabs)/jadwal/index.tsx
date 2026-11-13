@@ -176,24 +176,64 @@ export default function BerandaJadwalScreen() {
         <EmptyNote message="Tidak ada sesi pada tanggal ini." />
       ) : (
         <View style={styles.timeline}>
-          {daySessions.map((session) => (
-            <View key={session.id} style={styles.timelineRow}>
-              <Text style={styles.timelineHour}>{session.jamMulai}</Text>
-              <Pressable
-                onPress={() => openDetail(session)}
-                style={({ pressed }) => [styles.timelineChip, pressed && styles.pressed]}>
-                <View style={styles.timelineText}>
-                  <Text style={styles.timelineTitle} numberOfLines={1}>
-                    {session.praktikum}
-                  </Text>
-                  <Text style={styles.timelineSub}>
-                    {session.jamMulai}-{session.jamSelesai} · {session.kelasLab}
-                  </Text>
-                </View>
-                <Ionicons name="open-outline" size={16} color={Palette.textMuted} />
-              </Pressable>
-            </View>
-          ))}
+          {daySessions.map((session) => {
+            const now = new Date();
+            const todayIso = toIso(now);
+            const currentHourMin = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            const isAktif = session.status === 'dibuka';
+            const isLewat =
+              session.status === 'ditutup' ||
+              session.tanggal < todayIso ||
+              (session.tanggal === todayIso && currentHourMin > session.jamSelesai);
+
+            return (
+              <View key={session.id} style={styles.timelineRow}>
+                <Text
+                  style={[
+                    styles.timelineHour,
+                    isAktif && styles.timelineHourActive,
+                    isLewat && styles.timelineHourPast,
+                  ]}>
+                  {session.jamMulai}
+                </Text>
+                <Pressable
+                  onPress={() => openDetail(session)}
+                  style={({ pressed }) => [
+                    styles.timelineChip,
+                    isAktif && styles.timelineChipActive,
+                    isLewat && styles.timelineChipPast,
+                    pressed && styles.pressed,
+                  ]}>
+                  <View style={styles.timelineText}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      {isAktif ? <View style={styles.activeDot} /> : null}
+                      <Text
+                        style={[
+                          styles.timelineTitle,
+                          isAktif && styles.timelineTitleActive,
+                          isLewat && styles.timelineTitlePast,
+                        ]}
+                        numberOfLines={1}>
+                        {session.praktikum}
+                      </Text>
+                    </View>
+                    <Text style={styles.timelineSub}>
+                      {session.jamMulai}-{session.jamSelesai} · {session.kelasLab}
+                    </Text>
+                  </View>
+                  {isAktif ? (
+                    <View style={styles.liveTag}>
+                      <Text style={styles.liveTagText}>Dibuka</Text>
+                    </View>
+                  ) : isLewat ? (
+                    <Text style={styles.pastTagText}>Selesai</Text>
+                  ) : (
+                    <Ionicons name="open-outline" size={16} color={Palette.textMuted} />
+                  )}
+                </Pressable>
+              </View>
+            );
+          })}
         </View>
       )}
     </Screen>
@@ -212,24 +252,33 @@ function FeaturedCard({
   const ratio = total === 0 ? 0 : hadir / total;
   const tanggal = fromIso(session.tanggal);
 
+  const isDibuka = session.status === 'dibuka';
+  const isDitutup = session.status === 'ditutup';
+  const statusColor = isDibuka
+    ? Palette.primary
+    : isDitutup
+      ? Palette.ink
+      : Palette.textMuted;
+
   return (
     <GlassCard style={styles.featured}>
       <View style={styles.featuredText}>
-        <View style={styles.statusLine}>
-          <View
+        <View
+          style={[
+            styles.statusLine,
+            isDibuka && styles.statusLineOpen,
+            isDitutup && styles.statusLineClosed,
+          ]}>
+          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+          <Text
             style={[
-              styles.statusDot,
-              {
-                backgroundColor:
-                  session.status === 'dibuka'
-                    ? Palette.primary
-                    : session.status === 'ditutup'
-                      ? Palette.ink
-                      : '#B9B5C6',
-              },
-            ]}
-          />
-          <Text style={styles.statusText}>{STATUS_TEXT[session.status]}</Text>
+              styles.statusText,
+              { color: statusColor },
+              isDibuka && { fontWeight: '700' },
+              isDitutup && { fontWeight: '600' },
+            ]}>
+            {STATUS_TEXT[session.status]}
+          </Text>
         </View>
         <Text style={styles.featuredTitle}>{session.praktikum}</Text>
         <Text style={styles.featuredMeta}>
@@ -249,9 +298,9 @@ function FeaturedCard({
         </Pressable>
       </View>
       <View style={styles.art}>
-        <View style={[styles.artBlob, { backgroundColor: Palette.lavender, top: 6, right: 4 }]} />
-        <View style={[styles.artBlob, styles.artBlobSmall, { backgroundColor: Palette.lilac }]} />
-        <Ionicons name="easel" size={56} color={Palette.primary} />
+        <View style={styles.artCircle}>
+          <Ionicons name="easel-outline" size={42} color={Palette.primary} />
+        </View>
       </View>
     </GlassCard>
   );
@@ -310,8 +359,17 @@ const styles = StyleSheet.create({
   },
   statusLine: {
     alignItems: 'center',
+    borderRadius: 999,
     flexDirection: 'row',
     gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  statusLineOpen: {
+    backgroundColor: 'rgba(226, 27, 208, 0.10)',
+  },
+  statusLineClosed: {
+    backgroundColor: 'rgba(23, 21, 28, 0.06)',
   },
   statusDot: {
     borderRadius: 999,
@@ -360,19 +418,15 @@ const styles = StyleSheet.create({
   art: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 112,
+    width: 96,
   },
-  artBlob: {
+  artCircle: {
+    alignItems: 'center',
+    backgroundColor: Palette.lavender,
     borderRadius: 999,
-    height: 86,
-    position: 'absolute',
-    width: 86,
-  },
-  artBlobSmall: {
-    bottom: 10,
-    height: 48,
-    left: 2,
-    width: 48,
+    height: 76,
+    justifyContent: 'center',
+    width: 76,
   },
   monthPill: {
     alignItems: 'center',
@@ -433,6 +487,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     width: 42,
   },
+  timelineHourActive: {
+    color: Palette.primary,
+    fontWeight: '700',
+  },
+  timelineHourPast: {
+    color: Palette.textMuted,
+  },
   timelineChip: {
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.75)',
@@ -445,16 +506,56 @@ const styles = StyleSheet.create({
     paddingRight: 16,
     paddingVertical: 11,
   },
+  timelineChipActive: {
+    backgroundColor: 'rgba(226, 27, 208, 0.08)',
+    borderColor: 'rgba(226, 27, 208, 0.45)',
+    borderWidth: 1,
+  },
+  timelineChipPast: {
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+    borderColor: 'rgba(110, 90, 150, 0.08)',
+    borderWidth: 1,
+    opacity: 0.65,
+  },
   timelineText: {
     flex: 1,
+  },
+  activeDot: {
+    backgroundColor: Palette.primary,
+    borderRadius: 999,
+    height: 7,
+    width: 7,
   },
   timelineTitle: {
     color: Palette.text,
     fontSize: 13,
     fontWeight: '600',
   },
+  timelineTitleActive: {
+    color: Palette.primary,
+    fontWeight: '700',
+  },
+  timelineTitlePast: {
+    color: Palette.textSecondary,
+  },
   timelineSub: {
     color: Palette.textMuted,
     fontSize: 11,
+  },
+  liveTag: {
+    backgroundColor: Palette.primary,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  liveTagText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  pastTagText: {
+    color: Palette.textMuted,
+    fontSize: 11,
+    fontWeight: '500',
   },
 });

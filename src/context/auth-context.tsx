@@ -1,6 +1,9 @@
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import {
+  GoogleAuthProvider,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   type User as FirebaseUser,
@@ -10,6 +13,10 @@ import React, { createContext, useContext, useEffect, useState, type ReactNode }
 
 import { auth, db, COLLECTIONS } from '@/services/firebase';
 import type { Role, User } from '@/types';
+
+GoogleSignin.configure({
+  webClientId: '621397636275-keaukjep38c5gnel3qhbpqdi6rg562n8.apps.googleusercontent.com',
+});
 
 interface SignUpParams {
   nama: string;
@@ -25,6 +32,8 @@ interface AuthContextValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (params: SignUpParams) => Promise<void>;
+  signInWithGoogle: () => Promise<{ isNewUser: boolean }>;
+  completeProfile: (params: {nama: string; nim: string; role: Role}) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -97,7 +106,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function signInWithGoogle(): Promise<{ isNewUser: boolean }> {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    // Reset sesi Google di perangkat agar dialog pemilih akun (Account Picker) selalu muncul
+    try {
+      await GoogleSignin.signOut();
+    } catch (_) {}
+
+    const response = await GoogleSignin.signIn();
+    const idToken = response.data?.idToken;
+
+    if (!idToken) {
+      throw new Error('Gagal mendapatkan token autentikasi dari Google');
+    }
+
+    const credential = GoogleAuthProvider.credential(idToken);
+    const userCredential = await signInWithCredential(auth, credential);
+    const uid = userCredential.user.uid;
+
+    // Cek apakah data user sudah ada di Firestore
+    const userRef = doc(db, COLLECTIONS.users, uid);
+    const userDoc = await getDoc(userRef);
+
+    return { isNewUser: !userDoc.exists() };
+  }
+
+  async function completeProfile({ nama, nim, role }: { nama: string; nim: string; role: Role }) {
+    if (!auth.currentUser) {
+      throw new Error('Tidak ada akun yang sedang aktif');
+    }
+
+    const uid = auth.currentUser.uid;
+    const email = auth.currentUser.email ?? '';
+
+    const userData = {
+      nama: nama.trim(),
+      nim: nim.trim(),
+      role,
+      email: email.trim().toLowerCase(),
+    };
+
+    // Simpan ke Firestore dan perbarui state currentUser
+    const userRef = doc(db, COLLECTIONS.users, uid);
+    await setDoc(userRef, userData);
+
+    setCurrentUser({
+      id: uid,
+      ...userData,
+    });
+  }
+
   async function signOut() {
+    try {
+      await GoogleSignin.signOut();
+    } catch (_) {
+      // Abaikan jika user tidak login via Google
+    }
     await firebaseSignOut(auth);
     setCurrentUser(null);
   }
@@ -110,6 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         signIn,
         signUp,
+        signInWithGoogle,
+        completeProfile,
         signOut,
       }}>
       {children}
