@@ -4,7 +4,9 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
+  query,
   updateDoc,
+  where,
 } from '@react-native-firebase/firestore';
 import { useEffect, useState } from 'react';
 
@@ -19,10 +21,25 @@ export function useSessions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 1. Dengarkan perubahan koleksi sessions secara realtime
+  // 1. Query sesi disesuaikan dengan role akun aktif agar lolos aturan security rules
   useEffect(() => {
+    // Jika belum login, kosongkan sesi dan matikan loading
+    if (!currentUser) {
+      setSessions([]);
+      setLoading(false);
+      return;
+    }
+
+    const isAsisten = currentUser.role === 'asisten';
+    const sessionsCol = collection(db, COLLECTIONS.sessions);
+
+    // Asisten membaca sesi bimbingannya; Praktikan hanya membaca sesi yang memuat ID-nya di pesertaIds
+    const q = isAsisten
+      ? query(sessionsCol, where('asistenId', '==', currentUser.id))
+      : query(sessionsCol, where('pesertaIds', 'array-contains', currentUser.id));
+
     const unsubscribeSessions = onSnapshot(
-      collection(db, COLLECTIONS.sessions),
+      q,
       (snapshot) => {
         const list: Session[] = [];
         snapshot?.forEach((d) => {
@@ -42,15 +59,7 @@ export function useSessions() {
           });
         });
 
-        // Filter sesi berdasarkan peran akun yang login (sesuai SRS002)
-        const isAsisten = currentUser?.role === 'asisten';
-        const filtered = list.filter((session) =>
-          isAsisten
-            ? session.asistenId === currentUser?.id
-            : session.pesertaIds.includes(currentUser?.id ?? ''),
-        );
-
-        setSessions(filtered);
+        setSessions(list);
         setLoading(false);
         setError(null);
       },
@@ -64,10 +73,23 @@ export function useSessions() {
     return () => unsubscribeSessions();
   }, [currentUser]);
 
-  // 2. Dengarkan perubahan koleksi attendances untuk rekap progres kehadiran
+  // 2. Query presensi realtime disesuaikan dengan role
   useEffect(() => {
+    if (!currentUser) {
+      setAttendances([]);
+      return;
+    }
+
+    const isAsisten = currentUser.role === 'asisten';
+    const attendancesCol = collection(db, COLLECTIONS.attendances);
+
+    // Praktikan hanya membaca presensi miliknya sendiri; Asisten membaca seluruh presensi
+    const q = isAsisten
+      ? query(attendancesCol)
+      : query(attendancesCol, where('userId', '==', currentUser.id));
+
     const unsubscribeAttendances = onSnapshot(
-      collection(db, COLLECTIONS.attendances),
+      q,
       (snapshot) => {
         const list: Attendance[] = [];
         snapshot?.forEach((d) => {
@@ -87,7 +109,7 @@ export function useSessions() {
     );
 
     return () => unsubscribeAttendances();
-  }, []);
+  }, [currentUser]);
 
   // CRUD Sesi untuk Asisten
   async function createSession(

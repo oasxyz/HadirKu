@@ -1,6 +1,6 @@
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TextField } from '@/components/text-field';
 import { Chip, GlassCard, PrimaryButton, Screen, TopBar } from '@/components/ui';
@@ -55,96 +55,100 @@ export default function RegisterScreen() {
     <Screen withTabBar={false}>
       <TopBar title="Daftar Akun" back fallback="/login" />
 
-      <GlassCard style={styles.sheet}>
-        <Text style={styles.heading}>Buat Akun Baru</Text>
-        <Text style={styles.subtitle}>
-          Lengkapi data diri untuk mengakses presensi dan jadwal praktikum.
-        </Text>
+      <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1 }}>
+        <GlassCard style={styles.sheet}>
+          <Text style={styles.heading}>Buat Akun Baru</Text>
+          <Text style={styles.subtitle}>
+            Lengkapi data diri untuk mengakses presensi dan jadwal praktikum.
+          </Text>
 
-        {error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.form}>
-          <TextField
-            label="Nama Lengkap"
-            placeholder="Contoh: Budi Santoso"
-            value={nama}
-            onChangeText={(text) => {
-              setNama(text);
-              if (error) setError(null);
-            }}
-          />
-
-          <TextField
-            label="NIM"
-            placeholder="Contoh: 21120120140000"
-            value={nim}
-            onChangeText={(text) => {
-              setNim(text);
-              if (error) setError(null);
-            }}
-            keyboardType="numeric"
-          />
-
-          <TextField
-            label="Email Institusi"
-            placeholder="nama@univ.ac.id"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (error) setError(null);
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-
-          <TextField
-            label="Kata Sandi"
-            placeholder="Minimal 6 karakter"
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (error) setError(null);
-            }}
-            isPassword
-          />
-
-          {/* Pilihan Peran */}
-          <View style={styles.roleSection}>
-            <Text style={styles.roleLabel}>Peran Akun</Text>
-            <View style={styles.chips}>
-              <Chip
-                label="Praktikan"
-                selected={role === 'praktikan'}
-                onPress={() => setRole('praktikan')}
-              />
-              <Chip
-                label="Asisten"
-                selected={role === 'asisten'}
-                onPress={() => setRole('asisten')}
-              />
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
             </View>
-            <Text style={styles.roleHint}>Peran tidak bisa diubah setelah mendaftar.</Text>
+          ) : null}
+
+          <View style={styles.form}>
+            <TextField
+              label="Nama Lengkap"
+              placeholder="Contoh: Budi Santoso"
+              value={nama}
+              onChangeText={(text) => {
+                setNama(text);
+                if (error) setError(null);
+              }}
+            />
+
+            <TextField
+              label="NIM"
+              placeholder="Contoh: 21120120140000"
+              value={nim}
+              onChangeText={(text) => {
+                setNim(text);
+                if (error) setError(null);
+              }}
+              keyboardType="numeric"
+            />
+
+            <TextField
+              label="Email Institusi"
+              placeholder="nama@univ.ac.id"
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (error) setError(null);
+              }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <TextField
+              label="Kata Sandi"
+              placeholder="Minimal 6 karakter"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (error) setError(null);
+              }}
+              isPassword
+            />
+
+            {/* Pilihan Peran */}
+            <View style={styles.roleSection}>
+              <Text style={styles.roleLabel}>Peran Akun</Text>
+              <View style={styles.chips}>
+                <Chip
+                  label="Praktikan"
+                  selected={role === 'praktikan'}
+                  onPress={() => setRole('praktikan')}
+                />
+                <Chip
+                  label="Asisten"
+                  selected={role === 'asisten'}
+                  onPress={() => setRole('asisten')}
+                />
+              </View>
+              <Text style={styles.roleHint}>Peran tidak bisa diubah setelah mendaftar.</Text>
+            </View>
           </View>
-        </View>
 
-        <PrimaryButton
-          label={loading ? 'Mendaftar…' : 'Daftar'}
-          onPress={handleRegister}
-          disabled={loading}
-        />
+          <PrimaryButton
+            label={loading ? 'Mendaftar…' : 'Daftar'}
+            onPress={handleRegister}
+            disabled={loading}
+          />
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Sudah punya akun? </Text>
-          <Pressable onPress={() => router.replace('/login' as Href)}>
-            <Text style={styles.loginLink}>Masuk</Text>
-          </Pressable>
-        </View>
-      </GlassCard>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Sudah punya akun? </Text>
+            <Pressable onPress={() => router.replace('/login' as Href)}>
+              <Text style={styles.loginLink}>Masuk</Text>
+            </Pressable>
+          </View>
+        </GlassCard>
+      </KeyboardAvoidingView>
     </Screen>
   );
 }

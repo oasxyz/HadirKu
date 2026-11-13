@@ -78,14 +78,15 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     boxShadow: shadow,
     flexDirection: 'row',
-    gap: 7,
     height: 48,
     justifyContent: 'center',
-    minWidth: 48,
+    width: 48,
   },
   itemActive: {
     backgroundColor: Palette.primary,
+    gap: 7,
     paddingHorizontal: 18,
+    width: 'auto',
   },
   label: {
     color: '#FFFFFF',

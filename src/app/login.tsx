@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TextField } from '@/components/text-field';
 import { GlassCard, PrimaryButton, Screen } from '@/components/ui';
@@ -39,70 +39,74 @@ export default function LoginScreen() {
   return (
     <Screen withTabBar={false}>
       {/* Hero Visual 3 Busur + Badge */}
-      <View style={styles.hero}>
-        <View style={[styles.arc, { width: 330, height: 330, top: 6, borderColor: '#DDD6EA' }]} />
-        <View style={[styles.arc, { width: 256, height: 256, top: 43, borderColor: '#C5B1E2' }]} />
-        <View style={[styles.arc, { width: 182, height: 182, top: 80, borderColor: '#EDA9E6' }]} />
-        <View style={styles.heroBadge}>
-          <Ionicons name="school" size={36} color={Palette.primary} />
-        </View>
-      </View>
-
-      {/* Kartu Login */}
-      <GlassCard style={styles.sheet}>
-        <Text style={styles.heading}>
-          Selamat Datang di{'\n'}
-          <Text style={styles.headingBold}>HadirKu</Text>
-        </Text>
-        <Text style={styles.subtitle}>
-          Masuk dengan email dan kata sandi praktikummu.
-        </Text>
-
-        {error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
+      <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1 }}>
+        <View style={styles.hero}>
+          <View style={[styles.arc, { width: 330, height: 330, top: 6, borderColor: '#DDD6EA' }]} />
+          <View style={[styles.arc, { width: 256, height: 256, top: 43, borderColor: '#C5B1E2' }]} />
+          <View style={[styles.arc, { width: 182, height: 182, top: 80, borderColor: '#EDA9E6' }]} />
+          <View style={styles.heroBadge}>
+            <Ionicons name="school" size={36} color={Palette.primary} />
           </View>
-        ) : null}
-
-        <View style={styles.form}>
-          <TextField
-            label="Email Institusi"
-            placeholder="nama@univ.ac.id"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (error) setError(null);
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-
-          <TextField
-            label="Kata Sandi"
-            placeholder="Masukkan kata sandi"
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (error) setError(null);
-            }}
-            isPassword
-          />
         </View>
 
-        <PrimaryButton
-          label={loading ? 'Memproses…' : 'Masuk'}
-          onPress={handleLogin}
-          disabled={loading}
-        />
+        {/* Kartu Login */}
+        <GlassCard style={styles.sheet}>
+          <Text style={styles.heading}>
+            Selamat Datang di{'\n'}
+            <Text style={styles.headingBold}>HadirKu</Text>
+          </Text>
+          <Text style={styles.subtitle}>
+            Masuk dengan email dan kata sandi praktikummu.
+          </Text>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Belum punya akun? </Text>
-          <Pressable onPress={() => router.push('/register' as Href)}>
-            <Text style={styles.registerLink}>Daftar</Text>
-          </Pressable>
-        </View>
-      </GlassCard>
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.form}>
+            <TextField
+              label="Email Institusi"
+              placeholder="nama@univ.ac.id"
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (error) setError(null);
+              }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <TextField
+              label="Kata Sandi"
+              placeholder="Masukkan kata sandi"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (error) setError(null);
+              }}
+              isPassword
+            />
+          </View>
+
+          <PrimaryButton
+            label={loading ? 'Memproses…' : 'Masuk'}
+            onPress={handleLogin}
+            disabled={loading}
+          />
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Belum punya akun? </Text>
+            <Pressable onPress={() => router.push('/register' as Href)}>
+              <Text style={styles.registerLink}>Daftar</Text>
+            </Pressable>
+          </View>
+        </GlassCard>
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
