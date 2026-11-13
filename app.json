@@ -56,7 +56,8 @@
             "kotlinVersion": "2.2.21"
           }
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
