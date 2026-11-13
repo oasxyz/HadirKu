@@ -57,7 +57,16 @@
           }
         }
       ],
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "HadirKu memakai kamera untuk memindai QR presensi.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true,
