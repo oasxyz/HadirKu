@@ -237,9 +237,18 @@ Pesan ditulis bahasa Indonesia, bukan kode mentah Firebase:
 ### SRS001 — Autentikasi dan profil (PIC A)
 
 - **Login** (`login.tsx`, baru, tanpa tab bar). Susunan sama dengan layar pilih identitas sekarang (`src/app/index.tsx`): tiga busur ungu + lencana, lalu `GlassCard` besar (radius 36) berisi judul "Selamat Datang di **HadirKu**", Email, Kata sandi (ikon mata), `PrimaryButton` "Masuk", tautan "Belum punya akun? Daftar". Saat proses: tombol `disabled`, label "Memproses…".
+- **Masuk dengan Google** (tambahan SRS001). Di login dan register, di bawah tombol utama: garis pemisah dengan teks "atau", lalu tombol pil **putih bertulisan hitam** (tinggi 56, bayangan standar): "Masuk dengan Google" di login, "Daftar dengan Google" di register. Teks saja, tanpa ikon. Tombol `disabled` selama proses.
+  - Pengguna lama (dokumen `users/{uid}` sudah ada): langsung ke `/jadwal`.
+  - Pengguna baru: ke **Lengkapi Profil** dulu.
+  - Membatalkan pilih akun Google **bukan error**: tidak ada pesan, layar tetap di login.
+  - Email sudah terdaftar dengan kata sandi: pesan merah di atas form, "Email ini sudah terdaftar dengan kata sandi. Masuk memakai email dan kata sandi."
+- **Lengkapi Profil** (baru, tanpa tab bar, hanya untuk pengguna Google baru). `TopBar` "Lengkapi Profil" tanpa tombol kembali. `GlassCard`: `Avatar` 72 dan "Masuk sebagai <email Google>", Nama lengkap (terisi dari akun Google, boleh diedit), NIM, Peran dengan dua `Chip` (Praktikan bawaan) dan keterangan "Peran tidak bisa diubah setelah disimpan.", `PrimaryButton` "Simpan", tautan "Batal, keluar dari akun" (keluar dari Firebase dan Google). Validasi sama dengan Register ("NIM wajib diisi", dst.). Simpan membuat `users/{uid}` lalu ke `/jadwal`.
 - **Register** (`register.tsx`, baru, tanpa tab bar). `TopBar` "Daftar Akun" + `GlassCard`: Nama lengkap, NIM, Email, Kata sandi, Peran dengan dua `Chip` (terpilih = hitam) dan keterangan "Peran tidak bisa diubah setelah mendaftar.", `PrimaryButton` "Daftar". Tautan "Sudah punya akun? Masuk".
 - **Profil** (`(tabs)/profil.tsx`, ubah). `Avatar` 104, nama, `Badge` peran (`outline`), tiga `ListRow` tanpa ikon (NIM, Email, Versi Aplikasi), tombol hitam "Keluar". Email diambil dari akun Firebase. Keluar memakai dialog konfirmasi "Keluar dari akun?" lalu kembali ke `login`.
-- **`src/app/index.tsx`** berubah menjadi pemeriksa sesi login: sudah login ke `/jadwal`, belum ke `login`.
+- **`src/app/index.tsx`** pemeriksa sesi login: belum login ke `login`; sudah login dan punya dokumen `users` ke `/jadwal`; sudah login tetapi **belum punya dokumen `users`** (pengguna Google baru) ke Lengkapi Profil. Jangan kirim pengguna tanpa dokumen `users` ke `/jadwal`, karena `currentUser` kosong.
+- **Keluar** harus keluar dari Firebase **dan** dari Google; kalau tidak, pemilih akun Google langsung memakai akun terakhir.
+
+Masuk dengan Google butuh modul native (`@react-native-google-signin/google-signin`, sudah dipasang PM) dan **APK baru**. Sebelum APK dibagikan, jalur email dan kata sandi tetap dipakai untuk pengujian. `webClientId` diambil dari `google-services.json`; tanyakan PM bila perlu.
 
 ### SRS002 — Jadwal dan kelola sesi (PIC A)
 
