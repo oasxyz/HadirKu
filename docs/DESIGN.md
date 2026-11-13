@@ -277,6 +277,7 @@ Saat ini kode hanya menampilkan `DigitBoxes`; QR adalah tambahan Sprint 2 dan bu
 - **Kamera tidak bisa dipakai** (baru): izin ditolak atau kamera rusak menampilkan `Illustration`, "Kamera tidak bisa diakses. Izinkan kamera di pengaturan, atau ketik kode sesi.", dan tombol "Ketik kode". Jangan biarkan layar hitam kosong.
 - **Ketik kode** (ada): "Masukkan Kode Sesi", `DigitBoxes` (tepi merah saat salah), pesan error merah di bawahnya, tombol "Kirim Presensi". Pesan: "Masukkan kode sesi terlebih dahulu", "Kode sesi harus 6 digit", "Kode sesi tidak sesuai", "Anda bukan peserta sesi ini".
 - QR yang bukan milik sesi ini memakai pesan yang sama: "Kode sesi tidak sesuai".
+- **Lokasi** (tanpa tampilan sendiri). Saat presensi, aplikasi meminta izin lokasi, menghitung jarak ke `session.asistenCoords`, dan menyimpan `jarakMeter`. Jangan tampilkan apa pun ke praktikan: tidak ada pesan "di luar lab", tidak ada error. Izin ditolak, GPS gagal, atau `asistenCoords` kosong: presensi tetap berhasil seperti biasa. Hanya jarak yang disimpan, bukan koordinat praktikan.
 - Sudah presensi: kartu bertepi magenta, `Illustration icon="checkmark"`, "Sudah Hadir", "Tercatat pukul …".
 - `belum_dibuka`: kartu teks "Presensi belum dibuka oleh asisten".
 - `ditutup`: kartu teks "Sesi praktikum telah ditutup".
@@ -284,7 +285,7 @@ Saat ini kode hanya menampilkan `DigitBoxes`; QR adalah tambahan Sprint 2 dan bu
 ### SRS005 — Rekap (PIC B) dan catatan (PIC C)
 
 - **Rekap daftar** (`(tabs)/rekap/index.tsx`, ada). `ListRow` per sesi: nama praktikum, "tanggal · Hadir x/y", `StatusBadge`.
-- **Rekap detail** (`rekap/[id].tsx`, ada, tanpa tab bar). Nama praktikum besar, chip tanggal dan jam, `StatusBadge`, "Praktikan Hadir x / y", dua batang (Hadir pink-ungu, Belum hadir ungu muda), kartu "Daftar Kehadiran" berisi baris nama, NIM, dan chip jam.
+- **Rekap detail** (`rekap/[id].tsx`, ada, tanpa tab bar). Nama praktikum besar, chip tanggal dan jam, `StatusBadge`, "Praktikan Hadir x / y", dua batang (Hadir pink-ungu, Belum hadir ungu muda), kartu "Daftar Kehadiran" berisi baris nama, NIM, dan chip jam. Presensi dengan `jarakMeter` di atas `BATAS_JARAK_METER` (`src/constants/lokasi.ts`) diberi `Badge tone="dark"` "Di luar lab · 123 m" di bawah nama. Tanpa `jarakMeter` tidak ada badge. Jangan memakai warna lain atau tulisan "mencurigakan": ini petunjuk, bukan tuduhan.
 - **Catatan** (`(tabs)/catatan.tsx`, ubah). Baris per sesi: nama praktikum, "tanggal · lab", chip jam presensi. Tambahan Sprint 2: kartu ringkasan (cincin kehadiran + deret titik, bagian 6) di atas daftar, dan baris izin dengan `Badge` "Izin diterima".
 
 Presensi lewat QR dan lewat ketik kode tercatat sama, jadi rekap dan catatan tidak membedakannya.
