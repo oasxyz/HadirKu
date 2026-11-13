@@ -5,30 +5,44 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DigitBoxes } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
-import { useAppContext } from '@/context/app-context';
+import { useSessions } from '@/hooks/use-sessions';
+// QR Component is commented out pending PM APK build with react-native-svg and QR package
+// import QRCode from 'react-native-qrcode-svg';
 
 type Confirmation = 'open' | 'close' | null;
 
 export default function SessionControls({ sessionId }: { sessionId: string }) {
-  const { state, dispatch } = useAppContext();
+  const { sessions, attendances, updateSession } = useSessions();
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
-  const session = state.sessions.find((item) => item.id === sessionId);
+  
+  const session = sessions.find((item) => item.id === sessionId);
 
   if (!session) {
     return null;
   }
 
-  const attendanceCount = state.attendances.filter(
+  const attendanceCount = attendances.filter(
     (attendance) => attendance.sessionId === sessionId,
   ).length;
 
-  function confirmAction() {
-    if (confirmation === 'open') {
-      dispatch({ type: 'OPEN_SESSION', sessionId });
-    } else if (confirmation === 'close') {
-      dispatch({ type: 'CLOSE_SESSION', sessionId });
+  async function confirmAction() {
+    try {
+      if (confirmation === 'open') {
+        const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+        await updateSession(sessionId, {
+          status: 'dibuka',
+          kodeSesi: generatedCode,
+        });
+      } else if (confirmation === 'close') {
+        await updateSession(sessionId, {
+          status: 'ditutup',
+        });
+      }
+    } catch (error) {
+      console.error('Gagal memperbarui status sesi:', error);
+    } finally {
+      setConfirmation(null);
     }
-    setConfirmation(null);
   }
 
   if (session.status === 'ditutup') {
@@ -51,12 +65,17 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
           <View style={styles.statusCopy}>
             <Text style={styles.cardTitle}>Sesi sedang dibuka</Text>
             <Text style={styles.cardDescription}>
-              Bagikan kode ini kepada praktikan untuk melakukan presensi.
+              Minta praktikan memindai QR ini. Kalau kameranya bermasalah, bacakan kode di bawahnya.
             </Text>
           </View>
 
+          <View style={styles.qrContainer}>
+             {/* <QRCode value={session.kodeSesi ?? ''} size={150} color={Palette.ink} /> */}
+             <Text style={styles.qrPlaceholderText}>[QR CODE BELUM TERPASANG DI APK]</Text>
+          </View>
+
           <View style={styles.codeBox}>
-            <Text style={styles.codeLabel}>KODE SESI</Text>
+            <Text style={styles.codeLabel}>ATAU KETIK KODE</Text>
             <DigitBoxes value={session.kodeSesi ?? ''} color={Palette.primary} />
           </View>
 
@@ -70,7 +89,6 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
           <Pressable
             onPress={() => setConfirmation('close')}
             style={({ pressed }) => [styles.dangerButton, pressed && styles.pressed]}>
-            <Ionicons name="stop-circle-outline" size={18} color="#FFFFFF" />
             <Text style={styles.buttonText}>Tutup Sesi</Text>
           </Pressable>
         </View>
@@ -99,7 +117,6 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
         <Pressable
           onPress={() => setConfirmation('open')}
           style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
-          <Ionicons name="play-outline" size={18} color="#FFFFFF" />
           <Text style={styles.buttonText}>Buka Sesi</Text>
         </Pressable>
       </View>
@@ -165,7 +182,7 @@ const styles = StyleSheet.create({
     boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
   },
   openCard: {
-    borderColor: 'rgba(226, 27, 208, 0.45)',
+    borderColor: Palette.primary,
   },
   closedCard: {
     borderColor: 'rgba(23, 21, 28, 0.3)',
@@ -182,6 +199,22 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     fontSize: 13,
     lineHeight: 19,
+  },
+  qrContainer: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: Spacing.three,
+    justifyContent: 'center',
+    alignSelf: 'center',
+    width: 200,
+    height: 200,
+  },
+  qrPlaceholderText: {
+    color: Palette.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   codeBox: {
     alignItems: 'center',
