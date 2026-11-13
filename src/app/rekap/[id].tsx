@@ -1,28 +1,68 @@
 // SRS005 rekap (PIC B — Yustinus): detail kehadiran per sesi, realtime dari Firestore.
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams, router, type Href } from 'expo-router';
+import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { useEffect } from 'react';
 
 import { StatusBadge } from '@/components/status-badge';
 import {
   Chip,
   EmptyNote,
   GlassCard,
-  RoundButton,
+  Illustration,
   Screen,
   SectionTitle,
   TopBar,
 } from '@/components/ui';
 import { Palette } from '@/constants/theme';
-import { useAppContext } from '@/context/app-context';
+import { useCurrentUser } from '@/context/auth-context';
+import { useSessions } from '@/hooks/use-sessions';
+import { usePraktikanList } from '@/hooks/use-users';
 import { formatRentangJam, formatTanggal } from '@/utils/format';
 
 const BAR_HEIGHT = 150;
 
 export default function RekapDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state } = useAppContext();
-  const session = state.sessions.find((item) => item.id === id);
+  const currentUser = useCurrentUser();
+  const { sessions, attendances, loading: sessionsLoading, error } = useSessions();
+  const { praktikanList, loading: usersLoading } = usePraktikanList();
+
+  useEffect(() => {
+    if (!currentUser) {
+      router.replace('/login' as Href);
+    }
+  }, [currentUser]);
+
+  if (!currentUser) {
+    return null; 
+  }
+
+  if (sessionsLoading || usersLoading) {
+    return (
+      <Screen withTabBar={false}>
+        <TopBar title="Rekap" back fallback="/rekap" />
+        <GlassCard style={{ alignItems: 'center', padding: 24, gap: 12 }}>
+          <ActivityIndicator size="large" color={Palette.primary} />
+          <Text style={{ color: Palette.textSecondary, fontSize: 14 }}>Memuat...</Text>
+        </GlassCard>
+      </Screen>
+    );
+  }
+
+  if (error) {
+    return (
+      <Screen withTabBar={false}>
+        <TopBar title="Rekap" back fallback="/rekap" />
+        <EmptyNote 
+          icon={<Illustration icon="cloud-offline-outline" />}
+          message="Tidak ada koneksi internet. Terjadi kesalahan, coba lagi." 
+        />
+      </Screen>
+    );
+  }
+
+  const session = sessions.find((item) => item.id === id);
 
   if (!session) {
     return (
@@ -33,9 +73,10 @@ export default function RekapDetailScreen() {
     );
   }
 
-  const attendees = state.attendances
+  const attendees = attendances
     .filter((item) => item.sessionId === session.id)
-    .map((item) => ({ item, user: state.users.find((user) => user.id === item.userId) }));
+    .map((item) => ({ item, user: praktikanList.find((user) => user.id === item.userId) }));
+    
   const total = session.pesertaIds.length;
   const hadir = attendees.length;
   const belum = Math.max(total - hadir, 0);
@@ -44,7 +85,7 @@ export default function RekapDetailScreen() {
 
   return (
     <Screen withTabBar={false}>
-      <TopBar title="Rekap" back fallback="/rekap" right={<RoundButton icon="ellipsis-horizontal" />} />
+      <TopBar title="Rekap" back fallback="/rekap" />
 
       <View style={styles.titleBlock}>
         <Text style={styles.title}>{session.praktikum}</Text>
@@ -87,8 +128,6 @@ export default function RekapDetailScreen() {
                 label={new Date(item.waktuPresensi).toLocaleTimeString('id-ID', {
                   hour: '2-digit',
                   minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false,
                 })}
               />
             </View>

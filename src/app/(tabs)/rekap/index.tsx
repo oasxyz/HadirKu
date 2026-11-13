@@ -1,27 +1,68 @@
 // SRS005 rekap (PIC B — Yustinus): daftar sesi untuk direkap, kehadiran realtime dari Firestore.
 import { router, type Href } from 'expo-router';
-import { View } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 
 import { StatusBadge } from '@/components/status-badge';
-import { EmptyNote, ListRow, Screen, TopBar } from '@/components/ui';
-import { useAppContext } from '@/context/app-context';
+import { EmptyNote, GlassCard, ListRow, Screen, TopBar, Illustration } from '@/components/ui';
+import { Palette } from '@/constants/theme';
+import { useCurrentUser } from '@/context/auth-context';
+import { useSessions } from '@/hooks/use-sessions';
 import { formatTanggal } from '@/utils/format';
+import { useEffect } from 'react';
 
 export default function RekapScreen() {
-  const { state } = useAppContext();
-  const sessions = state.sessions
-    .filter((session) => session.asistenId === state.currentUserId)
+  const currentUser = useCurrentUser();
+  const { sessions, attendances, loading, error } = useSessions();
+
+  // Redirect to login handled by router in layout or index, but adding safeguard per DESIGN
+  useEffect(() => {
+    if (!currentUser) {
+      router.replace('/login' as Href);
+    }
+  }, [currentUser]);
+
+  if (!currentUser) {
+    return null; // Don't render empty screen while redirecting
+  }
+
+  if (loading) {
+    return (
+      <Screen>
+        <TopBar title="Rekap Kehadiran" />
+        <GlassCard style={{ alignItems: 'center', padding: 24, gap: 12 }}>
+          <ActivityIndicator size="large" color={Palette.primary} />
+          <Text style={{ color: Palette.textSecondary, fontSize: 14 }}>Memuat...</Text>
+        </GlassCard>
+      </Screen>
+    );
+  }
+
+  if (error) {
+    return (
+      <Screen>
+        <TopBar title="Rekap Kehadiran" />
+        <EmptyNote 
+          icon={<Illustration icon="cloud-offline-outline" />}
+          message="Tidak ada koneksi internet. Terjadi kesalahan, coba lagi." 
+        />
+      </Screen>
+    );
+  }
+
+  // Filter only sessions handled by the logged-in assistant and sort
+  const assistantSessions = sessions
+    .filter((session) => session.asistenId === currentUser.id)
     .sort((a, b) => a.tanggal.localeCompare(b.tanggal));
 
   return (
     <Screen>
       <TopBar title="Rekap Kehadiran" />
-      {sessions.length === 0 ? (
+      {assistantSessions.length === 0 ? (
         <EmptyNote message="Belum ada sesi praktikum untuk direkap." />
       ) : (
         <View style={{ gap: 12 }}>
-          {sessions.map((session) => {
-            const hadir = state.attendances.filter((item) => item.sessionId === session.id).length;
+          {assistantSessions.map((session) => {
+            const hadir = attendances.filter((item) => item.sessionId === session.id).length;
             return (
               <ListRow
                 key={session.id}
