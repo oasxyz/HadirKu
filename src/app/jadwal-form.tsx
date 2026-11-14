@@ -1,43 +1,75 @@
-import { router, useLocalSearchParams, type Href } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { TextField } from '@/components/text-field';
-import { Chip, GlassCard, PrimaryButton, Screen, TopBar } from '@/components/ui';
+import {
+  Chip,
+  EmptyNote,
+  GlassCard,
+  PrimaryButton,
+  Screen,
+  TopBar,
+} from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useSessions } from '@/hooks/use-sessions';
 import { usePraktikanList } from '@/hooks/use-users';
+import type { Session } from '@/types';
 import { getAuthErrorMessage } from '@/utils/auth-error';
 
 export default function JadwalFormScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { sessions, createSession, updateSession } = useSessions();
+  const { sessions, loading } = useSessions();
+
+  if (id && loading) {
+    return (
+      <Screen withTabBar={false}>
+        <TopBar title="Ubah Sesi" back fallback="/jadwal" />
+        <GlassCard style={styles.loadingCard}>
+          <ActivityIndicator size="large" color={Palette.primary} />
+          <Text style={styles.loadingText}>Memuat sesi…</Text>
+        </GlassCard>
+      </Screen>
+    );
+  }
+
+  const existingSession = id ? sessions.find((s) => s.id === id) : undefined;
+
+  if (id && !existingSession) {
+    return (
+      <Screen withTabBar={false}>
+        <TopBar title="Ubah Sesi" back fallback="/jadwal" />
+        <EmptyNote message="Sesi praktikum tidak ditemukan atau telah dihapus." />
+      </Screen>
+    );
+  }
+
+  // Form di-mount ulang per sesi lewat `key`, sehingga nilai awal cukup diambil sekali
+  // saat render pertama tanpa setState di dalam effect.
+  return (
+    <JadwalForm
+      key={existingSession?.id ?? 'baru'}
+      sessionId={id}
+      initial={existingSession}
+    />
+  );
+}
+
+function JadwalForm({ sessionId, initial }: { sessionId?: string; initial?: Session }) {
+  const { createSession, updateSession } = useSessions();
   const { praktikanList } = usePraktikanList();
 
-  const isEdit = Boolean(id);
-  const existingSession = sessions.find((s) => s.id === id);
+  const isEdit = Boolean(initial);
 
-  const [praktikum, setPraktikum] = useState('');
-  const [kelasLab, setKelasLab] = useState('');
-  const [tanggal, setTanggal] = useState('');
-  const [jamMulai, setJamMulai] = useState('');
-  const [jamSelesai, setJamSelesai] = useState('');
-  const [pesertaIds, setPesertaIds] = useState<string[]>([]);
+  const [praktikum, setPraktikum] = useState(initial?.praktikum ?? '');
+  const [kelasLab, setKelasLab] = useState(initial?.kelasLab ?? '');
+  const [tanggal, setTanggal] = useState(initial?.tanggal ?? '');
+  const [jamMulai, setJamMulai] = useState(initial?.jamMulai ?? '');
+  const [jamSelesai, setJamSelesai] = useState(initial?.jamSelesai ?? '');
+  const [pesertaIds, setPesertaIds] = useState<string[]>(initial?.pesertaIds ?? []);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Jika mode edit, isi form dengan data sesi yang dipilih
-  useEffect(() => {
-    if (existingSession) {
-      setPraktikum(existingSession.praktikum);
-      setKelasLab(existingSession.kelasLab);
-      setTanggal(existingSession.tanggal);
-      setJamMulai(existingSession.jamMulai);
-      setJamSelesai(existingSession.jamSelesai);
-      setPesertaIds(existingSession.pesertaIds);
-    }
-  }, [existingSession]);
 
   function togglePeserta(userId: string) {
     if (pesertaIds.includes(userId)) {
@@ -96,8 +128,8 @@ export default function JadwalFormScreen() {
         pesertaIds,
       };
 
-      if (isEdit && id) {
-        await updateSession(id, payload);
+      if (isEdit && sessionId) {
+        await updateSession(sessionId, payload);
       } else {
         await createSession(payload);
       }
@@ -218,6 +250,16 @@ export default function JadwalFormScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingCard: {
+    alignItems: 'center',
+    borderRadius: 36,
+    gap: 12,
+    padding: 24,
+  },
+  loadingText: {
+    color: Palette.textSecondary,
+    fontSize: 14,
+  },
   sheet: {
     borderRadius: 36,
     gap: 16,

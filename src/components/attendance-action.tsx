@@ -111,10 +111,6 @@ export default function AttendanceAction({
       setErrorMsg('Kode sesi harus 6 digit');
       return;
     }
-    if (session.kodeSesi !== trimmed) {
-      setErrorMsg('Kode sesi tidak sesuai');
-      return;
-    }
     if (!session.pesertaIds.includes(currentUserId)) {
       setErrorMsg('Anda bukan peserta sesi ini');
       return;
@@ -125,10 +121,13 @@ export default function AttendanceAction({
       const attId = attendanceDocId(sessionId, currentUserId);
       const attRef = doc(db, COLLECTIONS.attendances, attId);
 
+      // Kode dikirim supaya firestore.rules bisa mencocokkannya dengan sessionCodes/{sessionId}.
+      // Kode sesi tidak lagi disimpan di dokumen sesi agar tidak terbaca praktikan.
       await setDoc(attRef, {
         sessionId,
         userId: currentUserId,
         waktuPresensi: new Date().toISOString(),
+        kode: trimmed,
       });
 
       setKode('');
@@ -137,7 +136,8 @@ export default function AttendanceAction({
     } catch (err: any) {
       console.error('Gagal mencatat presensi:', err);
       if (err?.code === 'firestore/permission-denied') {
-        setErrorMsg('Presensi ditolak. Pastikan sesi masih dibuka dan Anda peserta sesi ini.');
+        // Rules menolak kalau kode tidak cocok, sesi sudah ditutup, atau bukan peserta.
+        setErrorMsg('Presensi ditolak. Kode sesi salah atau sesi sudah ditutup.');
       } else {
         setErrorMsg(err?.message ?? 'Gagal mencatat presensi');
       }

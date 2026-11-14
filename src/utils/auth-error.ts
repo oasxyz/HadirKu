@@ -27,9 +27,10 @@ export function getAuthErrorMessage(error: any): string {
       return 'Layanan sedang tidak tersedia, periksa koneksi internetmu';
 
     default:
+      // Jangan tampilkan error.message mentah ke pengguna (bisa bocor detail internal).
       if (typeof error?.message === 'string' && error.message.includes('permission-denied')) {
         return 'Kamu tidak punya akses ke data ini';
       }
-      return error?.message || 'Terjadi kesalahan, coba lagi';
+      return 'Terjadi kesalahan, coba lagi';
   }
 }

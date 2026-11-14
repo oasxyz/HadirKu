@@ -12,23 +12,37 @@ import { useEffect, useState } from 'react';
 
 import { useCurrentUser } from '@/context/auth-context';
 import { db, COLLECTIONS } from '@/services/firebase';
-import type { Attendance, Session } from '@/types';
+import type { Attendance, Coordinates, Session } from '@/types';
+
+type SessionsState = {
+  userId: string | null;
+  sessions: Session[];
+  loading: boolean;
+  error: string | null;
+};
+
+type AttendancesState = {
+  userId: string | null;
+  attendances: Attendance[];
+};
 
 export function useSessions() {
   const currentUser = useCurrentUser();
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [attendances, setAttendances] = useState<Attendance[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [sessionState, setSessionState] = useState<SessionsState>({
+    userId: null,
+    sessions: [],
+    loading: true,
+    error: null,
+  });
+  const [attendanceState, setAttendanceState] = useState<AttendancesState>({
+    userId: null,
+    attendances: [],
+  });
 
   // 1. Query sesi disesuaikan dengan role akun aktif agar lolos aturan security rules
   useEffect(() => {
-    // Jika belum login, kosongkan sesi dan matikan loading
-    if (!currentUser) {
-      setSessions([]);
-      setLoading(false);
-      return;
-    }
+    // Belum login: jangan setState di dalam effect; nilai kosong diturunkan saat return.
+    if (!currentUser) return;
 
     const isAsisten = currentUser.role === 'asisten';
     const sessionsCol = collection(db, COLLECTIONS.sessions);
@@ -44,6 +58,14 @@ export function useSessions() {
         const list: Session[] = [];
         snapshot?.forEach((d) => {
           const data = d.data();
+
+          // Field lokasi/nama hasil denormalisasi: dibuang jika bentuknya tidak valid.
+          const coords = data.asistenCoords;
+          const asistenCoords: Coordinates | null =
+            typeof coords?.lat === 'number' && typeof coords?.lng === 'number'
+              ? { lat: coords.lat, lng: coords.lng }
+              : null;
+
           list.push({
             id: d.id,
             kelasId: data.kelasId,
@@ -53,20 +75,29 @@ export function useSessions() {
             jamMulai: data.jamMulai ?? '',
             jamSelesai: data.jamSelesai ?? '',
             asistenId: data.asistenId ?? '',
+            asistenNama: typeof data.asistenNama === 'string' ? data.asistenNama : undefined,
+            asistenCoords,
             pesertaIds: Array.isArray(data.pesertaIds) ? data.pesertaIds : [],
             kodeSesi: data.kodeSesi ?? null,
             status: data.status ?? 'belum_dibuka',
           });
         });
 
-        setSessions(list);
-        setLoading(false);
-        setError(null);
+        setSessionState({
+          userId: currentUser.id,
+          sessions: list,
+          loading: false,
+          error: null,
+        });
       },
       (err) => {
         console.error('Gagal mengambil sesi Firestore:', err);
-        setError('Gagal memuat jadwal praktikum');
-        setLoading(false);
+        setSessionState({
+          userId: currentUser.id,
+          sessions: [],
+          loading: false,
+          error: 'Gagal memuat jadwal praktikum',
+        });
       },
     );
 
@@ -75,10 +106,7 @@ export function useSessions() {
 
   // 2. Query presensi realtime disesuaikan dengan role
   useEffect(() => {
-    if (!currentUser) {
-      setAttendances([]);
-      return;
-    }
+    if (!currentUser) return;
 
     const isAsisten = currentUser.role === 'asisten';
     const attendancesCol = collection(db, COLLECTIONS.attendances);
@@ -99,9 +127,10 @@ export function useSessions() {
             sessionId: data.sessionId,
             userId: data.userId,
             waktuPresensi: data.waktuPresensi,
+            jarakMeter: typeof data.jarakMeter === 'number' ? data.jarakMeter : null,
           });
         });
-        setAttendances(list);
+        setAttendanceState({ userId: currentUser.id, attendances: list });
       },
       (err) => {
         console.error('Gagal mengambil data presensi Firestore:', err);
@@ -111,9 +140,22 @@ export function useSessions() {
     return () => unsubscribeAttendances();
   }, [currentUser]);
 
+  // Nilai yang ditampilkan hanya milik user aktif, supaya tidak ada data basi saat ganti akun.
+  const isSynced = currentUser !== null && sessionState.userId === currentUser.id;
+  const sessions = isSynced ? sessionState.sessions : [];
+  const loading = currentUser === null ? false : isSynced ? sessionState.loading : true;
+  const error = isSynced ? sessionState.error : null;
+  const attendances =
+    currentUser !== null && attendanceState.userId === currentUser.id
+      ? attendanceState.attendances
+      : [];
+
   // CRUD Sesi untuk Asisten
   async function createSession(
-    data: Omit<Session, 'id' | 'kodeSesi' | 'status' | 'asistenId'>,
+    data: Omit<
+      Session,
+      'id' | 'kodeSesi' | 'status' | 'asistenId' | 'asistenNama' | 'asistenCoords'
+    >,
   ) {
     if (!currentUser || currentUser.role !== 'asisten') {
       throw new Error('Hanya asisten yang dapat menambahkan sesi');
@@ -122,6 +164,9 @@ export function useSessions() {
     const newDoc = {
       ...data,
       asistenId: currentUser.id,
+      // Nama asisten disalin ke dokumen sesi agar praktikan tidak perlu membaca koleksi users.
+      asistenNama: currentUser.nama,
+      asistenCoords: null,
       kodeSesi: null,
       status: 'belum_dibuka' as const,
     };
