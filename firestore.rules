@@ -79,7 +79,8 @@ service cloud.firestore {
     // Koleksi SessionCodes (SRS003)
     // Kode sesi dipisah dari dokumen sesi supaya tidak terbaca praktikan.
     match /sessionCodes/{sessionId} {
-      allow read: if isAsisten() && resource.data.asistenId == request.auth.uid;
+      allow read: if isAsisten()
+        && (resource == null || resource.data.asistenId == request.auth.uid);
 
       allow create: if isAsisten()
         && request.resource.data.asistenId == request.auth.uid
