@@ -1,5 +1,7 @@
 // DRAFT PM (SRS009 menyempurnakan). Belum diuji di emulator; tempel ke Firebase Console > Firestore > Rules.
 // ERROR HANDLING VERSI PIC A (BISA DICEK KEMBALI DI PENGEMBANGAN SELANJUTNYA).
+// Publish HANYA setelah aplikasi versi baru terpasang: build lama tidak mengirim `kode` saat
+// presensi dan tidak mengirim `asistenNama` saat membuat sesi.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -27,9 +29,9 @@ service cloud.firestore {
 
     // Koleksi Users
     match /users/{uid} {
-      // User bisa membaca profilnya sendiri; User yang signed-in bisa membaca profil asisten/praktikan untuk relasi jadwal/rekap
-      allow read: if signedIn();
-      
+      // User bisa membaca profilnya sendiri; Asisten bisa membaca daftar user untuk rekap/peserta
+      allow read: if signedIn() && (request.auth.uid == uid || isAsisten());
+
       // Buat akun baru hanya untuk UID milik sendiri dengan role yang diizinkan
       allow create: if signedIn() && request.auth.uid == uid
         && request.resource.data.role in ['asisten', 'praktikan']
@@ -53,44 +55,75 @@ service cloud.firestore {
     match /sessions/{sessionId} {
       // Praktikan hanya bisa membaca sesi yang memuat dirinya di pesertaIds
       allow read: if isAsisten() || isPeserta(resource.data);
-      
-      // Asisten hanya bisa membuat sesi untuk dirinya sendiri
+
+      // Asisten hanya bisa membuat sesi untuk dirinya sendiri.
+      // `asistenNama` disalin saat create agar praktikan tidak perlu membaca koleksi users.
       allow create: if isAsisten()
-        && request.resource.data.asistenId == request.auth.uid;
-      
-      // Hanya asisten pembuat sesi yang bisa mengubah atau menghapus sesinya
+        && request.resource.data.asistenId == request.auth.uid
+        && request.resource.data.asistenNama is string;
+
+      // Hanya asisten pembuat sesi yang bisa mengubah sesinya.
+      // Status hanya boleh maju: belum_dibuka -> dibuka -> ditutup (sesi ditutup tidak bisa dibuka lagi).
       allow update: if isAsisten()
-        && (resource.data.asistenId == request.auth.uid);
+        && resource.data.asistenId == request.auth.uid
+        && (
+          request.resource.data.status == resource.data.status
+          || (resource.data.status == 'belum_dibuka' && request.resource.data.status == 'dibuka')
+          || (resource.data.status == 'dibuka' && request.resource.data.status == 'ditutup')
+        );
+
       allow delete: if isAsisten()
-        && (resource.data.asistenId == request.auth.uid);
+        && resource.data.asistenId == request.auth.uid;
+    }
+
+    // Koleksi SessionCodes (SRS003)
+    // Kode sesi dipisah dari dokumen sesi supaya tidak terbaca praktikan.
+    match /sessionCodes/{sessionId} {
+      allow read: if isAsisten() && resource.data.asistenId == request.auth.uid;
+
+      allow create: if isAsisten()
+        && request.resource.data.asistenId == request.auth.uid
+        && request.resource.data.kode is string
+        && request.resource.data.kode.size() == 6;
+
+      allow update: if isAsisten()
+        && resource.data.asistenId == request.auth.uid
+        && request.resource.data.asistenId == request.auth.uid;
+
+      allow delete: if isAsisten() && resource.data.asistenId == request.auth.uid;
     }
 
     // Koleksi Attendances
     // ID dokumen = sessionId_uid, sehingga presensi ganda otomatis ditolak
     match /attendances/{attendanceId} {
       allow read: if isAsisten() || (signedIn() && resource.data.userId == request.auth.uid);
-      
+
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && attendanceId == request.resource.data.sessionId + '_' + request.auth.uid
+        // Kode harus sama dengan kode sesi yang hanya bisa dibaca asisten
+        && request.resource.data.kode == get(/databases/$(database)/documents/sessionCodes/$(request.resource.data.sessionId)).data.kode
+        // jarakMeter opsional, tapi kalau diisi harus angka >= 0
+        && (request.resource.data.get('jarakMeter', null) == null
+            || (request.resource.data.jarakMeter is number && request.resource.data.jarakMeter >= 0))
         && get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'dibuka'
         && request.auth.uid in get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.pesertaIds;
-        
+
       allow update, delete: if false;
     }
 
     // Koleksi Leave Requests
     match /leaveRequests/{requestId} {
       allow read: if isAsisten() || (signedIn() && resource.data.userId == request.auth.uid);
-      
+
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'menunggu';
-      
+
       // Hanya asisten yang bisa mengubah status keputusan
       allow update: if isAsisten()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'diputuskanOleh', 'diputuskanAt']);
-        
+
       allow delete: if false;
     }
   }
