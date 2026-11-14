@@ -26,9 +26,10 @@ export default function LoginScreen() {
     try {
       setError(null);
       setLoading(true);
-      await signIn(email, password);
-      // Login sukses -> masuk ke beranda jadwal
-      router.replace('/jadwal' as Href);
+      const { hasProfile } = await signIn(email, password);
+      // Profil sudah dibaca sebelum navigasi: akun tanpa dokumen users diarahkan
+      // melengkapi profil, bukan masuk beranda dengan currentUser kosong.
+      router.replace((hasProfile ? '/jadwal' : '/lengkapi-profil') as Href);
     } catch (err: any) {
       setError(getAuthErrorMessage(err));
     } finally {
