@@ -1,4 +1,5 @@
 // SRS003 (PIC B — Yustinus): buka/tutup sesi, pindahkan ke Firestore dengan listener realtime.
+import { doc, setDoc } from '@react-native-firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
@@ -6,13 +7,18 @@ import QRCode from 'react-native-qrcode-svg';
 
 import { DigitBoxes } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
+import { useCurrentUser } from '@/context/auth-context';
+import { useSessionCode } from '@/hooks/use-session-code';
 import { useSessions } from '@/hooks/use-sessions';
+import { COLLECTIONS, db } from '@/services/firebase';
 import { getBatasTutupSesi, sesiSudahBerakhir } from '@/utils/sesi';
 
 type Confirmation = 'open' | 'close' | null;
 
 export default function SessionControls({ sessionId }: { sessionId: string }) {
+  const currentUser = useCurrentUser();
   const { sessions, attendances, updateSession } = useSessions();
+  const kodeSesi = useSessionCode(sessionId);
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
   const [processing, setProcessing] = useState(false);
 
@@ -74,9 +80,20 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
         }
 
         const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+        if (!currentUser || currentUser.role !== 'asisten') {
+          throw new Error('Hanya asisten yang dapat membuka sesi');
+        }
+
+        // Kode ditulis lebih dulu ke koleksi terpisah (hanya asisten pemilik yang bisa membaca).
+        // Dengan begitu sesi tidak pernah berstatus 'dibuka' tanpa kode yang valid.
+        await setDoc(doc(db, COLLECTIONS.sessionCodes, sessionId), {
+          kode: generatedCode,
+          asistenId: currentUser.id,
+        });
+
         await updateSession(sessionId, {
           status: 'dibuka',
-          kodeSesi: generatedCode,
           asistenCoords,
         });
       } else if (confirmation === 'close') {
@@ -114,10 +131,10 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
             </Text>
           </View>
 
-          {session.kodeSesi ? (
+          {kodeSesi ? (
             <View style={styles.qrContainer}>
               <QRCode
-                value={session.kodeSesi}
+                value={kodeSesi}
                 size={160}
                 color={Palette.ink}
                 backgroundColor="#FFFFFF"
@@ -128,7 +145,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
 
           <View style={styles.codeBox}>
             <Text style={styles.codeLabel}>ATAU KETIK KODE</Text>
-            <DigitBoxes value={session.kodeSesi ?? ''} color={Palette.primary} />
+            <DigitBoxes value={kodeSesi ?? ''} color={Palette.primary} />
           </View>
 
           <View style={styles.attendanceSummary}>

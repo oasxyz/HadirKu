@@ -11,6 +11,8 @@ export const COLLECTIONS = {
   users: 'users',
   classes: 'classes',
   sessions: 'sessions',
+  // Kode sesi dipisah dari dokumen sesi agar tidak terbaca praktikan (SRS003).
+  sessionCodes: 'sessionCodes',
   attendances: 'attendances',
   leaveRequests: 'leaveRequests',
 } as const;
