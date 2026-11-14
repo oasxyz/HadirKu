@@ -1,9 +1,11 @@
-// src/components/attendance-action.tsx
 // SRS004 (PIC C — Varissa): presensi via kode manual ATAU scan QR.
+// Kode sesi TIDAK dibaca client (dipindah ke koleksi sessionCodes yang praktikan tidak bisa akses).
+// Validasi kode benar/salah sepenuhnya dilakukan oleh Firestore rules saat create.
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import { doc, setDoc } from '@react-native-firebase/firestore';
-import React, { useState } from 'react';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Location from 'expo-location';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -19,8 +21,46 @@ import { DigitBoxes, Illustration } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useSessions } from '@/hooks/use-sessions';
-import { db, COLLECTIONS, attendanceDocId } from '@/services/firebase';
-import type { Session } from '@/types';
+import { COLLECTIONS, attendanceDocId, db } from '@/services/firebase';
+import type { Coordinates, Session } from '@/types';
+import { getAuthErrorMessage } from '@/utils/auth-error';
+import { sesiSudahBerakhir } from '@/utils/sesi';
+
+// Jarak lingkaran besar haversine dalam meter antara dua titik lat/lng.
+function haversineMeter(a: Coordinates, b: Coordinates): number {
+  const R = 6_371_000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLng = Math.sin(dLng / 2);
+  const h =
+    sinDLat * sinDLat +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinDLng * sinDLng;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// Ambil jarak praktikan ke asisten. Return null kalau izin ditolak, GPS gagal, atau coords tidak ada.
+// TIDAK PERNAH throw — presensi harus tetap bisa jalan walau lokasi gagal.
+async function hitungJarakAman(
+  asistenCoords: Coordinates | null | undefined,
+): Promise<number | null> {
+  if (!asistenCoords) return null;
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return null;
+    const position = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    const praktikanCoords: Coordinates = {
+      lat: position.coords.latitude,
+      lng: position.coords.longitude,
+    };
+    return Math.round(haversineMeter(asistenCoords, praktikanCoords));
+  } catch {
+    return null;
+  }
+}
 
 export default function AttendanceAction({
   sessionId,
@@ -34,6 +74,7 @@ export default function AttendanceAction({
 
   const [kode, setKode] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [scannerError, setScannerError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -50,7 +91,9 @@ export default function AttendanceAction({
 
   if (!session) return null;
 
-  // === KONDISI 1: Sesi belum dibuka ===
+  // Sesi yang sudah lewat jamSelesai + TOLERANSI (walau status masih 'dibuka') diperlakukan ditutup.
+  const sesiBerakhir = sesiSudahBerakhir(session);
+
   if (session.status === 'belum_dibuka') {
     return (
       <View style={styles.banner}>
@@ -59,8 +102,7 @@ export default function AttendanceAction({
     );
   }
 
-  // === KONDISI 2: Sesi sudah ditutup ===
-  if (session.status === 'ditutup') {
+  if (session.status === 'ditutup' || sesiBerakhir) {
     return (
       <View style={[styles.banner, styles.closedBorder]}>
         <Text style={[styles.bannerText, { color: Palette.ink }]}>
@@ -70,7 +112,6 @@ export default function AttendanceAction({
     );
   }
 
-  // === KONDISI 3: Sudah hadir ===
   if (existingAttendance) {
     const waktu = new Date(existingAttendance.waktuPresensi);
     const jam = waktu.toLocaleTimeString('id-ID', {
@@ -92,54 +133,72 @@ export default function AttendanceAction({
     );
   }
 
-  // === KONDISI 4: Sesi dibuka, belum hadir ===
-  // PENTING: pakai arrow function, BUKAN function declaration, biar TypeScript
-  // bisa narrow `session` dari null check di atas ke dalam closure ini.
-  const submitPresensi = async (inputKode: string) => {
-    setErrorMsg(null);
+  const submitPresensi = async (inputKode: string, fromScanner = false) => {
+    const setError = fromScanner ? setScannerError : setErrorMsg;
+    setError(null);
     const trimmed = inputKode.trim();
 
     if (!currentUser) {
-      setErrorMsg('Pengguna belum masuk');
+      setError('Pengguna belum masuk');
       return;
     }
     if (trimmed.length === 0) {
-      setErrorMsg('Masukkan kode sesi terlebih dahulu');
+      setError('Masukkan kode sesi terlebih dahulu');
       return;
     }
     if (trimmed.length !== 6) {
-      setErrorMsg('Kode sesi harus 6 digit');
+      setError('Kode sesi harus 6 digit');
       return;
     }
+    // Tidak ada lagi cek session.kodeSesi di sini — kode sesi tidak dibaca client.
+    // Kode dikirim apa adanya ke server, dan rules yang akan memvalidasi cocok/tidaknya.
     if (!session.pesertaIds.includes(currentUserId)) {
-      setErrorMsg('Anda bukan peserta sesi ini');
+      setError('Anda bukan peserta sesi ini');
+      return;
+    }
+    // Cek ulang kalau sesi baru saja berakhir antara render dan submit
+    if (sesiSudahBerakhir(session)) {
+      setError('Sesi praktikum telah ditutup');
       return;
     }
 
     try {
       setSubmitting(true);
+
+      // Hitung jarak dulu (opsional, tidak menghalangi presensi kalau gagal)
+      const jarakMeter = await hitungJarakAman(session.asistenCoords);
+
       const attId = attendanceDocId(sessionId, currentUserId);
       const attRef = doc(db, COLLECTIONS.attendances, attId);
 
-      // Kode dikirim supaya firestore.rules bisa mencocokkannya dengan sessionCodes/{sessionId}.
-      // Kode sesi tidak lagi disimpan di dokumen sesi agar tidak terbaca praktikan.
-      await setDoc(attRef, {
+      const payload: {
+        sessionId: string;
+        userId: string;
+        waktuPresensi: string;
+        kode: string;
+        jarakMeter?: number;
+      } = {
         sessionId,
         userId: currentUserId,
         waktuPresensi: new Date().toISOString(),
         kode: trimmed,
-      });
+      };
+      if (jarakMeter !== null) payload.jarakMeter = jarakMeter;
+
+      await setDoc(attRef, payload);
 
       setKode('');
       setShowScanner(false);
       setShowSuccess(true);
     } catch (err: any) {
       console.error('Gagal mencatat presensi:', err);
+      // Rules yang memvalidasi kode benar/salah. Tidak ada info granular dari Firestore
+      // soal alasan spesifik penolakan, jadi permission-denied di sini paling sering
+      // berarti kode salah (skenario paling umum setelah validasi lain lolos di atas).
       if (err?.code === 'firestore/permission-denied') {
-        // Rules menolak kalau kode tidak cocok, sesi sudah ditutup, atau bukan peserta.
-        setErrorMsg('Presensi ditolak. Kode sesi salah atau sesi sudah ditutup.');
+        setError('Kode sesi tidak sesuai');
       } else {
-        setErrorMsg(err?.message ?? 'Gagal mencatat presensi');
+        setError(getAuthErrorMessage(err));
       }
     } finally {
       setSubmitting(false);
@@ -147,6 +206,7 @@ export default function AttendanceAction({
   };
 
   const openScanner = async () => {
+    setScannerError(null);
     if (!permission?.granted) {
       const result = await requestPermission();
       if (!result.granted) {
@@ -162,8 +222,12 @@ export default function AttendanceAction({
   const handleBarCodeScanned = ({ data }: { data: string }) => {
     if (scanned || submitting) return;
     setScanned(true);
-    setKode(data);
-    submitPresensi(data);
+    submitPresensi(data, true);
+  };
+
+  const scanAgain = () => {
+    setScannerError(null);
+    setScanned(false);
   };
 
   return (
@@ -191,7 +255,7 @@ export default function AttendanceAction({
 
       <TouchableOpacity
         style={[styles.submitButton, submitting && { opacity: 0.7 }]}
-        onPress={() => submitPresensi(kode)}
+        onPress={() => submitPresensi(kode, false)}
         disabled={submitting}>
         {submitting ? (
           <ActivityIndicator color="#FFFFFF" size="small" />
@@ -212,7 +276,6 @@ export default function AttendanceAction({
         <Text style={styles.scanButtonText}>Scan QR Code</Text>
       </Pressable>
 
-      {/* === Modal Scanner QR === */}
       <Modal
         visible={showScanner}
         animationType="slide"
@@ -229,15 +292,29 @@ export default function AttendanceAction({
               Scan QR yang ditampilkan asisten di layarnya
             </Text>
           </View>
+
+          {scannerError && (
+            <View style={styles.scannerErrorCard}>
+              <Text style={styles.scannerErrorText}>{scannerError}</Text>
+              <Pressable
+                onPress={scanAgain}
+                style={({ pressed }) => [styles.scanAgainBtn, pressed && { opacity: 0.7 }]}>
+                <Text style={styles.scanAgainText}>Coba Lagi</Text>
+              </Pressable>
+            </View>
+          )}
+
           {submitting && (
             <View style={styles.scannerLoading}>
               <ActivityIndicator size="large" color="#FFFFFF" />
               <Text style={{ color: '#FFFFFF', marginTop: 8 }}>Menyimpan presensi...</Text>
             </View>
           )}
+
           <Pressable
             onPress={() => {
               setScanned(false);
+              setScannerError(null);
               setShowScanner(false);
             }}
             style={({ pressed }) => [styles.closeScannerBtn, pressed && { opacity: 0.7 }]}>
@@ -247,7 +324,6 @@ export default function AttendanceAction({
         </View>
       </Modal>
 
-      {/* === Modal Sukses === */}
       <Modal
         visible={showSuccess}
         transparent
@@ -284,21 +360,9 @@ const styles = StyleSheet.create({
   closedBorder: { borderColor: 'rgba(23, 21, 28, 0.3)' },
   successBorder: { borderColor: 'rgba(226, 27, 208, 0.45)' },
   bannerText: { fontSize: 14, color: Palette.textSecondary, textAlign: 'center' },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Palette.text,
-    marginBottom: Spacing.two,
-  },
+  label: { fontSize: 14, fontWeight: '600', color: Palette.text, marginBottom: Spacing.two },
   codeField: { marginBottom: Spacing.two },
-  hiddenInput: {
-    bottom: 0,
-    left: 0,
-    opacity: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
+  hiddenInput: { bottom: 0, left: 0, opacity: 0, position: 'absolute', right: 0, top: 0 },
   errorText: { color: Palette.danger, fontSize: 13, marginBottom: Spacing.two },
   submitButton: {
     backgroundColor: Palette.primary,
@@ -318,32 +382,35 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 12,
   },
-  scanButtonText: {
-    color: Palette.primary,
+  scanButtonText: { color: Palette.primary, fontSize: 14, fontWeight: '600' },
+  scannerContainer: { flex: 1, backgroundColor: '#000000' },
+  scannerOverlay: { position: 'absolute', top: 80, left: 0, right: 0, alignItems: 'center' },
+  scannerTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
+  scannerSubtitle: { color: 'rgba(255, 255, 255, 0.7)', fontSize: 14, marginTop: 4 },
+  scannerErrorCard: {
+    position: 'absolute',
+    bottom: 140,
+    left: 24,
+    right: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    gap: 10,
+  },
+  scannerErrorText: {
+    color: Palette.danger,
     fontSize: 14,
     fontWeight: '600',
+    textAlign: 'center',
   },
-  scannerContainer: {
-    flex: 1,
-    backgroundColor: '#000000',
+  scanAgainBtn: {
+    backgroundColor: Palette.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 999,
   },
-  scannerOverlay: {
-    position: 'absolute',
-    top: 80,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  scannerTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  scannerSubtitle: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 14,
-    marginTop: 4,
-  },
+  scanAgainText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   scannerLoading: {
     position: 'absolute',
     top: 0,
