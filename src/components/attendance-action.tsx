@@ -1,6 +1,3 @@
-// SRS004 (PIC C — Varissa): presensi via kode manual ATAU scan QR.
-// Kode sesi TIDAK dibaca client (dipindah ke koleksi sessionCodes yang praktikan tidak bisa akses).
-// Validasi kode benar/salah sepenuhnya dilakukan oleh Firestore rules saat create.
 import { Ionicons } from '@expo/vector-icons';
 import { doc, setDoc } from '@react-native-firebase/firestore';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -26,7 +23,6 @@ import type { Coordinates, Session } from '@/types';
 import { getAuthErrorMessage } from '@/utils/auth-error';
 import { sesiSudahBerakhir } from '@/utils/sesi';
 
-// Jarak lingkaran besar haversine dalam meter antara dua titik lat/lng.
 function haversineMeter(a: Coordinates, b: Coordinates): number {
   const R = 6_371_000;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -40,8 +36,6 @@ function haversineMeter(a: Coordinates, b: Coordinates): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-// Ambil jarak praktikan ke asisten. Return null kalau izin ditolak, GPS gagal, atau coords tidak ada.
-// TIDAK PERNAH throw — presensi harus tetap bisa jalan walau lokasi gagal.
 async function hitungJarakAman(
   asistenCoords: Coordinates | null | undefined,
 ): Promise<number | null> {
@@ -91,7 +85,6 @@ export default function AttendanceAction({
 
   if (!session) return null;
 
-  // Sesi yang sudah lewat jamSelesai + TOLERANSI (walau status masih 'dibuka') diperlakukan ditutup.
   const sesiBerakhir = sesiSudahBerakhir(session);
 
   if (session.status === 'belum_dibuka') {
@@ -150,13 +143,11 @@ export default function AttendanceAction({
       setError('Kode sesi harus 6 digit');
       return;
     }
-    // Tidak ada lagi cek session.kodeSesi di sini — kode sesi tidak dibaca client.
-    // Kode dikirim apa adanya ke server, dan rules yang akan memvalidasi cocok/tidaknya.
+
     if (!session.pesertaIds.includes(currentUserId)) {
       setError('Anda bukan peserta sesi ini');
       return;
     }
-    // Cek ulang kalau sesi baru saja berakhir antara render dan submit
     if (sesiSudahBerakhir(session)) {
       setError('Sesi praktikum telah ditutup');
       return;
@@ -165,7 +156,6 @@ export default function AttendanceAction({
     try {
       setSubmitting(true);
 
-      // Hitung jarak dulu (opsional, tidak menghalangi presensi kalau gagal)
       const jarakMeter = await hitungJarakAman(session.asistenCoords);
 
       const attId = attendanceDocId(sessionId, currentUserId);
@@ -192,9 +182,6 @@ export default function AttendanceAction({
       setShowSuccess(true);
     } catch (err: any) {
       console.error('Gagal mencatat presensi:', err);
-      // Rules yang memvalidasi kode benar/salah. Tidak ada info granular dari Firestore
-      // soal alasan spesifik penolakan, jadi permission-denied di sini paling sering
-      // berarti kode salah (skenario paling umum setelah validasi lain lolos di atas).
       if (err?.code === 'firestore/permission-denied') {
         setError('Kode sesi tidak sesuai');
       } else {
