@@ -1,5 +1,4 @@
-// src/components/izin/pengajuan-izin.tsx
-// SRS006 (pengajuan dan status izin) dan SRS007 (klasifikasi AI) — PIC C.
+import { sesiSudahBerakhir } from '@/utils/sesi';
 import { addDoc, collection } from '@react-native-firebase/firestore';
 import { router, type Href } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -81,9 +80,9 @@ export function PengajuanIzin() {
     );
   }
 
-  // Sesi yang bisa diajukan izin: user adalah peserta, sesi belum ditutup, dan belum ada izin menunggu
   const sesiBisaDiajukan = sessions.filter((s) => {
     if (s.status === 'ditutup') return false;
+    if (sesiSudahBerakhir(s)) return false; 
     const sudahAdaMenunggu = myLeaves.some(
       (lr) => lr.sessionId === s.id && lr.status === 'menunggu',
     );
