@@ -32,7 +32,7 @@ import { formatTanggal } from '@/utils/format';
 
 export function PengajuanIzin() {
   const currentUser = useCurrentUser();
-  const { sessions, loading: sessionsLoading, error: sessionsError } = useSessions();
+  const { sessions, attendances, loading: sessionsLoading, error: sessionsError } = useSessions();
   const { leaveRequests, loading: leaveLoading, error: leaveError } = useLeaveRequests();
 
   const [showForm, setShowForm] = useState(false);
@@ -46,7 +46,6 @@ export function PengajuanIzin() {
     if (!currentUser) router.replace('/login' as Href);
   }, [currentUser]);
 
-  // Hanya izin milik praktikan yang login
   const myLeaves = useMemo(
     () =>
       currentUser
@@ -82,7 +81,12 @@ export function PengajuanIzin() {
 
   const sesiBisaDiajukan = sessions.filter((s) => {
     if (s.status === 'ditutup') return false;
-    if (sesiSudahBerakhir(s)) return false; 
+    if (sesiSudahBerakhir(s)) return false;
+    // Sudah hadir di sesi ini → tidak perlu ajukan izin
+    const sudahHadir = attendances.some(
+      (a) => a.sessionId === s.id && a.userId === currentUser.id,
+    );
+    if (sudahHadir) return false;
     const sudahAdaMenunggu = myLeaves.some(
       (lr) => lr.sessionId === s.id && lr.status === 'menunggu',
     );
@@ -183,7 +187,6 @@ export function PengajuanIzin() {
         </View>
       )}
 
-      {/* === Modal Form Pengajuan === */}
       <Modal
         visible={showForm}
         animationType="fade"
@@ -247,7 +250,6 @@ export function PengajuanIzin() {
         </View>
       </Modal>
 
-      {/* === Modal Picker Sesi === */}
       <Modal
         visible={showPicker}
         animationType="fade"
