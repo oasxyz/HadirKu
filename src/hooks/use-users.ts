@@ -5,18 +5,25 @@ import { useCurrentUser } from '@/context/auth-context';
 import { db, COLLECTIONS } from '@/services/firebase';
 import type { User } from '@/types';
 
+type PraktikanState = {
+  userId: string | null;
+  praktikanList: User[];
+  loading: boolean;
+};
+
 export function usePraktikanList() {
   const currentUser = useCurrentUser();
-  const [praktikanList, setPraktikanList] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const canRead = currentUser?.role === 'asisten';
+  const [state, setState] = useState<PraktikanState>({
+    userId: null,
+    praktikanList: [],
+    loading: true,
+  });
 
   useEffect(() => {
-    // Sesuai firestore.rules: Hanya asisten yang berhak membaca daftar semua user praktikan
-    if (!currentUser || currentUser.role !== 'asisten') {
-      setPraktikanList([]);
-      setLoading(false);
-      return;
-    }
+    // Sesuai firestore.rules: Hanya asisten yang berhak membaca daftar semua user praktikan.
+    // Jangan setState di dalam effect; nilai kosong diturunkan saat return.
+    if (!currentUser || currentUser.role !== 'asisten') return;
 
     const q = query(collection(db, COLLECTIONS.users), where('role', '==', 'praktikan'));
     const unsubscribe = onSnapshot(
@@ -33,17 +40,21 @@ export function usePraktikanList() {
             email: data.email ?? '',
           });
         });
-        setPraktikanList(users);
-        setLoading(false);
+        setState({ userId: currentUser.id, praktikanList: users, loading: false });
       },
       (error) => {
         console.error('Gagal mengambil daftar praktikan:', error);
-        setLoading(false);
+        setState({ userId: currentUser.id, praktikanList: [], loading: false });
       },
     );
 
     return () => unsubscribe();
   }, [currentUser]);
 
-  return { praktikanList, loading };
+  const isSynced = canRead && state.userId === currentUser?.id;
+
+  return {
+    praktikanList: isSynced ? state.praktikanList : [],
+    loading: canRead ? (isSynced ? state.loading : true) : false,
+  };
 }
