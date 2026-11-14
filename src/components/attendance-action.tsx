@@ -1,9 +1,13 @@
-// SRS004 (PIC C — Varissa): presensi; simpan ke Firestore dengan ID dokumen sessionId_uid.
+// src/components/attendance-action.tsx
+// SRS004 (PIC C — Varissa): presensi via kode manual ATAU scan QR.
+import { Ionicons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { doc, setDoc } from '@react-native-firebase/firestore';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -15,7 +19,7 @@ import { DigitBoxes, Illustration } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useSessions } from '@/hooks/use-sessions';
-import { db, COLLECTIONS } from '@/services/firebase';
+import { db, COLLECTIONS, attendanceDocId } from '@/services/firebase';
 import type { Session } from '@/types';
 
 export default function AttendanceAction({
@@ -32,6 +36,10 @@ export default function AttendanceAction({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanned, setScanned] = useState(false);
+
+  const [permission, requestPermission] = useCameraPermissions();
 
   const session = propSession ?? sessions.find((s) => s.id === sessionId);
   const currentUserId = currentUser?.id ?? '';
@@ -85,9 +93,11 @@ export default function AttendanceAction({
   }
 
   // === KONDISI 4: Sesi dibuka, belum hadir ===
-  const handleSubmit = async () => {
+  // PENTING: pakai arrow function, BUKAN function declaration, biar TypeScript
+  // bisa narrow `session` dari null check di atas ke dalam closure ini.
+  const submitPresensi = async (inputKode: string) => {
     setErrorMsg(null);
-    const trimmed = kode.trim();
+    const trimmed = inputKode.trim();
 
     if (!currentUser) {
       setErrorMsg('Pengguna belum masuk');
@@ -112,31 +122,54 @@ export default function AttendanceAction({
 
     try {
       setSubmitting(true);
-      // Format ID: sessionId_uid sesuai aturan firestore.rules
-      const attendanceId = `${sessionId}_${currentUserId}`;
-      const attendanceRef = doc(db, COLLECTIONS.attendances, attendanceId);
+      const attId = attendanceDocId(sessionId, currentUserId);
+      const attRef = doc(db, COLLECTIONS.attendances, attId);
 
-      await setDoc(attendanceRef, {
+      await setDoc(attRef, {
         sessionId,
         userId: currentUserId,
         waktuPresensi: new Date().toISOString(),
       });
 
       setKode('');
+      setShowScanner(false);
       setShowSuccess(true);
     } catch (err: any) {
-      console.error('Gagal mencatat presensi Firestore:', err);
-      setErrorMsg(err?.message ?? 'Gagal mencatat presensi');
+      console.error('Gagal mencatat presensi:', err);
+      if (err?.code === 'firestore/permission-denied') {
+        setErrorMsg('Presensi ditolak. Pastikan sesi masih dibuka dan Anda peserta sesi ini.');
+      } else {
+        setErrorMsg(err?.message ?? 'Gagal mencatat presensi');
+      }
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const openScanner = async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        setErrorMsg('Izin kamera diperlukan untuk scan QR');
+        return;
+      }
+    }
+    setScanned(false);
+    setErrorMsg(null);
+    setShowScanner(true);
+  };
+
+  const handleBarCodeScanned = ({ data }: { data: string }) => {
+    if (scanned || submitting) return;
+    setScanned(true);
+    setKode(data);
+    submitPresensi(data);
   };
 
   return (
     <View>
       <Text style={styles.label}>Masukkan Kode Sesi</Text>
 
-      {/* Kotak digit hanya tampilan; input aslinya transparan di atasnya supaya ketukan membuka keyboard. */}
       <View style={styles.codeField}>
         <DigitBoxes value={kode} error={errorMsg !== null} />
         <TextInput
@@ -158,7 +191,7 @@ export default function AttendanceAction({
 
       <TouchableOpacity
         style={[styles.submitButton, submitting && { opacity: 0.7 }]}
-        onPress={handleSubmit}
+        onPress={() => submitPresensi(kode)}
         disabled={submitting}>
         {submitting ? (
           <ActivityIndicator color="#FFFFFF" size="small" />
@@ -167,6 +200,54 @@ export default function AttendanceAction({
         )}
       </TouchableOpacity>
 
+      <Pressable
+        onPress={openScanner}
+        disabled={submitting}
+        style={({ pressed }) => [
+          styles.scanButton,
+          pressed && { opacity: 0.7 },
+          submitting && { opacity: 0.5 },
+        ]}>
+        <Ionicons name="qr-code-outline" size={18} color={Palette.primary} />
+        <Text style={styles.scanButtonText}>Scan QR Code</Text>
+      </Pressable>
+
+      {/* === Modal Scanner QR === */}
+      <Modal
+        visible={showScanner}
+        animationType="slide"
+        onRequestClose={() => setShowScanner(false)}>
+        <View style={styles.scannerContainer}>
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          />
+          <View style={styles.scannerOverlay}>
+            <Text style={styles.scannerTitle}>Arahkan ke QR Code</Text>
+            <Text style={styles.scannerSubtitle}>
+              Scan QR yang ditampilkan asisten di layarnya
+            </Text>
+          </View>
+          {submitting && (
+            <View style={styles.scannerLoading}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', marginTop: 8 }}>Menyimpan presensi...</Text>
+            </View>
+          )}
+          <Pressable
+            onPress={() => {
+              setScanned(false);
+              setShowScanner(false);
+            }}
+            style={({ pressed }) => [styles.closeScannerBtn, pressed && { opacity: 0.7 }]}>
+            <Ionicons name="close" size={24} color="#FFFFFF" />
+            <Text style={styles.closeScannerText}>Tutup</Text>
+          </Pressable>
+        </View>
+      </Modal>
+
+      {/* === Modal Sukses === */}
       <Modal
         visible={showSuccess}
         transparent
@@ -209,9 +290,7 @@ const styles = StyleSheet.create({
     color: Palette.text,
     marginBottom: Spacing.two,
   },
-  codeField: {
-    marginBottom: Spacing.two,
-  },
+  codeField: { marginBottom: Spacing.two },
   hiddenInput: {
     bottom: 0,
     left: 0,
@@ -220,22 +299,74 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  errorText: {
-    color: Palette.danger,
-    fontSize: 13,
-    marginBottom: Spacing.two,
-  },
+  errorText: { color: Palette.danger, fontSize: 13, marginBottom: Spacing.two },
   submitButton: {
     backgroundColor: Palette.primary,
     padding: 14,
     borderRadius: 999,
     alignItems: 'center',
   },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  scanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: Spacing.two,
+    borderWidth: 1,
+    borderColor: Palette.primary,
+    borderRadius: 999,
+    paddingVertical: 12,
+  },
+  scanButtonText: {
+    color: Palette.primary,
+    fontSize: 14,
     fontWeight: '600',
   },
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  scannerOverlay: {
+    position: 'absolute',
+    top: 80,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  scannerTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  scannerSubtitle: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  scannerLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeScannerBtn: {
+    position: 'absolute',
+    bottom: 60,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 999,
+  },
+  closeScannerText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(30,20,50,0.4)',
@@ -252,12 +383,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Palette.text,
-    marginBottom: Spacing.two,
-  },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: Palette.text, marginBottom: Spacing.two },
   modalSubtitle: {
     fontSize: 14,
     color: Palette.textSecondary,
@@ -270,9 +396,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     borderRadius: 999,
   },
-  modalButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  modalButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
 });
