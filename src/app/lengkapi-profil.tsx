@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TextField } from '@/components/text-field';
@@ -11,7 +11,7 @@ import type { Role } from '@/types';
 import { getAuthErrorMessage } from '@/utils/auth-error';
 
 export default function LengkapiProfilScreen() {
-  const { firebaseUser, completeProfile, signOut } = useAuth();
+  const { firebaseUser, currentUser, completeProfile, signOut } = useAuth();
 
   const [nama, setNama] = useState(firebaseUser?.displayName ?? '');
   const [nim, setNim] = useState('');
@@ -20,9 +20,22 @@ export default function LengkapiProfilScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Layar ini hanya untuk akun yang belum punya dokumen profil. Kalau profil sudah
+  // ada (mis. dibuka lewat back stack), jangan biarkan nama/NIM tertimpa.
+  useEffect(() => {
+    if (currentUser) {
+      router.replace('/jadwal' as Href);
+    }
+  }, [currentUser]);
+
   async function handleSave() {
     if (!nama.trim() || !nim.trim()) {
       setError('Nama lengkap dan NIM wajib diisi');
+      return;
+    }
+
+    if (!/^\d{6,20}$/.test(nim.trim())) {
+      setError('NIM harus berupa angka (6–20 digit)');
       return;
     }
 
@@ -47,7 +60,8 @@ export default function LengkapiProfilScreen() {
     try {
       setLoading(true);
       await signOut();
-    } catch (_) {
+    } catch {
+      // Abaikan: tetap arahkan ke login walau sign out gagal sebagian.
     } finally {
       setLoading(false);
       router.replace('/login' as Href);

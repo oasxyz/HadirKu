@@ -9,6 +9,9 @@ export function getAuthErrorMessage(error: any): string {
       return 'Email atau kata sandi salah';
     case 'auth/email-already-in-use':
       return 'Email sudah terdaftar';
+    case 'auth/account-exists-with-different-credential':
+    case 'auth/credential-already-in-use':
+      return 'Email ini sudah terdaftar dengan kata sandi. Masuk pakai email dan kata sandi.';
     case 'auth/weak-password':
       return 'Kata sandi minimal 6 karakter';
     case 'auth/invalid-email':

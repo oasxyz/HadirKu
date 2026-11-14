@@ -27,6 +27,11 @@ export default function RegisterScreen() {
       return;
     }
 
+    if (!/^\d{6,20}$/.test(nim.trim())) {
+      setError('NIM harus berupa angka (6–20 digit)');
+      return;
+    }
+
     if (password.length < 6) {
       setError('Kata sandi minimal 6 karakter');
       return;

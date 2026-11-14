@@ -5,7 +5,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar, Badge, ListRow, Screen, TopBar } from '@/components/ui';
 import { Palette } from '@/constants/theme';
-import { useAuth, useCurrentUser } from '@/context/auth-context';
+import { useAuth } from '@/context/auth-context';
 
 export default function ProfilScreen() {
   const { firebaseUser, currentUser, signOut } = useAuth();
