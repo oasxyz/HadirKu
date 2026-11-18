@@ -8,6 +8,7 @@ import { useCurrentUser } from '@/context/auth-context';
 
 const TAB_META: Record<string, { label: string; icon: IconName }> = {
   jadwal: { label: 'Beranda', icon: 'home-outline' },
+  peta: { label: 'Peta', icon: 'map-outline' },
   rekap: { label: 'Rekap', icon: 'stats-chart-outline' },
   catatan: { label: 'Catatan', icon: 'document-text-outline' },
   izin: { label: 'Izin', icon: 'chatbubbles-outline' },
@@ -44,7 +45,7 @@ export function FloatingTabBar({ state, navigation }: TabBarProps) {
                 accessibilityLabel={meta.label}
                 onPress={() => navigation.navigate(route.name)}
                 style={[styles.item, active && styles.itemActive]}>
-                <Ionicons name={meta.icon} size={19} color={active ? '#FFFFFF' : Palette.text} />
+                <Ionicons name={meta.icon} size={18} color={active ? '#FFFFFF' : Palette.text} />
                 {active ? <Text style={styles.label}>{meta.label}</Text> : null}
               </Pressable>
             );
@@ -62,14 +63,14 @@ const styles = StyleSheet.create({
     right: 0,
   },
   bar: {
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
     borderColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 999,
     borderWidth: 1,
     boxShadow: '0 14px 34px rgba(90, 70, 130, 0.20)',
     flexDirection: 'row',
-    gap: 8,
-    padding: 7,
+    gap: 6,
+    padding: 6,
   },
   item: {
     alignItems: 'center',
@@ -77,14 +78,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     boxShadow: shadow,
     flexDirection: 'row',
-    height: 48,
+    height: 44,
     justifyContent: 'center',
-    width: 48,
+    width: 44,
   },
   itemActive: {
     backgroundColor: Palette.primary,
-    gap: 7,
-    paddingHorizontal: 18,
+    gap: 6,
+    paddingHorizontal: 15,
     width: 'auto',
   },
   label: {

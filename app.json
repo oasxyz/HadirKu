@@ -19,7 +19,17 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.oasxyz.HadirKu",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "config": {
+        "googleMaps": {
+          "apiKey": "KOSONGKAN_DULU_TUNGGU_ASPRAK"
+        }
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "output": "static",
@@ -66,7 +76,20 @@
           "recordAudioAndroid": false
         }
       ],
-      "expo-location"
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "HadirKu memerlukan akses lokasi untuk memastikan Anda berada di dalam radius laboratorium saat melakukan presensi."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#E21BD0"
+        }
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -75,9 +98,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "be49fc7d-c5db-48b4-8bb6-c131b710c3e3"
+        "projectId": "4a9e9685-9df0-4ff4-82a7-b45391743b12"
       }
     },
-    "owner": "anniszkk"
+    "owner": "uusss"
   }
 }

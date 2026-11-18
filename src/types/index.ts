@@ -1,25 +1,13 @@
 export type Role = 'asisten' | 'praktikan';
 
-// Sprint 2: `id` = uid Firebase Auth, dokumen disimpan di koleksi `users`.
 export interface User {
-  id: string;
+  id: string; // uid Firebase Auth
   nama: string;
   nim: string;
   role: Role;
   email?: string;
+  pushTokens?: string[]; // Sprint 3: Token FCM untuk push notification
 }
-
-// Sprint 2: koleksi `classes`. Sesi dibuat dari kelas dan menyalin
-// praktikum, kelasLab, asistenId, dan pesertaIds (denormalisasi agar rules dan query sederhana).
-export interface Kelas {
-  id: string;
-  praktikum: string;
-  kelasLab: string;
-  asistenId: string;
-  pesertaIds: string[];
-}
-
-export type SessionStatus = 'belum_dibuka' | 'dibuka' | 'ditutup';
 
 // Titik lokasi dalam derajat desimal (WGS84).
 export interface Coordinates {
@@ -27,44 +15,83 @@ export interface Coordinates {
   lng: number;
 }
 
+// Sprint 3: Entitas laboratorium untuk validasi lokasi dan Peta
+export interface Lab {
+  id: string; // misal: 'gedung-ap', 'lab-b', 'lab-c', 'lab-d'
+  namaLab: string;
+  deskripsi?: string;
+  latitude: number;
+  longitude: number;
+  radiusMeter: number;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+export interface Kelas {
+  id: string;
+  praktikum: string;
+  labId?: string; // Sprint 3: referensi ke koleksi labs
+  kelasLab: string;
+  asistenId: string;
+  pesertaIds: string[];
+}
+
+export type SessionStatus = 'belum_dibuka' | 'dibuka' | 'ditutup';
+
 export interface Session {
   id: string;
   kelasId?: string;
   praktikum: string;
+  labId?: string; // Sprint 3: referensi ke koleksi labs (opsional selama transisi dari Sprint 2)
   kelasLab: string;
-  tanggal: string;
-  jamMulai: string;
-  jamSelesai: string;
+  tanggal: string; // YYYY-MM-DD
+  jamMulai: string; // HH:mm
+  jamSelesai: string; // HH:mm
   asistenId: string;
   pesertaIds: string[];
-  kodeSesi: string | null;
   status: SessionStatus;
-  // Nama asisten, disalin saat sesi dibuat agar praktikan tidak perlu membaca dokumen `users` asisten
-  // (rules melarang praktikan membaca data pengguna lain). Sesi lama belum punya field ini.
   asistenNama?: string;
-  // Lokasi asisten saat sesi dibuka, acuan jarak presensi. Null jika izin ditolak atau GPS gagal.
-  // Dikosongkan (null) saat sesi ditutup karena dokumen sesi terbaca oleh peserta.
+  updatedAt?: string;
+  /** @deprecated Sprint 3: Gunakan koleksi sessionCodes / sessionSecrets */
+  kodeSesi?: string | null;
+  /** @deprecated Sprint 3: Titik acuan lokasi kini diambil dari koleksi labs */
   asistenCoords?: Coordinates | null;
 }
 
-// Sprint 2: ID dokumen presensi = `${sessionId}_${userId}` (lihat services/firebase.ts)
-// sehingga presensi ganda otomatis ditolak.
+// Sprint 3: Rahasia kode sesi yang terpisah dari dokumen publik sessions
+export interface SessionSecret {
+  id: string; // Sama dengan sessionId
+  kodeSesi: string; // 6 digit
+  asistenId: string;
+  updatedAt?: string;
+}
+
+export type AttendanceMethod = 'qr' | 'kode';
+
 export interface Attendance {
-  id: string;
+  id: string; // Composite ID: sessionId_userId
   sessionId: string;
   userId: string;
   waktuPresensi: string;
-  // Jarak praktikan ke asisten saat presensi, dalam meter (dibulatkan). Hanya jarak, bukan koordinat.
-  // Kosong jika lokasi tidak tersedia; kosong berarti tidak ditandai, bukan di luar batas.
   jarakMeter?: number | null;
+  radiusSaatPresensi?: number;
+  metode?: AttendanceMethod;
 }
 
-// Nilai enum di bawah sudah ditetapkan di SRS Sprint 2; jangan menambah nilai sendiri.
 export type LeaveStatus = 'menunggu' | 'diterima' | 'ditolak';
-export type LeaveCategory = 'sakit' | 'keluarga' | 'akademik' | 'lainnya';
 
-// Sprint 2: koleksi `leaveRequests`. `kategoriAi` hanya informasi pendukung
-// (null jika AI gagal atau belum dijalankan); keputusan hanya dari asisten.
+// Sprint 3 menggunakan 'sakit' | 'izin'. Nilai Sprint 2 dipertahankan di union agar
+// kode lama dan dokumen Firestore lama tidak error saat dikompilasi/dibaca.
+export type LeaveCategory = 'sakit' | 'izin' | 'keluarga' | 'akademik' | 'lainnya';
+
+// Helper untuk menormalisasi kategori izin lama Sprint 2 ke standar Sprint 3 ('sakit' | 'izin')
+export function normalizeLeaveCategory(
+  category: LeaveCategory | null | undefined
+): 'sakit' | 'izin' | null {
+  if (!category) return null;
+  return category === 'sakit' ? 'sakit' : 'izin';
+}
+
 export interface LeaveRequest {
   id: string;
   sessionId: string;
@@ -77,6 +104,30 @@ export interface LeaveRequest {
   diputuskanAt: string | null;
 }
 
+// Sprint 3: Status akhir kehadiran praktikan untuk Rekap Asisten & Catatan Praktikan
+export type FinalAttendanceStatus = 'hadir' | 'sakit' | 'izin' | 'alpha' | 'belum_hadir';
+
+export type NotificationType = 'sesi_dibuka' | 'jadwal_berubah' | 'izin_diterima' | 'izin_ditolak';
+
+export interface Notification {
+  id: string;
+  targetUserIds: string[];
+  title: string;
+  body: string;
+  type: NotificationType;
+  sessionId?: string;
+  createdAt: string;
+  readBy: string[];
+}
+
+export interface AppConfig {
+  enforceMockLocationBlock: boolean;
+  gpsAccuracyBufferMeter: number;
+  useOsmFallbackTiles: boolean;
+  aiTimeoutMs: number;
+}
+
+/** @deprecated Sprint 1 legacy state — akan dihapus saat pembersihan AppProvider (SRS3-02) */
 export interface AppState {
   currentUserId: string;
   users: User[];
@@ -84,6 +135,7 @@ export interface AppState {
   attendances: Attendance[];
 }
 
+/** @deprecated Sprint 1 legacy action — akan dihapus saat pembersihan AppProvider (SRS3-02) */
 export type AppAction =
   | { type: 'OPEN_SESSION'; sessionId: string }
   | { type: 'CLOSE_SESSION'; sessionId: string }
