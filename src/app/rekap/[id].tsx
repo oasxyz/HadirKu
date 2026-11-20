@@ -1,33 +1,60 @@
-// SRS005 rekap (PIC B — Yustinus): detail kehadiran per sesi, realtime dari Firestore.
+// SRS3-04 (PIC B — Annis): detail rekap per sesi dengan 4 status (Hadir, Sakit, Izin, Alpha).
+// Data realtime dari Firestore: sesi, presensi, dan pengajuan izin.
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router, type Href } from 'expo-router';
-import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StatusBadge } from '@/components/status-badge';
 import {
-  Badge,
-  Chip,
-  EmptyNote,
-  GlassCard,
-  Screen,
-  SectionTitle,
-  TopBar,
-} from '@/components/ui';
+  LABEL_STATUS_KEHADIRAN,
+  StatusKehadiranBadge,
+  WARNA_ANGKA_STATUS,
+} from '@/components/status-kehadiran-badge';
+import { Badge, Chip, EmptyNote, GlassCard, Screen, SectionTitle, TopBar } from '@/components/ui';
 import { BATAS_JARAK_METER } from '@/constants/lokasi';
 import { Palette } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
+import { useLeaveRequests } from '@/hooks/use-leave-requests';
 import { useSessions } from '@/hooks/use-sessions';
 import { usePraktikanList } from '@/hooks/use-users';
+import type { Attendance, FinalAttendanceStatus } from '@/types';
 import { formatRentangJam, formatTanggal } from '@/utils/format';
+import { hitungStatusKehadiran, ringkasKehadiran, sesiSelesai } from '@/utils/status-kehadiran';
 
-const BAR_HEIGHT = 150;
+// Status sesi bisa berubah hanya karena waktu (lewat jamSelesai + toleransi), jadi layar
+// dihitung ulang berkala walaupun tidak ada perubahan di Firestore.
+const INTERVAL_JAM_MS = 30_000;
+
+const URUTAN_STATUS: Record<FinalAttendanceStatus, number> = {
+  hadir: 0,
+  sakit: 1,
+  izin: 2,
+  alpha: 3,
+  belum_hadir: 3,
+};
+
+function useSekarang(): Date {
+  const [sekarang, setSekarang] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setSekarang(new Date()), INTERVAL_JAM_MS);
+    return () => clearInterval(timer);
+  }, []);
+  return sekarang;
+}
+
+function formatJam(iso: string): string {
+  return new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function RekapDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const currentUser = useCurrentUser();
+  const sekarang = useSekarang();
   const { sessions, attendances, loading: sessionsLoading, error } = useSessions();
+  const { leaveRequests, loading: izinLoading, error: izinError } = useLeaveRequests();
   const { praktikanList, loading: usersLoading } = usePraktikanList();
+  const [filter, setFilter] = useState<FinalAttendanceStatus | null>(null);
 
   useEffect(() => {
     if (!currentUser) {
@@ -39,13 +66,13 @@ export default function RekapDetailScreen() {
     return null;
   }
 
-  if (sessionsLoading || usersLoading) {
+  if (sessionsLoading || usersLoading || izinLoading) {
     return (
       <Screen withTabBar={false}>
         <TopBar title="Rekap" back fallback="/rekap" />
-        <GlassCard style={{ alignItems: 'center', padding: 24, gap: 12 }}>
+        <GlassCard style={styles.loadingCard}>
           <ActivityIndicator size="large" color={Palette.primary} />
-          <Text style={{ color: Palette.textSecondary, fontSize: 14 }}>Memuat...</Text>
+          <Text style={styles.loadingText}>Memuat...</Text>
         </GlassCard>
       </Screen>
     );
@@ -74,19 +101,60 @@ export default function RekapDetailScreen() {
     );
   }
 
-  const attendees = attendances
-    .filter((item) => item.sessionId === session.id)
-    .sort(
-      (a, b) =>
-        new Date(b.waktuPresensi).getTime() - new Date(a.waktuPresensi).getTime(),
-    )
-    .map((item) => ({ item, user: praktikanList.find((user) => user.id === item.userId) }));
+  const selesai = sesiSelesai(session, sekarang);
 
+  // Untuk yang belum hadir atau Alpha: tunjukkan izin yang belum diterima supaya asisten
+  // tahu alasannya tanpa membuka tab Izin. Data Sprint 2 bisa punya beberapa dokumen, ambil terbaru.
+  function keteranganIzin(userId: string, status: FinalAttendanceStatus): string | null {
+    if (status !== 'belum_hadir' && status !== 'alpha') return null;
+    const terbaru = leaveRequests
+      .filter((item) => item.sessionId === session!.id && item.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (!terbaru) return null;
+    if (terbaru.status === 'menunggu') return 'Izin menunggu';
+    if (terbaru.status === 'ditolak') return 'Izin ditolak';
+    return null;
+  }
+
+  const peserta = session.pesertaIds
+    .map((userId) => {
+      const user = praktikanList.find((item) => item.id === userId);
+      const attendance = attendances.find(
+        (item) => item.sessionId === session.id && item.userId === userId,
+      );
+      const status = hitungStatusKehadiran(session, userId, attendances, leaveRequests, sekarang);
+      return { userId, user, attendance, status, keteranganIzin: keteranganIzin(userId, status) };
+    })
+    .sort((a, b) => {
+      const byStatus = URUTAN_STATUS[a.status] - URUTAN_STATUS[b.status];
+      if (byStatus !== 0) return byStatus;
+      // Yang hadir diurutkan dari presensi paling awal, sisanya menurut nama.
+      if (a.attendance && b.attendance) {
+        return a.attendance.waktuPresensi.localeCompare(b.attendance.waktuPresensi);
+      }
+      return (a.user?.nama ?? '').localeCompare(b.user?.nama ?? '');
+    });
+
+  const ringkasan = ringkasKehadiran(peserta.map((item) => item.status));
   const total = session.pesertaIds.length;
-  const hadir = attendees.length;
-  const belum = Math.max(total - hadir, 0);
-  const barHeight = (count: number) =>
-    total === 0 ? 28 : Math.max(28, (count / total) * BAR_HEIGHT);
+
+  // Kotak keempat: Belum Hadir selama sesi berjalan, Alpha setelah sesi selesai.
+  const kotakRingkasan: FinalAttendanceStatus[] = [
+    'hadir',
+    'sakit',
+    'izin',
+    selesai ? 'alpha' : 'belum_hadir',
+  ];
+  // Filter Belum Hadir otomatis menjadi Alpha (dan sebaliknya) saat sesi berganti status.
+  const filterAktif: FinalAttendanceStatus | null =
+    filter === 'belum_hadir' && selesai
+      ? 'alpha'
+      : filter === 'alpha' && !selesai
+        ? 'belum_hadir'
+        : filter;
+  const pesertaTampil = filterAktif
+    ? peserta.filter((item) => item.status === filterAktif)
+    : peserta;
 
   return (
     <Screen withTabBar={false}>
@@ -108,77 +176,126 @@ export default function RekapDetailScreen() {
         <View>
           <Text style={styles.statLabel}>Praktikan Hadir</Text>
           <Text style={styles.statValue}>
-            {hadir} / {total}
+            {ringkasan.hadir} / {total}
           </Text>
         </View>
       </View>
 
-      <View style={styles.bars}>
-        <Bar label="Hadir" value={hadir} height={barHeight(hadir)} color="#EFB4EA" />
-        <Bar label="Belum hadir" value={belum} height={barHeight(belum)} color="#DDD3EC" />
+      <View style={styles.summaryRow}>
+        {kotakRingkasan.map((status) => (
+          <SummaryBox
+            key={status}
+            label={LABEL_STATUS_KEHADIRAN[status]}
+            value={ringkasan[status]}
+            color={WARNA_ANGKA_STATUS[status]}
+            selected={filterAktif === status}
+            onPress={() => setFilter(filterAktif === status ? null : status)}
+          />
+        ))}
       </View>
 
-      <GlassCard style={styles.listCard}>
-        <SectionTitle title="Daftar Kehadiran" />
-        {attendees.length === 0 ? (
-          <Text style={styles.empty}>Belum ada praktikan yang melakukan presensi.</Text>
-        ) : (
-          attendees.map(({ item, user }) => {
-            const jarakMeter = item.jarakMeter;
-            const isSuspicious =
-              jarakMeter !== undefined &&
-              jarakMeter !== null &&
-              jarakMeter > BATAS_JARAK_METER;
+      {izinError ? (
+        <Text style={styles.warningText}>
+          Data izin gagal dimuat, jadi Sakit dan Izin belum terhitung. Coba buka ulang layar ini.
+        </Text>
+      ) : null}
 
-            return (
-              <View key={item.id} style={styles.row}>
-                <View style={styles.rowText}>
-                  <Text style={styles.rowName}>{user?.nama ?? '-'}</Text>
-                  <Text style={styles.rowNim}>{user?.nim ?? ''}</Text>
-                  {isSuspicious && (
-                    <View style={styles.badgeWrapper}>
-                      <Badge label={`Di luar lab · ${Math.round(jarakMeter)}m`} tone="dark" />
-                    </View>
-                  )}
-                </View>
-                <Chip
-                  label={new Date(item.waktuPresensi).toLocaleTimeString('id-ID', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                />
+      <GlassCard style={styles.listCard}>
+        <SectionTitle
+          title={filterAktif ? `Peserta ${LABEL_STATUS_KEHADIRAN[filterAktif]}` : 'Daftar Peserta'}
+          right={
+            filterAktif ? (
+              <Pressable onPress={() => setFilter(null)} hitSlop={8} accessibilityRole="button">
+                <Text style={styles.resetText}>Tampilkan semua</Text>
+              </Pressable>
+            ) : undefined
+          }
+        />
+        {peserta.length === 0 ? (
+          <Text style={styles.empty}>Sesi ini belum memiliki peserta.</Text>
+        ) : pesertaTampil.length === 0 && filterAktif ? (
+          <Text style={styles.empty}>
+            Tidak ada peserta berstatus {LABEL_STATUS_KEHADIRAN[filterAktif]}.
+          </Text>
+        ) : (
+          pesertaTampil.map(({ userId, user, attendance, status, keteranganIzin: izin }) => (
+            <View key={userId} style={styles.row}>
+              <View style={styles.rowText}>
+                <Text style={styles.rowName}>{user?.nama ?? 'Praktikan tidak dikenal'}</Text>
+                <Text style={styles.rowNim}>
+                  {attendance ? `${user?.nim ?? ''} · ${keteranganPresensi(attendance)}` : user?.nim ?? ''}
+                </Text>
+                {izin ? <Text style={styles.rowNote}>{izin}</Text> : null}
+                {attendance && diLuarRadius(attendance) ? (
+                  <View style={styles.badgeWrapper}>
+                    <Badge label="Di luar radius" tone="dark" />
+                  </View>
+                ) : null}
               </View>
-            );
-          })
+              <StatusKehadiranBadge status={status} />
+            </View>
+          ))
         )}
       </GlassCard>
     </Screen>
   );
 }
 
-function Bar({
+function keteranganPresensi(attendance: Attendance): string {
+  const jam = formatJam(attendance.waktuPresensi);
+  const jarak = attendance.jarakMeter;
+  return jarak === undefined || jarak === null ? jam : `${jam} · ${Math.round(jarak)} m`;
+}
+
+// Presensi Sprint 3 menyimpan radius lab saat presensi; data Sprint 2 memakai batas lama.
+function diLuarRadius(attendance: Attendance): boolean {
+  const jarak = attendance.jarakMeter;
+  if (jarak === undefined || jarak === null) return false;
+  return jarak > (attendance.radiusSaatPresensi ?? BATAS_JARAK_METER);
+}
+
+function SummaryBox({
   label,
   value,
-  height,
   color,
+  selected,
+  onPress,
 }: {
   label: string;
   value: number;
-  height: number;
   color: string;
+  selected: boolean;
+  onPress: () => void;
 }) {
   return (
-    <View style={styles.barColumn}>
-      <View style={styles.barTrack}>
-        <View style={[styles.barFill, { height, backgroundColor: color }]} />
-      </View>
-      <Text style={styles.barLabel}>{label}</Text>
-      <Text style={styles.barValue}>{value} orang</Text>
-    </View>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`${label} ${value} orang, ketuk untuk menyaring daftar`}
+      style={({ pressed }) => [
+        styles.summaryBox,
+        selected && styles.summaryBoxSelected,
+        pressed && styles.pressed,
+      ]}>
+      <Text style={[styles.summaryValue, { color: selected ? '#FFFFFF' : color }]}>{value}</Text>
+      <Text style={[styles.summaryLabel, selected && styles.summaryLabelSelected]} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  loadingCard: {
+    alignItems: 'center',
+    gap: 12,
+    padding: 24,
+  },
+  loadingText: {
+    color: Palette.textSecondary,
+    fontSize: 14,
+  },
   titleBlock: {
     gap: 10,
   },
@@ -216,36 +333,49 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
   },
-  bars: {
+  summaryRow: {
     flexDirection: 'row',
-    gap: 14,
+    gap: 8,
   },
-  barColumn: {
+  summaryBox: {
     alignItems: 'center',
-    flex: 1,
-    gap: 4,
-  },
-  barTrack: {
-    alignItems: 'center',
-    height: BAR_HEIGHT + 20,
-    justifyContent: 'flex-end',
-    width: '100%',
-  },
-  barFill: {
+    backgroundColor: Palette.card,
     borderColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 26,
+    borderRadius: 18,
     borderWidth: 1,
-    width: '100%',
+    flex: 1,
+    gap: 2,
+    paddingHorizontal: 4,
+    paddingVertical: 14,
   },
-  barLabel: {
+  summaryBoxSelected: {
+    backgroundColor: Palette.ink,
+    borderColor: Palette.ink,
+  },
+  summaryLabelSelected: {
+    color: '#FFFFFF',
+  },
+  pressed: {
+    opacity: 0.75,
+  },
+  resetText: {
+    color: Palette.primary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  summaryValue: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  summaryLabel: {
+    color: Palette.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  warningText: {
     color: Palette.textSecondary,
     fontSize: 12,
-    marginTop: 6,
-  },
-  barValue: {
-    color: Palette.text,
-    fontSize: 18,
-    fontWeight: '600',
+    lineHeight: 17,
   },
   listCard: {
     gap: 12,
@@ -262,7 +392,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     paddingLeft: 20,
-    paddingRight: 8,
+    paddingRight: 12,
     paddingVertical: 12,
   },
   rowText: {
@@ -276,6 +406,11 @@ const styles = StyleSheet.create({
   rowNim: {
     color: Palette.textMuted,
     fontSize: 11,
+  },
+  rowNote: {
+    color: Palette.textSecondary,
+    fontSize: 11,
+    marginTop: 2,
   },
   badgeWrapper: {
     alignSelf: 'flex-start',
