@@ -3,7 +3,13 @@
 import { router, type Href } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { aktivitasLab, jarakMeter, type GrupLab, type Titik } from '@/components/peta/aktivitas-lab';
+import {
+  aktivitasLab,
+  jarakMeter,
+  namaGrup,
+  type GrupLab,
+  type Titik,
+} from '@/components/peta/aktivitas-lab';
 import { StatusBadge } from '@/components/status-badge';
 import { Badge, GlassCard } from '@/components/ui';
 import { Palette } from '@/constants/theme';
@@ -68,10 +74,13 @@ export function PanelLab({
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.labName} numberOfLines={1}>
-            {lab.namaLab}
+            {namaGrup(grup)}
           </Text>
           <Badge label={`Radius ${lab.radiusMeter} m`} tone="outline" />
         </View>
+        {grup.labs.length === 1 && lab.deskripsi ? (
+          <Text style={styles.subtle}>{lab.deskripsi}</Text>
+        ) : null}
         <Text style={styles.subtle}>{jarak}</Text>
 
         {grup.labs.length > 1 ? (

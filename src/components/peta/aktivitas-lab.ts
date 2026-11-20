@@ -25,6 +25,19 @@ export type GrupLab = {
 };
 
 /**
+ * Nama gedung untuk label marker dan judul panel.
+ * - Beberapa lab dalam satu titik dengan `deskripsi` sama (mis. "Gedung E"): pakai deskripsi itu.
+ * - Beberapa lab tanpa deskripsi yang sama: gabungan nama lab.
+ * - Satu lab: nama lab itu sendiri (deskripsinya ditampilkan sebagai keterangan).
+ */
+export function namaGrup(grup: GrupLab): string {
+  if (grup.labs.length === 1) return grup.labs[0].namaLab;
+  const deskripsi = grup.labs[0].deskripsi?.trim();
+  const semuaSama = Boolean(deskripsi) && grup.labs.every((lab) => lab.deskripsi?.trim() === deskripsi);
+  return semuaSama && deskripsi ? deskripsi : grup.labs.map((lab) => lab.namaLab).join(', ');
+}
+
+/**
  * Lab yang titiknya sama (mis. Lab B, C, D memakai patokan Gedung E) digabung menjadi satu
  * marker, supaya marker tidak menumpuk dan semuanya tetap bisa dipilih.
  */

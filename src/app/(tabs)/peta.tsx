@@ -9,7 +9,13 @@ import MapView, { Circle, Marker, UrlTile, type Region } from 'react-native-maps
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '@/components/error-boundary';
-import { kelompokkanLab, sedangBerlangsung, type GrupLab } from '@/components/peta/aktivitas-lab';
+import {
+  kelompokkanLab,
+  namaGrup,
+  sedangBerlangsung,
+  type GrupLab,
+} from '@/components/peta/aktivitas-lab';
+import { GAYA_PETA_PASTEL } from '@/components/peta/gaya-peta';
 import { KartuKondisi } from '@/components/peta/kartu-kondisi';
 import { PanelLab } from '@/components/peta/panel-lab';
 import { useLabsPeta } from '@/components/peta/use-labs-peta';
@@ -179,6 +185,7 @@ export default function PetaScreen() {
           style={StyleSheet.absoluteFill}
           initialRegion={regionAwal}
           mapType={pakaiOsm ? 'none' : 'standard'}
+          customMapStyle={pakaiOsm ? undefined : GAYA_PETA_PASTEL}
           toolbarEnabled={false}
           showsCompass={false}
           onPress={() => setLabTerpilih(null)}>
@@ -204,13 +211,14 @@ export default function PetaScreen() {
 
           {grupLab.map((grup) => {
             const aktif = grupAktif(grup);
-            const judul = grup.labs.map((lab) => lab.namaLab).join(', ');
+            const judul = namaGrup(grup);
             return (
               <Marker
-                // Warna marker kustom di Android baru berubah kalau marker dibuat ulang.
-                key={`lab-${grup.key}-${aktif ? 1 : 0}`}
+                // Isi marker kustom di Android baru berubah kalau marker dibuat ulang.
+                key={`lab-${grup.key}-${aktif ? 1 : 0}-${judul}`}
                 coordinate={{ latitude: grup.latitude, longitude: grup.longitude }}
-                anchor={{ x: 0.5, y: 1 }}
+                // Titik lancip pin (di atas label) yang menempel ke koordinat.
+                anchor={{ x: 0.5, y: 0.7 }}
                 tracksViewChanges={false}
                 accessibilityLabel={`Laboratorium ${judul}`}
                 onPress={() => pilihLab(grup.labs[0].id)}>
@@ -219,6 +227,9 @@ export default function PetaScreen() {
                     <View style={styles.pinDot} />
                   </View>
                   <View style={[styles.pinTail, { borderTopColor: aktif ? Palette.primary : Palette.ink }]} />
+                  <Text style={styles.pinLabel} numberOfLines={1}>
+                    {judul}
+                  </Text>
                 </View>
               </Marker>
             );
@@ -326,6 +337,16 @@ const styles = StyleSheet.create({
   },
   pinWrap: {
     alignItems: 'center',
+    width: 140,
+  },
+  pinLabel: {
+    color: Palette.ink,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+    textShadowColor: 'rgba(255, 255, 255, 0.95)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 4,
   },
   pin: {
     alignItems: 'center',
