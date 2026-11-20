@@ -240,7 +240,7 @@ export function DateTimeField({ label, value, mode = 'date', onChange, error }: 
         isVisible={isPickerVisible}
         mode={mode}
         date={value || new Date()}
-        onConfirm={(date) => { setPickerVisibility(false); onChange(date); }}
+        onConfirm={(date: Date) => { setPickerVisibility(false); onChange(date); }}
         onCancel={() => setPickerVisibility(false)}
       />
     </View>
