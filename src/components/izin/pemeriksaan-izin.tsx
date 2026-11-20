@@ -25,6 +25,8 @@ import { useSessions } from "@/hooks/use-sessions";
 import { usePraktikanList } from "@/hooks/use-users";
 import { useLeaveRequests } from "@/hooks/use-leave-requests";
 import { kirimNotifikasi, pesanIzinDiputuskan } from "@/services/notifications";
+import { KategoriIzinBadge } from "@/components/status-kehadiran-badge";
+import { normalizeLeaveCategory } from "@/types";
 import { formatTanggal } from "@/utils/format";
 import { Logger } from "@/utils/logger";
 
@@ -236,11 +238,8 @@ export function PemeriksaanIzin() {
                   (p) => p.id === req.userId,
                 );
                 const session = sessions.find((s) => s.id === req.sessionId);
-                const aiBadgeTone = req.kategoriAi ? "outline" : "muted";
-                const aiBadgeLabel = req.kategoriAi
-                  ? req.kategoriAi.charAt(0).toUpperCase() +
-                    req.kategoriAi.slice(1)
-                  : "Belum terklasifikasi";
+                // Kategori Sprint 2 (keluarga/akademik/lainnya) dibaca sebagai "izin".
+                const kategori = normalizeLeaveCategory(req.kategoriAi);
 
                 return (
                   <GlassCard key={req.id} style={styles.reqCard}>
@@ -262,7 +261,7 @@ export function PemeriksaanIzin() {
 
                     <View style={styles.aiSection}>
                       <Text style={styles.aiLabel}>Saran AI</Text>
-                      <Badge label={aiBadgeLabel} tone={aiBadgeTone} />
+                      <KategoriIzinBadge kategori={kategori} />
                     </View>
 
                     {req.status === "menunggu" ? (

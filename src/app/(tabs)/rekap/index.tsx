@@ -1,4 +1,4 @@
-// SRS005 rekap (PIC B — Yustinus): daftar sesi untuk direkap, kehadiran realtime dari Firestore.
+// SRS3-04 (PIC B — Annis): daftar sesi untuk direkap dengan ringkasan 4 status, realtime dari Firestore.
 import { router, type Href } from "expo-router";
 import { View, Text, ActivityIndicator } from "react-native";
 
@@ -12,13 +12,21 @@ import {
 } from "@/components/ui";
 import { Palette } from "@/constants/theme";
 import { useCurrentUser } from "@/context/auth-context";
+import { useLeaveRequests } from "@/hooks/use-leave-requests";
 import { useSessions } from "@/hooks/use-sessions";
 import { formatTanggal } from "@/utils/format";
+import {
+  hitungStatusKehadiran,
+  ringkasKehadiran,
+  sesiSelesai,
+} from "@/utils/status-kehadiran";
 import { useEffect } from "react";
 
 export default function RekapScreen() {
   const currentUser = useCurrentUser();
-  const { sessions, attendances, loading, error } = useSessions();
+  const { sessions, attendances, loading: sessionsLoading, error } = useSessions();
+  const { leaveRequests, loading: izinLoading } = useLeaveRequests();
+  const loading = sessionsLoading || izinLoading;
 
   // Redirect to login handled by router in layout or index, but adding safeguard per DESIGN
   useEffect(() => {
@@ -70,14 +78,26 @@ export default function RekapScreen() {
       ) : (
         <View style={{ gap: 12 }}>
           {assistantSessions.map((session) => {
-            const hadir = attendances.filter(
-              (item) => item.sessionId === session.id,
-            ).length;
+            const ringkasan = ringkasKehadiran(
+              session.pesertaIds.map((userId) =>
+                hitungStatusKehadiran(session, userId, attendances, leaveRequests),
+              ),
+            );
+            const total = session.pesertaIds.length;
+            // Alpha baru ditampilkan setelah sesi selesai; sebelum itu belum ada yang Alpha.
+            const detail = [
+              `Hadir ${ringkasan.hadir}/${total}`,
+              ringkasan.sakit > 0 ? `Sakit ${ringkasan.sakit}` : null,
+              ringkasan.izin > 0 ? `Izin ${ringkasan.izin}` : null,
+              sesiSelesai(session) ? `Alpha ${ringkasan.alpha}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ");
             return (
               <ListRow
                 key={session.id}
                 title={session.praktikum}
-                subtitle={`${formatTanggal(session.tanggal)} · Hadir ${hadir}/${session.pesertaIds.length}`}
+                subtitle={`${formatTanggal(session.tanggal)} · ${detail}`}
                 right={<StatusBadge status={session.status} />}
                 onPress={() => router.push(`/rekap/${session.id}` as Href)}
               />
