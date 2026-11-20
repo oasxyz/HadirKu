@@ -1,6 +1,6 @@
 // SRS3-03 (PIC B — Annis): Peta Laboratorium Interaktif.
 // Marker lab + lingkaran radius, posisi pengguna realtime, dan panel aktivitas lab.
-// Versi "punya sendiri": praktikan melihat sesi yang diikutinya, asisten melihat sesinya sendiri.
+// Praktikan melihat sesi yang diikutinya; asisten melihat semua sesi di tiap lab (keputusan tim).
 import Constants from 'expo-constants';
 import { router, type Href } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -20,6 +20,7 @@ import { KartuKondisi } from '@/components/peta/kartu-kondisi';
 import { PanelLab } from '@/components/peta/panel-lab';
 import { useLabsPeta } from '@/components/peta/use-labs-peta';
 import { useLokasiPengguna } from '@/components/peta/use-lokasi-pengguna';
+import { useSesiSemuaAsisten } from '@/components/peta/use-sesi-semua-asisten';
 import { Chip, GlassCard, RoundButton, TAB_BAR_SPACE } from '@/components/ui';
 import { useAppConfig } from '@/constants/config';
 import { Palette } from '@/constants/theme';
@@ -56,7 +57,12 @@ export default function PetaScreen() {
   const sekarang = useSekarang();
   const config = useAppConfig();
   const { labs, loading: labsLoading, error: labsError, cobaLagi: muatUlangLab } = useLabsPeta();
-  const { sessions, attendances, error: sessionsError } = useSessions();
+  const { sessions: sesiSaya, attendances, error: sesiSayaError } = useSessions();
+  const semuaAsisten = useSesiSemuaAsisten();
+  // Keputusan tim: asisten melihat semua sesi di tiap lab, praktikan hanya sesi yang diikutinya.
+  const isAsisten = currentUser?.role === 'asisten';
+  const sessions = isAsisten ? semuaAsisten.sessions : sesiSaya;
+  const sessionsError = isAsisten ? semuaAsisten.error : sesiSayaError;
   const lokasi = useLokasiPengguna();
   const [labTerpilih, setLabTerpilih] = useState<string | null>(null);
 
