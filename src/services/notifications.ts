@@ -14,7 +14,10 @@ import {
   collection,
   doc,
   getDoc,
+  onSnapshot,
+  query,
   updateDoc,
+  where,
 } from '@react-native-firebase/firestore';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
@@ -25,7 +28,7 @@ import { Platform } from 'react-native';
 
 import { useCurrentUser } from '@/context/auth-context';
 import { COLLECTIONS, db } from '@/services/firebase';
-import type { LeaveRequest, NotificationType, Session } from '@/types';
+import type { LeaveRequest, Notification, NotificationType, Session } from '@/types';
 import { formatRentangJam, formatTanggal } from '@/utils/format';
 import { Logger } from '@/utils/logger';
 
@@ -143,6 +146,94 @@ export function useDaftarkanPushToken() {
   useEffect(() => {
     if (userId) daftarkanPushToken(userId);
   }, [userId]);
+}
+
+// ---------------------------------------------------------------------------
+// Notifikasi in-app (fallback bila push tidak sampai)
+// ---------------------------------------------------------------------------
+
+type NotifState = {
+  userId: string | null;
+  items: Notification[];
+  loading: boolean;
+  error: string | null;
+};
+
+/** Pemberitahuan untuk pengguna yang login, terbaru di atas, realtime. */
+export function useNotifikasiSaya() {
+  const currentUser = useCurrentUser();
+  const userId = currentUser?.id ?? null;
+  const [state, setState] = useState<NotifState>({
+    userId: null,
+    items: [],
+    loading: true,
+    error: null,
+  });
+
+  useEffect(() => {
+    if (!userId) return;
+    // Tanpa orderBy supaya tidak butuh indeks gabungan; diurutkan di perangkat.
+    const q = query(
+      collection(db, COLLECTIONS.notifications),
+      where('targetUserIds', 'array-contains', userId),
+    );
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const items: Notification[] = [];
+        snapshot?.forEach((d) => {
+          const data = d.data();
+          items.push({
+            id: d.id,
+            targetUserIds: Array.isArray(data.targetUserIds) ? data.targetUserIds : [],
+            title: typeof data.title === 'string' ? data.title : '',
+            body: typeof data.body === 'string' ? data.body : '',
+            type: data.type,
+            sessionId: typeof data.sessionId === 'string' ? data.sessionId : undefined,
+            createdAt: typeof data.createdAt === 'string' ? data.createdAt : '',
+            readBy: Array.isArray(data.readBy) ? data.readBy : [],
+          });
+        });
+        items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        setState({ userId, items, loading: false, error: null });
+      },
+      (error) => {
+        Logger.error('FIRESTORE', 'useNotifikasiSaya', error);
+        setState({
+          userId,
+          items: [],
+          loading: false,
+          error: 'Pemberitahuan tidak dapat dimuat. Periksa koneksi internet Anda.',
+        });
+      },
+    );
+    return () => unsubscribe();
+  }, [userId]);
+
+  const sinkron = userId !== null && state.userId === userId;
+  const items = sinkron ? state.items : [];
+  const belumDibaca = userId ? items.filter((item) => !item.readBy.includes(userId)) : [];
+
+  async function tandaiDibaca(ids: string[]) {
+    if (!userId) return;
+    await Promise.all(
+      ids.map((id) =>
+        updateDoc(doc(db, COLLECTIONS.notifications, id), { readBy: arrayUnion(userId) }).catch(
+          (error: unknown) => Logger.error('FIRESTORE', 'tandaiDibaca', error),
+        ),
+      ),
+    );
+  }
+
+  return {
+    items,
+    jumlahBelumDibaca: belumDibaca.length,
+    sudahDibaca: (item: Notification) => (userId ? item.readBy.includes(userId) : true),
+    loading: userId === null ? false : sinkron ? state.loading : true,
+    error: sinkron ? state.error : null,
+    tandaiDibaca,
+    tandaiSemuaDibaca: () => tandaiDibaca(belumDibaca.map((item) => item.id)),
+  };
 }
 
 // ---------------------------------------------------------------------------
