@@ -1,15 +1,46 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Avatar, Badge, ListRow, Screen, TopBar } from '@/components/ui';
+import { KartuKondisi } from '@/components/peta/kartu-kondisi';
+import { Avatar, Badge, GlassCard, ListRow, Screen, SectionTitle, TopBar } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
+import {
+  hapusPushToken,
+  useNotifikasiSaya,
+  usePushNotifikasi,
+  type StatusPush,
+} from '@/services/notifications';
+
+const MAKS_NOTIF = 10;
+
+/** "2026-11-20T14:05:00Z" -> "20 Nov, 21.05" (jam perangkat). */
+function formatWaktuNotif(iso: string): string {
+  const waktu = new Date(iso);
+  if (Number.isNaN(waktu.getTime())) return '';
+  return waktu.toLocaleString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+const LABEL_STATUS_PUSH: Record<StatusPush, string> = {
+  memeriksa: 'Memeriksa…',
+  aktif: 'Aktif',
+  ditolak: 'Izin notifikasi ditolak',
+  tidak_didukung: 'Tidak didukung di perangkat ini',
+  gagal: 'Belum tersambung',
+};
 
 export default function ProfilScreen() {
   const { firebaseUser, currentUser, signOut } = useAuth();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const push = usePushNotifikasi();
+  const notif = useNotifikasiSaya();
 
   const displayName = currentUser?.nama || firebaseUser?.displayName || 'Pengguna';
   const isAsisten = currentUser?.role === 'asisten';
@@ -19,6 +50,9 @@ export default function ProfilScreen() {
 
   async function handleLogout() {
     setShowLogoutConfirm(false);
+    // SRS3-04 / QA #7: cabut token perangkat SEBELUM keluar, supaya notifikasi akun ini
+    // tidak lagi terkirim ke perangkat yang nanti dipakai akun lain.
+    if (currentUser) await hapusPushToken(currentUser.id);
     await signOut();
     router.replace('/login' as Href);
   }
@@ -39,8 +73,75 @@ export default function ProfilScreen() {
       <View style={styles.list}>
         <ListRow title="NIM" subtitle={nimDisplay} />
         <ListRow title="Email Institusi" subtitle={emailDisplay} />
-        <ListRow title="Versi Aplikasi" subtitle="2.0.0 (Sprint 2)" />
+        <ListRow title="Notifikasi" subtitle={LABEL_STATUS_PUSH[push.status]} />
+        <ListRow title="Versi Aplikasi" subtitle="3.0.0 (Sprint 3)" />
       </View>
+
+      {push.status === 'ditolak' ? (
+        <GlassCard>
+          <KartuKondisi
+            judul="Notifikasi Belum Aktif"
+            pesan="Aktifkan izin notifikasi agar Anda menerima pemberitahuan saat sesi dibuka, jadwal berubah, atau izin diputuskan."
+            aksi="Buka Pengaturan"
+            onAksi={() => {
+              Linking.openSettings().catch(() => undefined);
+            }}
+          />
+        </GlassCard>
+      ) : push.status === 'gagal' ? (
+        <GlassCard>
+          <KartuKondisi
+            judul="Notifikasi Belum Tersambung"
+            pesan="Perangkat belum terdaftar untuk menerima notifikasi. Periksa koneksi internet Anda lalu coba lagi."
+            aksi="Coba Lagi"
+            onAksi={push.cobaLagi}
+          />
+        </GlassCard>
+      ) : null}
+
+      {/* SRS3-04: notifikasi in-app, cadangan bila push tidak sampai ke perangkat */}
+      <GlassCard style={styles.notifCard}>
+        <SectionTitle
+          title={
+            notif.jumlahBelumDibaca > 0
+              ? `Pemberitahuan (${notif.jumlahBelumDibaca} baru)`
+              : 'Pemberitahuan'
+          }
+          right={
+            notif.jumlahBelumDibaca > 0 ? (
+              <Pressable onPress={notif.tandaiSemuaDibaca} hitSlop={8} accessibilityRole="button">
+                <Text style={styles.notifAction}>Tandai dibaca</Text>
+              </Pressable>
+            ) : undefined
+          }
+        />
+        {notif.loading ? (
+          <ActivityIndicator color={Palette.primary} />
+        ) : notif.error ? (
+          <Text style={styles.notifEmpty}>{notif.error}</Text>
+        ) : notif.items.length === 0 ? (
+          <Text style={styles.notifEmpty}>Belum ada pemberitahuan.</Text>
+        ) : (
+          notif.items.slice(0, MAKS_NOTIF).map((item) => {
+            const baru = !notif.sudahDibaca(item);
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => (baru ? notif.tandaiDibaca([item.id]) : undefined)}
+                accessibilityRole="button"
+                accessibilityLabel={`${baru ? 'Belum dibaca. ' : ''}${item.title}. ${item.body}`}
+                style={({ pressed }) => [styles.notifRow, pressed && { opacity: 0.7 }]}>
+                <View style={[styles.notifDot, baru && styles.notifDotNew]} />
+                <View style={styles.notifText}>
+                  <Text style={[styles.notifTitle, baru && styles.notifTitleNew]}>{item.title}</Text>
+                  <Text style={styles.notifBody}>{item.body}</Text>
+                  <Text style={styles.notifTime}>{formatWaktuNotif(item.createdAt)}</Text>
+                </View>
+              </Pressable>
+            );
+          })
+        )}
+      </GlassCard>
 
       <Pressable
         onPress={() => setShowLogoutConfirm(true)}
@@ -94,6 +195,58 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: 12,
+  },
+  notifCard: {
+    gap: 12,
+  },
+  notifAction: {
+    color: Palette.primary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  notifEmpty: {
+    color: Palette.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  notifRow: {
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    borderRadius: 20,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 12,
+  },
+  notifDot: {
+    borderRadius: 999,
+    height: 8,
+    marginTop: 6,
+    width: 8,
+  },
+  notifDotNew: {
+    backgroundColor: Palette.primary,
+  },
+  notifText: {
+    flex: 1,
+    gap: 2,
+  },
+  notifTitle: {
+    color: Palette.text,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  notifTitleNew: {
+    fontWeight: '700',
+  },
+  notifBody: {
+    color: Palette.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  notifTime: {
+    color: Palette.textMuted,
+    fontSize: 11,
+    marginTop: 2,
   },
   logout: {
     alignItems: 'center',
