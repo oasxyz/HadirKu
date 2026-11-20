@@ -69,6 +69,8 @@ export function useSessions() {
           list.push({
             id: d.id,
             kelasId: data.kelasId,
+            // Sprint 3: referensi lab untuk Peta dan validasi lokasi presensi.
+            labId: typeof data.labId === 'string' ? data.labId : undefined,
             praktikum: data.praktikum ?? '',
             kelasLab: data.kelasLab ?? '',
             tanggal: data.tanggal ?? '',
