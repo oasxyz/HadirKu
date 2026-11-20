@@ -3,7 +3,7 @@ import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import AttendanceAction from '@/components/attendance-action';
+import { AttendanceAction } from '@/components/attendance-action';
 import SessionControls from '@/components/session-controls';
 import { StatusBadge } from '@/components/status-badge';
 import {
@@ -128,8 +128,13 @@ export default function SesiDetailScreen() {
       {isAsisten ? (
         <SessionControls sessionId={session.id} />
       ) : (
-        <AttendanceAction sessionId={session.id} session={session} />
-      )}
+<AttendanceAction
+  sessionId={session.id}
+  session={session}
+  jarakMeter={null}
+  radiusMeter={null}
+  locked={false}
+/>      )}
 
       {/* Rekap Kehadiran untuk Asisten */}
       {isAsisten ? (
