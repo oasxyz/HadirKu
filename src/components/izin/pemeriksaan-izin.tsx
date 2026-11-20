@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Modal,
   Pressable,
@@ -26,6 +26,7 @@ import { usePraktikanList } from "@/hooks/use-users";
 import { useLeaveRequests } from "@/hooks/use-leave-requests";
 import { kirimNotifikasi, pesanIzinDiputuskan } from "@/services/notifications";
 import { formatTanggal } from "@/utils/format";
+import { Logger } from "@/utils/logger";
 
 type FilterWaktu = "hari_ini" | "minggu_ini" | "semua";
 type Decision = { id: string; action: "diterima" | "ditolak" } | null;
@@ -66,6 +67,7 @@ export function PemeriksaanIzin() {
   const [filter, setFilter] = useState<FilterWaktu>("hari_ini");
   const [decision, setDecision] = useState<Decision>(null);
   const [processing, setProcessing] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     if (!currentUser) {
@@ -152,7 +154,10 @@ export function PemeriksaanIzin() {
   });
 
   async function handleConfirm() {
-    if (!decision || processing) return;
+    // SRS 3.1 In-Flight Submission Lock: ref berubah seketika, sedangkan state baru
+    // terbaca di render berikutnya, jadi ketukan ganda yang cepat tetap tertahan.
+    if (!decision || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       setProcessing(true);
       await updateLeaveStatus(decision.id, decision.action, currentUser!.nama);
@@ -165,8 +170,9 @@ export function PemeriksaanIzin() {
         void kirimNotifikasi(pesanIzinDiputuskan(izin, decision.action, sesi));
       }
     } catch (err) {
-      console.error("Gagal memperbarui status izin:", err);
+      Logger.error("FIRESTORE", "putuskanIzin", err, { leaveRequestId: decision.id });
     } finally {
+      isSubmittingRef.current = false;
       setProcessing(false);
       setDecision(null);
     }

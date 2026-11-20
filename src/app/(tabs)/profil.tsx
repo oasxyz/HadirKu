@@ -74,7 +74,7 @@ export default function ProfilScreen() {
         <ListRow title="NIM" subtitle={nimDisplay} />
         <ListRow title="Email Institusi" subtitle={emailDisplay} />
         <ListRow title="Notifikasi" subtitle={LABEL_STATUS_PUSH[push.status]} />
-        <ListRow title="Versi Aplikasi" subtitle="2.0.0 (Sprint 2)" />
+        <ListRow title="Versi Aplikasi" subtitle="3.0.0 (Sprint 3)" />
       </View>
 
       {push.status === 'ditolak' ? (
