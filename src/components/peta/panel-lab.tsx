@@ -51,7 +51,21 @@ export function PanelLab({
   const lab = grup.labs.find((item) => item.id === labId) ?? grup.labs[0];
   const { berlangsung, berikutnya } = aktivitasLab(sessions, lab.id, sekarang);
   const hariIni = tanggalHariIni(sekarang);
-  const milikmu = role === 'praktikan' ? 'praktikummu' : 'sesimu';
+  // Praktikan hanya melihat praktikum yang diikutinya; asisten melihat semua sesi di lab.
+  const kosongBerlangsung =
+    role === 'praktikan'
+      ? 'Tidak ada praktikummu yang sedang berlangsung di lab ini.'
+      : 'Tidak ada praktikum yang sedang berlangsung di lab ini.';
+  const kosongBerikutnya =
+    role === 'praktikan'
+      ? 'Belum ada jadwal praktikummu berikutnya di lab ini.'
+      : 'Belum ada jadwal praktikum berikutnya di lab ini.';
+
+  // Untuk asisten: tandai sesi milik asisten lain supaya tidak tertukar dengan sesinya sendiri.
+  function keteranganPemilik(session: Session): string {
+    if (role !== 'asisten' || session.asistenId === userId) return '';
+    return session.asistenNama ? ` · Bukan sesimu (${session.asistenNama})` : ' · Bukan sesimu';
+  }
 
   const jarak = titikPengguna
     ? `Jarak Anda: ${Math.round(jarakMeter(titikPengguna, lab))} m`
@@ -106,9 +120,7 @@ export function PanelLab({
         <View style={styles.block}>
           <Text style={styles.blockLabel}>SEDANG BERLANGSUNG</Text>
           {berlangsung.length === 0 ? (
-            <Text style={styles.empty}>
-              Tidak ada {milikmu} yang sedang berlangsung di lab ini.
-            </Text>
+            <Text style={styles.empty}>{kosongBerlangsung}</Text>
           ) : (
             berlangsung.map((session) => (
               <View key={session.id} style={styles.session}>
@@ -118,6 +130,7 @@ export function PanelLab({
                 </View>
                 <Text style={styles.subtle}>
                   Kelas {session.kelasLab} · {waktu(session)}
+                  {keteranganPemilik(session)}
                 </Text>
                 {bisaPresensi(session) ? (
                   <Pressable
@@ -142,10 +155,11 @@ export function PanelLab({
               </View>
               <Text style={styles.subtle}>
                 Kelas {berikutnya.kelasLab} · {waktu(berikutnya)}
+                {keteranganPemilik(berikutnya)}
               </Text>
             </View>
           ) : (
-            <Text style={styles.empty}>Belum ada jadwal {milikmu} berikutnya di lab ini.</Text>
+            <Text style={styles.empty}>{kosongBerikutnya}</Text>
           )}
         </View>
       </ScrollView>
