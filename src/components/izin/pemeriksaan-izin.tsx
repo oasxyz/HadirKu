@@ -24,6 +24,7 @@ import { useCurrentUser } from "@/context/auth-context";
 import { useSessions } from "@/hooks/use-sessions";
 import { usePraktikanList } from "@/hooks/use-users";
 import { useLeaveRequests } from "@/hooks/use-leave-requests";
+import { kirimNotifikasi, pesanIzinDiputuskan } from "@/services/notifications";
 import { formatTanggal } from "@/utils/format";
 
 type FilterWaktu = "hari_ini" | "minggu_ini" | "semua";
@@ -155,6 +156,14 @@ export function PemeriksaanIzin() {
     try {
       setProcessing(true);
       await updateLeaveStatus(decision.id, decision.action, currentUser!.nama);
+
+      // SRS3-04: beri tahu praktikan pemohon. Dijalankan di latar belakang supaya dialog
+      // langsung tertutup; kegagalan notifikasi tidak membatalkan keputusan izin.
+      const izin = leaveRequests.find((req) => req.id === decision.id);
+      if (izin) {
+        const sesi = sessions.find((s) => s.id === izin.sessionId);
+        void kirimNotifikasi(pesanIzinDiputuskan(izin, decision.action, sesi));
+      }
     } catch (err) {
       console.error("Gagal memperbarui status izin:", err);
     } finally {

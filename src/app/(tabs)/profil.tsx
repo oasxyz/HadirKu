@@ -1,15 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Avatar, Badge, ListRow, Screen, TopBar } from '@/components/ui';
+import { KartuKondisi } from '@/components/peta/kartu-kondisi';
+import { Avatar, Badge, GlassCard, ListRow, Screen, TopBar } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
+import { hapusPushToken, usePushNotifikasi, type StatusPush } from '@/services/notifications';
+
+const LABEL_STATUS_PUSH: Record<StatusPush, string> = {
+  memeriksa: 'Memeriksa…',
+  aktif: 'Aktif',
+  ditolak: 'Izin notifikasi ditolak',
+  tidak_didukung: 'Tidak didukung di perangkat ini',
+  gagal: 'Belum tersambung',
+};
 
 export default function ProfilScreen() {
   const { firebaseUser, currentUser, signOut } = useAuth();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const push = usePushNotifikasi();
 
   const displayName = currentUser?.nama || firebaseUser?.displayName || 'Pengguna';
   const isAsisten = currentUser?.role === 'asisten';
@@ -19,6 +30,9 @@ export default function ProfilScreen() {
 
   async function handleLogout() {
     setShowLogoutConfirm(false);
+    // SRS3-04 / QA #7: cabut token perangkat SEBELUM keluar, supaya notifikasi akun ini
+    // tidak lagi terkirim ke perangkat yang nanti dipakai akun lain.
+    if (currentUser) await hapusPushToken(currentUser.id);
     await signOut();
     router.replace('/login' as Href);
   }
@@ -39,8 +53,31 @@ export default function ProfilScreen() {
       <View style={styles.list}>
         <ListRow title="NIM" subtitle={nimDisplay} />
         <ListRow title="Email Institusi" subtitle={emailDisplay} />
+        <ListRow title="Notifikasi" subtitle={LABEL_STATUS_PUSH[push.status]} />
         <ListRow title="Versi Aplikasi" subtitle="2.0.0 (Sprint 2)" />
       </View>
+
+      {push.status === 'ditolak' ? (
+        <GlassCard>
+          <KartuKondisi
+            judul="Notifikasi Belum Aktif"
+            pesan="Aktifkan izin notifikasi agar Anda menerima pemberitahuan saat sesi dibuka, jadwal berubah, atau izin diputuskan."
+            aksi="Buka Pengaturan"
+            onAksi={() => {
+              Linking.openSettings().catch(() => undefined);
+            }}
+          />
+        </GlassCard>
+      ) : push.status === 'gagal' ? (
+        <GlassCard>
+          <KartuKondisi
+            judul="Notifikasi Belum Tersambung"
+            pesan="Perangkat belum terdaftar untuk menerima notifikasi. Periksa koneksi internet Anda lalu coba lagi."
+            aksi="Coba Lagi"
+            onAksi={push.cobaLagi}
+          />
+        </GlassCard>
+      ) : null}
 
       <Pressable
         onPress={() => setShowLogoutConfirm(true)}
