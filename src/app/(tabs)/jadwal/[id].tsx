@@ -86,7 +86,7 @@ export default function SesiDetailScreen() {
               icon="create-outline"
               onPress={() =>
                 router.push({
-                  pathname: '/jadwal-form' as any,
+                  pathname: '/jadwal/form' as any,
                   params: { id: session.id },
                 })
               }

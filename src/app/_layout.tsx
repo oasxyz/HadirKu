@@ -54,6 +54,7 @@ export default function RootLayout() {
               <Stack.Screen name="login" />
               <Stack.Screen name="register" />
               <Stack.Screen name="lengkapi-profil" />
+              <Stack.Screen name="jadwal/form" />
               <Stack.Screen name="jadwal-form" />
               <Stack.Screen name="kelola-lab" />
 

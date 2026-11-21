@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ExpandableCalendar } from '@/components/expandable-calendar';
 import {
   Avatar,
   EmptyNote,
@@ -18,7 +19,6 @@ import { useCurrentUser } from '@/context/auth-context';
 import { useSessions } from '@/hooks/use-sessions';
 import type { Attendance, Session } from '@/types';
 
-const HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
 const STATUS_TEXT = {
@@ -37,16 +37,6 @@ function fromIso(iso: string): Date {
   return new Date(y, m - 1, d);
 }
 
-function weekOf(iso: string): string[] {
-  const start = fromIso(iso);
-  start.setDate(start.getDate() - start.getDay());
-  return Array.from({ length: 7 }, (_, i) => {
-    const day = new Date(start);
-    day.setDate(start.getDate() + i);
-    return toIso(day);
-  });
-}
-
 function openDetail(session: Session) {
   router.push({ pathname: '/jadwal/[id]', params: { id: session.id } });
 }
@@ -58,17 +48,22 @@ export default function BerandaJadwalScreen() {
   const isAsisten = currentUser?.role === 'asisten';
 
   // Urutkan sesi berdasarkan tanggal dan jam mulai
-  const sortedSessions = [...sessions].sort((a, b) =>
-    (a.tanggal + a.jamMulai).localeCompare(b.tanggal + b.jamMulai),
+  const sortedSessions = useMemo(
+    () =>
+      [...sessions].sort((a, b) =>
+        (a.tanggal + a.jamMulai).localeCompare(b.tanggal + b.jamMulai),
+      ),
+    [sessions],
   );
 
   const featured = sortedSessions.find((session) => session.status !== 'ditutup') ?? sortedSessions[0];
   const anchor = featured?.tanggal ?? toIso(new Date());
   const [selectedDate, setSelectedDate] = useState(anchor);
-  const week = weekOf(anchor);
-  const sessionDates = new Set(sortedSessions.map((session) => session.tanggal));
+  const sessionDates = useMemo(
+    () => new Set(sortedSessions.map((session) => session.tanggal)),
+    [sortedSessions],
+  );
   const daySessions = sortedSessions.filter((session) => session.tanggal === selectedDate);
-  const anchorDate = fromIso(anchor);
 
   if (loading) {
     return (
@@ -110,7 +105,7 @@ export default function BerandaJadwalScreen() {
           {isAsisten ? (
             <RoundButton
               icon="add"
-              onPress={() => router.push('/jadwal-form' as Href)}
+              onPress={() => router.push('/jadwal/form' as any)}
             />
           ) : null}
           <Pressable onPress={() => router.push('/profil' as Href)}>
@@ -132,44 +127,12 @@ export default function BerandaJadwalScreen() {
         />
       )}
 
-      <SectionTitle
-        title="Jadwal Praktikum"
-        right={
-          <View style={styles.monthPill}>
-            <Text style={styles.monthText}>
-              {BULAN[anchorDate.getMonth()]} {anchorDate.getFullYear()}
-            </Text>
-            <Ionicons name="chevron-down" size={13} color={Palette.text} />
-          </View>
-        }
+      <SectionTitle title="Jadwal Praktikum" />
+      <ExpandableCalendar
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        markedDates={sessionDates}
       />
-      <View style={styles.week}>
-        {week.map((iso) => {
-          const date = fromIso(iso);
-          const selected = iso === selectedDate;
-          return (
-            <Pressable
-              key={iso}
-              onPress={() => setSelectedDate(iso)}
-              style={[styles.day, selected && styles.daySelected]}>
-              <Text style={[styles.dayName, selected && styles.dayTextSelected]}>
-                {HARI[date.getDay()]}
-              </Text>
-              <Text style={[styles.dayNumber, selected && styles.dayTextSelected]}>
-                {date.getDate()}
-              </Text>
-              <View
-                style={[
-                  styles.dayDot,
-                  sessionDates.has(iso) && {
-                    backgroundColor: selected ? '#FFFFFF' : Palette.primary,
-                  },
-                ]}
-              />
-            </Pressable>
-          );
-        })}
-      </View>
 
       <SectionTitle title="Timeline" />
       {daySessions.length === 0 ? (
