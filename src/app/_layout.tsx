@@ -8,7 +8,6 @@ import { View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ScreenBackground } from '@/components/screen-background';
-import { AppProvider } from '@/context/app-context';
 import { AuthProvider } from '@/context/auth-context';
 import { seedInitialLabsIfNeeded } from '@/services/firebase';
 
@@ -34,39 +33,37 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <AppProvider>
-        <StatusBar style="dark" />
-        <AnimatedSplashOverlay />
-        <View style={{ flex: 1 }}>
-          <ScreenBackground />
-          <ThemeProvider value={transparentTheme}>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                animation: 'fade',
-                contentStyle: { backgroundColor: 'transparent' },
-              }}>
-              {/* ===== PM — layar awal dan navigasi tab ===== */}
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(tabs)" />
+      <StatusBar style="dark" />
+      <AnimatedSplashOverlay />
+      <View style={{ flex: 1 }}>
+        <ScreenBackground />
+        <ThemeProvider value={transparentTheme}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              animation: 'fade',
+              contentStyle: { backgroundColor: 'transparent' },
+            }}>
+            {/* ===== PM — layar awal dan navigasi tab ===== */}
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(tabs)" />
 
-              {/* ===== PIC A (Yoas) — Autentikasi, CRUD sesi full-screen, & Kelola Lab ===== */}
-              <Stack.Screen name="login" />
-              <Stack.Screen name="register" />
-              <Stack.Screen name="lengkapi-profil" />
-              <Stack.Screen name="jadwal/form" />
-              <Stack.Screen name="jadwal-form" />
-              <Stack.Screen name="kelola-lab" />
+            {/* ===== PIC A (Yoas) — Autentikasi, CRUD sesi full-screen, & Kelola Lab ===== */}
+            <Stack.Screen name="login" />
+            <Stack.Screen name="register" />
+            <Stack.Screen name="lengkapi-profil" />
+            <Stack.Screen name="jadwal/form" />
+            <Stack.Screen name="jadwal-form" />
+            <Stack.Screen name="kelola-lab" />
 
-              {/* ===== PIC B (Annis) — Detail rekap kehadiran ===== */}
-              <Stack.Screen name="rekap/[id]" />
+            {/* ===== PIC B (Annis) — Detail rekap kehadiran ===== */}
+            <Stack.Screen name="rekap/[id]" />
 
-              {/* ===== PIC C (Varissa) — Halaman khusus presensi berbasis lokasi ===== */}
-              <Stack.Screen name="presensi/[sessionId]" />
-            </Stack>
-          </ThemeProvider>
-        </View>
-      </AppProvider>
+            {/* ===== PIC C (Varissa) — Halaman khusus presensi berbasis lokasi ===== */}
+            <Stack.Screen name="presensi/[sessionId]" />
+          </Stack>
+        </ThemeProvider>
+      </View>
     </AuthProvider>
   );
 }

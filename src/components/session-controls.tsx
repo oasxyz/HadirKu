@@ -1,8 +1,9 @@
-// SRS003 (PIC B — Yustinus): buka/tutup sesi, pindahkan ke Firestore dengan listener realtime.
-import { doc, setDoc } from '@react-native-firebase/firestore';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+// SRS003 (PIC B — Yustinus) & SRS3-01 / SRS3-02 (PIC A — Yoas):
+// Buka/tutup sesi atomik dengan writeBatch (sessionCodes + status sessions) & trigger push notifikasi.
+import { doc, serverTimestamp, writeBatch } from '@react-native-firebase/firestore';
 import * as Location from 'expo-location';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { DigitBoxes } from '@/components/ui';
@@ -11,6 +12,8 @@ import { useCurrentUser } from '@/context/auth-context';
 import { useSessionCode } from '@/hooks/use-session-code';
 import { useSessions } from '@/hooks/use-sessions';
 import { COLLECTIONS, db } from '@/services/firebase';
+import { kirimNotifikasi, pesanSesiDibuka } from '@/services/notifications';
+import { Logger } from '@/utils/logger';
 import { getBatasTutupSesi, sesiSudahBerakhir } from '@/utils/sesi';
 
 type Confirmation = 'open' | 'close' | null;
@@ -21,6 +24,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
   const kodeSesi = useSessionCode(sessionId);
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
   const [processing, setProcessing] = useState(false);
+  const isSubmittingRef = useRef<boolean>(false);
 
   const session = sessions.find((item) => item.id === sessionId);
 
@@ -36,7 +40,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
 
     if (sesiSudahBerakhir(session)) {
       tutupSesi().catch((error) => {
-        console.error('Gagal menutup sesi otomatis:', error);
+        Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI', error);
       });
       return;
     }
@@ -45,7 +49,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
     const sisaWaktu = Math.max(0, batasTutup.getTime() - Date.now());
     const timer = setTimeout(() => {
       tutupSesi().catch((error) => {
-        console.error('Gagal menutup sesi otomatis:', error);
+        Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI_TIMER', error);
       });
     }, sisaWaktu);
 
@@ -59,8 +63,9 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
   ).length;
 
   async function confirmAction() {
-    if (processing) return;
+    if (processing || isSubmittingRef.current) return;
     try {
+      isSubmittingRef.current = true;
       setProcessing(true);
       if (confirmation === 'open') {
         let asistenCoords: { lat: number; lng: number } | null = null;
@@ -76,7 +81,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
             };
           }
         } catch (locErr) {
-          console.warn('Gagal mendapatkan lokasi asisten:', locErr);
+          Logger.warn('GEO', 'ASISTEN_LOC', 'Gagal mendapatkan lokasi asisten', { error: String(locErr) });
         }
 
         const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -85,24 +90,48 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
           throw new Error('Hanya asisten yang dapat membuka sesi');
         }
 
-        // Kode ditulis lebih dulu ke koleksi terpisah (hanya asisten pemilik yang bisa membaca).
-        // Dengan begitu sesi tidak pernah berstatus 'dibuka' tanpa kode yang valid.
-        await setDoc(doc(db, COLLECTIONS.sessionCodes, sessionId), {
+        // SRS 3.1: Atomic Batch writeBatch untuk sessions/{sessionId} dan sessionCodes/{sessionId}
+        const batch = writeBatch(db);
+        const codeDocRef = doc(db, COLLECTIONS.sessionCodes, sessionId);
+        const sessionDocRef = doc(db, COLLECTIONS.sessions, sessionId);
+
+        batch.set(codeDocRef, {
           kode: generatedCode,
           asistenId: currentUser.id,
+          updatedAt: serverTimestamp(),
         });
 
-        await updateSession(sessionId, {
+        batch.update(sessionDocRef, {
           status: 'dibuka',
           asistenCoords,
+          updatedAt: serverTimestamp(),
         });
+
+        await batch.commit();
+
+        // SRS 5.4: Picu notifikasi sesi_dibuka ke seluruh peserta praktikum
+        if (session) {
+          const notifMsg = pesanSesiDibuka({
+            id: sessionId,
+            praktikum: session.praktikum,
+            kelasLab: session.kelasLab,
+            tanggal: session.tanggal,
+            jamMulai: session.jamMulai,
+            jamSelesai: session.jamSelesai,
+            pesertaIds: session.pesertaIds,
+          });
+          kirimNotifikasi(notifMsg).catch((err) =>
+            Logger.error('FCM', 'NOTIF_SESI_DIBUKA', err)
+          );
+        }
       } else if (confirmation === 'close') {
         await tutupSesi();
       }
     } catch (error) {
-      console.error('Gagal memperbarui status sesi:', error);
+      Logger.error('FIRESTORE', 'CONFIRM_SESSION_ACTION', error);
     } finally {
       setProcessing(false);
+      isSubmittingRef.current = false;
       setConfirmation(null);
     }
   }
