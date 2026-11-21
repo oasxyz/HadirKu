@@ -1,7 +1,9 @@
 import type { LeaveCategory } from '@/types';
 
-// Dibaca ULANG tiap kali fungsi dipanggil (bukan sekali saat modul di-import),
-// supaya tidak "terjebak" undefined kalau env telat ke-load.
+/**
+ * Baca konfigurasi AI setiap kali dipanggil (bukan const modul) supaya
+ * aman kalau env telat ter-load pada hot reload Expo.
+ */
 function getAiConfig() {
   return {
     baseUrl: process.env.EXPO_PUBLIC_AI_BASE_URL,
@@ -10,23 +12,37 @@ function getAiConfig() {
   };
 }
 
-const TIMEOUT_MS = 10000;
+const DEFAULT_TIMEOUT_MS = 10_000;
 
-const SYSTEM_PROMPT = `Kamu adalah pembantu klasifikasi alasan izin praktikum.
-Klasifikasikan alasan izin ke salah satu dari empat kategori berikut:
+/**
+ * SPRINT 3: kategori disederhanakan menjadi dua.
+ * Semua alasan yang berhubungan dengan kondisi kesehatan fisik atau mental → 'sakit'.
+ * Selain itu (keluarga, akademik, lainnya) → 'izin'.
+ */
+const SYSTEM_PROMPT = `Kamu adalah pembantu klasifikasi alasan izin praktikum di kampus.
+Klasifikasikan alasan praktikan ke salah satu dari dua kategori berikut:
 - sakit: kondisi kesehatan fisik atau mental yang membuat tidak bisa hadir
-- keluarga: urusan keluarga seperti duka, pernikahan, atau mengurus anggota keluarga
-- akademik: tabrakan dengan kegiatan akademik lain seperti ujian, kuliah tamu, atau lomba
-- lainnya: alasan yang tidak masuk tiga kategori di atas
+- izin: alasan lain di luar kondisi kesehatan, seperti urusan keluarga, akademik, atau alasan pribadi
 
-Jawab HANYA dengan satu kata kategori (sakit, keluarga, akademik, atau lainnya) tanpa tanda baca atau penjelasan.`;
+Jawab HANYA dengan satu kata kategori (sakit atau izin) tanpa tanda baca atau penjelasan.`;
 
-const KATEGORI_VALID: LeaveCategory[] = ['sakit', 'keluarga', 'akademik', 'lainnya'];
+type Sprint3Category = 'sakit' | 'izin';
+const KATEGORI_VALID: Sprint3Category[] = ['sakit', 'izin'];
 
-export async function classifyLeaveReason(reason: string): Promise<LeaveCategory | null> {
+/**
+ * Klasifikasi alasan izin via API AI. Return 'sakit' / 'izin' / null (kalau gagal/timeout).
+ * Dokumen izin tetap bisa disimpan meskipun fungsi ini return null (lihat SRS3 Sprint 3 R7).
+ *
+ * @param reason teks alasan praktikan
+ * @param timeoutMs batas waktu dari appConfig.aiTimeoutMs (default 10000 ms)
+ */
+export async function classifyLeaveReason(
+  reason: string,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<LeaveCategory | null> {
   const { baseUrl, apiKey, model } = getAiConfig();
   if (!baseUrl || !apiKey || !model) {
-    console.warn('[ai.ts] ENV AI belum lengkap, skip klasifikasi');
+    console.warn('[ai.ts] ENV AI belum lengkap, lewati klasifikasi');
     return null;
   }
 
@@ -34,7 +50,7 @@ export async function classifyLeaveReason(reason: string): Promise<LeaveCategory
   if (trimmed.length === 0) return null;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -64,13 +80,13 @@ export async function classifyLeaveReason(reason: string): Promise<LeaveCategory
     const raw: string | undefined = data?.choices?.[0]?.message?.content;
     if (!raw) return null;
 
-    const kategori = raw.trim().toLowerCase() as LeaveCategory;
-    if (!KATEGORI_VALID.includes(kategori)) {
+    const normalized = raw.trim().toLowerCase() as Sprint3Category;
+    if (!KATEGORI_VALID.includes(normalized)) {
       console.warn('[ai.ts] Kategori tidak dikenal:', raw);
       return null;
     }
 
-    return kategori;
+    return normalized;
   } catch (err) {
     console.warn('[ai.ts] Error atau timeout:', err);
     return null;

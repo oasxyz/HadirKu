@@ -1,5 +1,5 @@
-import { sesiSudahBerakhir } from '@/utils/sesi';
-import { addDoc, collection } from '@react-native-firebase/firestore';
+import { Ionicons } from '@expo/vector-icons';
+import { doc, getFirestore, serverTimestamp, setDoc } from '@react-native-firebase/firestore';
 import { router, type Href } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -13,30 +13,61 @@ import {
   View,
 } from 'react-native';
 
+import { ExpandableCalendar, toDateString } from '@/components/expandable-calendar';
 import {
-  Badge,
   EmptyNote,
   GlassCard,
   Screen,
   SectionTitle,
   TopBar,
 } from '@/components/ui';
+import { useAppConfig } from '@/constants/config';
 import { Palette, Spacing } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useLeaveRequests } from '@/hooks/use-leave-requests';
 import { useSessions } from '@/hooks/use-sessions';
 import { classifyLeaveReason } from '@/services/ai';
-import { COLLECTIONS, db } from '@/services/firebase';
+import { COLLECTIONS, getCompositeId } from '@/services/firebase';
 import type { LeaveRequest } from '@/types';
+import { normalizeLeaveCategory } from '@/types';
 import { formatTanggal } from '@/utils/format';
+import { Logger, toUserErrorMessage } from '@/utils/logger';
+import { sesiSudahBerakhir } from '@/utils/sesi';
+
+/**
+ * Status visual sprint 3 — gunakan sebagai gantinya Badge `tone` di ui.tsx
+ * (sementara menunggu PM update tone warning/info/danger di komponen Badge).
+ */
+function LocalBadge({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: 'primary' | 'warning' | 'info' | 'danger' | 'muted';
+}) {
+  const palette: Record<typeof tone, { bg: string; fg: string }> = {
+    primary: { bg: Palette.primary, fg: '#FFFFFF' },
+    warning: { bg: 'rgba(217,119,6,0.14)', fg: '#D97706' },
+    info: { bg: 'rgba(109,40,217,0.12)', fg: '#6D28D9' },
+    danger: { bg: 'rgba(225,29,72,0.12)', fg: '#E11D48' },
+    muted: { bg: '#B9B5C6', fg: '#FFFFFF' },
+  };
+  const c = palette[tone];
+  return (
+    <View style={[styles.badge, { backgroundColor: c.bg }]}>
+      <Text style={[styles.badgeText, { color: c.fg }]}>{label}</Text>
+    </View>
+  );
+}
 
 export function PengajuanIzin() {
   const currentUser = useCurrentUser();
+  const config = useAppConfig();
   const { sessions, attendances, loading: sessionsLoading, error: sessionsError } = useSessions();
   const { leaveRequests, loading: leaveLoading, error: leaveError } = useLeaveRequests();
 
   const [showForm, setShowForm] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(toDateString(new Date()));
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [alasan, setAlasan] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -53,6 +84,17 @@ export function PengajuanIzin() {
         : [],
     [leaveRequests, currentUser],
   );
+
+  // Tanggal yang punya sesi (untuk marker titik di kalender)
+  const markedDates = useMemo(() => {
+    if (!currentUser) return new Set<string>();
+    const set = new Set<string>();
+    sessions.forEach((s) => {
+      if (!s.pesertaIds.includes(currentUser.id)) return;
+      set.add(s.tanggal);
+    });
+    return set;
+  }, [sessions, currentUser]);
 
   if (!currentUser) return null;
 
@@ -79,18 +121,21 @@ export function PengajuanIzin() {
     );
   }
 
+  // Filter sesi yang bisa diajukan: pada tanggal terpilih, belum ditutup / berakhir,
+  // belum hadir, belum ada pengajuan menunggu/diterima.
   const sesiBisaDiajukan = sessions.filter((s) => {
+    if (s.tanggal !== selectedDate) return false;
     if (s.status === 'ditutup') return false;
     if (sesiSudahBerakhir(s)) return false;
-    // Sudah hadir di sesi ini → tidak perlu ajukan izin
     const sudahHadir = attendances.some(
       (a) => a.sessionId === s.id && a.userId === currentUser.id,
     );
     if (sudahHadir) return false;
-    const sudahAdaMenunggu = myLeaves.some(
-      (lr) => lr.sessionId === s.id && lr.status === 'menunggu',
+    const sudahAdaAktif = myLeaves.some(
+      (lr) =>
+        lr.sessionId === s.id && (lr.status === 'menunggu' || lr.status === 'diterima'),
     );
-    return !sudahAdaMenunggu;
+    return !sudahAdaAktif;
   });
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId);
@@ -115,33 +160,42 @@ export function PengajuanIzin() {
       return;
     }
 
-    const sudahAda = myLeaves.some(
-      (lr) => lr.sessionId === selectedSessionId && lr.status === 'menunggu',
-    );
-    if (sudahAda) {
-      setErrorMsg('Anda sudah punya pengajuan menunggu untuk sesi ini');
+    // Cek belum ada dokumen untuk composite ID ini (doc id = sessionId_uid)
+    const compositeId = getCompositeId(selectedSessionId, currentUser.id);
+    const existing = myLeaves.find((lr) => lr.id === compositeId);
+    if (existing && (existing.status === 'menunggu' || existing.status === 'diterima')) {
+      setErrorMsg('Anda sudah punya pengajuan aktif untuk sesi ini');
       return;
     }
 
     setSubmitting(true);
     try {
-      const kategoriAi = await classifyLeaveReason(trimmed);
+      // Klasifikasi AI dulu (hasil dipakai saat write)
+      const kategoriAi = await classifyLeaveReason(trimmed, config.aiTimeoutMs);
 
-      await addDoc(collection(db, COLLECTIONS.leaveRequests), {
+      const firestore = getFirestore();
+      const ref = doc(firestore, COLLECTIONS.leaveRequests, compositeId);
+
+      await setDoc(ref, {
         sessionId: selectedSessionId,
         userId: currentUser.id,
         alasan: trimmed,
         kategoriAi,
         status: 'menunggu',
-        createdAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
         diputuskanOleh: null,
         diputuskanAt: null,
       });
 
+      Logger.info('FIRESTORE', 'LeaveRequestCreate', 'Pengajuan izin tersimpan', {
+        sessionId: selectedSessionId,
+        kategoriAi,
+      });
+
       resetForm();
     } catch (err) {
-      console.warn('[pengajuan-izin] submit err', err);
-      setErrorMsg('Gagal menyimpan pengajuan, periksa koneksi lalu coba lagi.');
+      Logger.error('FIRESTORE', 'LeaveRequestCreate', err);
+      setErrorMsg(toUserErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -155,6 +209,14 @@ export function PengajuanIzin() {
     <Screen>
       <TopBar title="Pengajuan Izin" />
 
+      <SectionTitle title="Pilih Tanggal Sesi" />
+
+      <ExpandableCalendar
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        markedDates={markedDates}
+      />
+
       <Pressable
         onPress={() => setShowForm(true)}
         disabled={sesiBisaDiajukan.length === 0}
@@ -163,11 +225,14 @@ export function PengajuanIzin() {
           sesiBisaDiajukan.length === 0 && styles.addButtonDisabled,
           pressed && { opacity: 0.8 },
         ]}>
-        <Text style={styles.addButtonText}>+ Ajukan Izin Baru</Text>
+        <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
+        <Text style={styles.addButtonText}>Ajukan Izin untuk Tanggal Ini</Text>
       </Pressable>
 
       {sesiBisaDiajukan.length === 0 && (
-        <Text style={styles.hint}>Tidak ada sesi yang bisa diajukan izin saat ini.</Text>
+        <Text style={styles.hint}>
+          Tidak ada sesi praktikum yang bisa diajukan izin di tanggal ini.
+        </Text>
       )}
 
       <SectionTitle title="Riwayat Pengajuan" />
@@ -187,6 +252,7 @@ export function PengajuanIzin() {
         </View>
       )}
 
+      {/* ====== MODAL FORM ====== */}
       <Modal
         visible={showForm}
         animationType="fade"
@@ -195,25 +261,46 @@ export function PengajuanIzin() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <ScrollView keyboardShouldPersistTaps="handled">
-              <Text style={styles.modalTitle}>Ajukan Izin</Text>
+              <Text style={styles.modalTitle}>
+                Ajukan Izin · {formatTanggal(selectedDate)}
+              </Text>
 
               <Text style={styles.label}>Sesi</Text>
-              <Pressable
-                onPress={() => setShowPicker(true)}
-                style={({ pressed }) => [styles.picker, pressed && { opacity: 0.8 }]}>
-                <Text style={selectedSession ? styles.pickerValue : styles.pickerPlaceholder}>
-                  {selectedSession
-                    ? `${selectedSession.praktikum} · ${formatTanggal(selectedSession.tanggal)}`
-                    : 'Pilih sesi'}
-                </Text>
-              </Pressable>
+              <View style={{ gap: 6 }}>
+                {sesiBisaDiajukan.map((s) => {
+                  const selected = s.id === selectedSessionId;
+                  return (
+                    <Pressable
+                      key={s.id}
+                      onPress={() => setSelectedSessionId(s.id)}
+                      style={[
+                        styles.sessionOption,
+                        selected && styles.sessionOptionSelected,
+                      ]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.sessionOptionTitle}>{s.praktikum}</Text>
+                        <Text style={styles.sessionOptionSub}>
+                          {s.kelasLab} · {s.jamMulai}-{s.jamSelesai}
+                        </Text>
+                      </View>
+                      {selected && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={22}
+                          color={Palette.primary}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
 
               <Text style={styles.label}>Alasan</Text>
               <TextInput
                 style={styles.textarea}
                 value={alasan}
                 onChangeText={setAlasan}
-                placeholder="Jelaskan alasan ketidakhadiran"
+                placeholder="Jelaskan alasan ketidakhadiran (min. 10 karakter)"
                 placeholderTextColor={Palette.textMuted}
                 multiline
                 numberOfLines={5}
@@ -249,43 +336,6 @@ export function PengajuanIzin() {
           </View>
         </View>
       </Modal>
-
-      <Modal
-        visible={showPicker}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowPicker(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Pilih Sesi</Text>
-            <ScrollView style={{ maxHeight: 400 }}>
-              {sesiBisaDiajukan.length === 0 ? (
-                <Text style={styles.hint}>Tidak ada sesi yang bisa diajukan izin.</Text>
-              ) : (
-                sesiBisaDiajukan.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    style={({ pressed }) => [styles.pickerItem, pressed && { opacity: 0.7 }]}
-                    onPress={() => {
-                      setSelectedSessionId(item.id);
-                      setShowPicker(false);
-                    }}>
-                    <Text style={styles.pickerItemTitle}>{item.praktikum}</Text>
-                    <Text style={styles.pickerItemSub}>
-                      {item.kelasLab} · {formatTanggal(item.tanggal)} · {item.jamMulai}-{item.jamSelesai}
-                    </Text>
-                  </Pressable>
-                ))
-              )}
-            </ScrollView>
-            <Pressable
-              onPress={() => setShowPicker(false)}
-              style={({ pressed }) => [styles.cancelBtn, { marginTop: Spacing.two }, pressed && { opacity: 0.7 }]}>
-              <Text style={styles.cancelBtnText}>Tutup</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
     </Screen>
   );
 }
@@ -299,15 +349,24 @@ function IzinCard({
   sessionNama: string;
   sessionTanggal?: string;
 }) {
-  const badgeTone =
-    item.status === 'diterima' ? 'primary' : item.status === 'ditolak' ? 'dark' : 'muted';
-  const badgeLabel =
+  const statusTone: 'primary' | 'warning' | 'danger' =
+    item.status === 'diterima' ? 'primary' : item.status === 'ditolak' ? 'danger' : 'warning';
+  const statusLabel =
     item.status === 'diterima' ? 'Diterima' : item.status === 'ditolak' ? 'Ditolak' : 'Menunggu';
 
-  const aiTone = item.kategoriAi ? 'outline' : 'muted';
-  const aiLabel = item.kategoriAi
-    ? item.kategoriAi.charAt(0).toUpperCase() + item.kategoriAi.slice(1)
-    : 'Belum terklasifikasi';
+  const normalizedKategori = normalizeLeaveCategory(item.kategoriAi);
+  const kategoriTone: 'warning' | 'info' | 'muted' =
+    normalizedKategori === 'sakit'
+      ? 'warning'
+      : normalizedKategori === 'izin'
+      ? 'info'
+      : 'muted';
+  const kategoriLabel =
+    normalizedKategori === 'sakit'
+      ? 'Sakit'
+      : normalizedKategori === 'izin'
+      ? 'Izin'
+      : 'Belum terklasifikasi';
 
   return (
     <GlassCard style={styles.reqCard}>
@@ -318,14 +377,14 @@ function IzinCard({
             <Text style={styles.reqMeta}>{formatTanggal(sessionTanggal)}</Text>
           ) : null}
         </View>
-        <Badge label={badgeLabel} tone={badgeTone} />
+        <LocalBadge label={statusLabel} tone={statusTone} />
       </View>
 
       <Text style={styles.reqAlasan}>{item.alasan}</Text>
 
       <View style={styles.aiRow}>
         <Text style={styles.aiLabel}>Kategori AI</Text>
-        <Badge label={aiLabel} tone={aiTone} />
+        <LocalBadge label={kategoriLabel} tone={kategoriTone} />
       </View>
 
       {item.status !== 'menunggu' && item.diputuskanOleh && item.diputuskanAt ? (
@@ -346,11 +405,13 @@ function IzinCard({
 const styles = StyleSheet.create({
   centerCard: { alignItems: 'center', padding: Spacing.four, gap: Spacing.two },
   addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: Palette.primary,
     padding: 14,
     borderRadius: 999,
-    alignItems: 'center',
-    marginBottom: Spacing.two,
   },
   addButtonDisabled: { opacity: 0.4 },
   addButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
@@ -358,7 +419,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Palette.textMuted,
     textAlign: 'center',
-    marginBottom: Spacing.two,
+    marginTop: -6,
   },
 
   reqCard: { gap: Spacing.two },
@@ -377,6 +438,16 @@ const styles = StyleSheet.create({
   aiLabel: { fontSize: 12, fontWeight: '600', color: Palette.textSecondary },
   decisionText: { fontSize: 12, color: Palette.textMuted, textAlign: 'center' },
 
+  badge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(30, 20, 50, 0.4)',
@@ -390,10 +461,9 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     width: '100%',
     maxHeight: '85%',
-    boxShadow: '0 8px 24px rgba(110, 70, 160, 0.10)',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: Palette.text,
     textAlign: 'center',
@@ -406,15 +476,26 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
     marginBottom: Spacing.one,
   },
-  picker: {
+  sessionOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
-  pickerValue: { color: Palette.text, fontSize: 14 },
-  pickerPlaceholder: { color: Palette.textMuted, fontSize: 14 },
+  sessionOptionSelected: {
+    borderColor: Palette.primary,
+    backgroundColor: 'rgba(226, 27, 208, 0.08)',
+  },
+  sessionOptionTitle: {
+    fontSize: 14, fontWeight: '600', color: Palette.text,
+  },
+  sessionOptionSub: {
+    fontSize: 12, color: Palette.textMuted, marginTop: 2,
+  },
   textarea: {
     borderWidth: 1,
     borderColor: Palette.border,
@@ -443,12 +524,4 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   confirmBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-
-  pickerItem: {
-    paddingVertical: Spacing.two,
-    borderBottomWidth: 1,
-    borderBottomColor: Palette.border,
-  },
-  pickerItemTitle: { fontSize: 14, fontWeight: '600', color: Palette.text },
-  pickerItemSub: { fontSize: 12, color: Palette.textMuted, marginTop: 2 },
 });
