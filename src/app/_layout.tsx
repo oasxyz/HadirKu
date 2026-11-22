@@ -6,8 +6,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ScreenBackground } from '@/components/screen-background';
+import { SplashHadirKu } from '@/components/splash-hadirku';
 import { ToastProvider } from '@/components/toast';
 import { AuthProvider } from '@/context/auth-context';
 import { seedInitialLabsIfNeeded } from '@/services/firebase';
@@ -39,7 +39,8 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <StatusBar style="dark" />
-      <AnimatedSplashOverlay />
+      {/* Splash bergerak (kalender) menyambung dari splash bawaan HP. */}
+      <SplashHadirKu />
       {/* Toast melayang di atas semua layar (lihat src/components/toast.tsx). */}
       <ToastProvider>
       <View style={{ flex: 1 }}>
@@ -53,6 +54,7 @@ export default function RootLayout() {
             }}>
             {/* ===== PM — layar awal dan navigasi tab ===== */}
             <Stack.Screen name="index" />
+            <Stack.Screen name="perkenalan" />
             <Stack.Screen name="(tabs)" />
 
             {/* ===== PIC A (Yoas) — Autentikasi, CRUD sesi full-screen, & Kelola Lab ===== */}

@@ -19,7 +19,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Ellipse, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { Palette } from '@/constants/theme';
 
@@ -522,6 +522,348 @@ export function IlustrasiKosong({ lebar = 84 }: { lebar?: number }) {
       </Lapisan>
       <Lapisan vb={vb} lebar={lebar} gaya={kedip} durasi={800} jeda={800} bolakBalik>
         <Circle cx={28} cy={16} r={3} fill={Palette.primary} />
+      </Lapisan>
+    </Kanvas>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Splash dan halaman perkenalan
+// ---------------------------------------------------------------------------
+
+const BULAN_PENDEK = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES'];
+
+// Splash memakai satu garis waktu (p 0→1 selama DURASI_SPLASH_MS); tiap bagian bergerak di
+// rentangnya sendiri: kalender jatuh → lembar kemarin sobek → stempel → orang masuk dan melambai.
+export const DURASI_SPLASH_MS = 2000;
+
+const splashKalenderJatuh: FungsiGaya = (p, s) => {
+  'worklet';
+  return {
+    transform: [
+      { translateY: interpolate(p, [0, 0.2, 0.26, 0.3], [-180, 8, -4, 0], Extrapolation.CLAMP) * s },
+      { rotate: `${interpolate(p, [0, 0.3], [-12, 0], Extrapolation.CLAMP)}deg` },
+    ],
+  };
+};
+const splashLembarSobek: FungsiGaya = (p, s) => {
+  'worklet';
+  const jatuh = interpolate(p, [0, 0.2, 0.26, 0.3], [-180, 8, -4, 0], Extrapolation.CLAMP);
+  const sobek = interpolate(p, [0.37, 0.6], [0, 60], Extrapolation.CLAMP);
+  const putar =
+    interpolate(p, [0, 0.3], [-12, 0], Extrapolation.CLAMP) +
+    interpolate(p, [0.37, 0.6], [0, 25], Extrapolation.CLAMP);
+  return {
+    opacity: interpolate(p, [0.37, 0.6], [1, 0], Extrapolation.CLAMP),
+    // Ikut jatuh bersama kalender, lalu sobek ke kanan bawah.
+    transform: [{ translateY: (jatuh + sobek) * s }, { rotate: `${putar}deg` }],
+  };
+};
+const splashStempel: FungsiGaya = (p) => {
+  'worklet';
+  return {
+    opacity: interpolate(p, [0.57, 0.62], [0, 1], Extrapolation.CLAMP),
+    transform: [{ scale: interpolate(p, [0.57, 0.68, 0.72], [2.2, 0.92, 1], Extrapolation.CLAMP) }],
+  };
+};
+const splashOrang: FungsiGaya = (p, s) => {
+  'worklet';
+  return {
+    opacity: interpolate(p, [0.65, 0.72], [0, 1], Extrapolation.CLAMP),
+    transform: [{ translateX: interpolate(p, [0.65, 0.8, 0.85], [60, -4, 0], Extrapolation.CLAMP) * s }],
+  };
+};
+const splashTangan: FungsiGaya = (p, s) => {
+  'worklet';
+  const lambaian = interpolate(p, [0.85, 0.89, 0.93, 0.97, 1], [0, -24, 10, -24, 0], Extrapolation.CLAMP);
+  return {
+    opacity: interpolate(p, [0.65, 0.72], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      { translateX: interpolate(p, [0.65, 0.8, 0.85], [60, -4, 0], Extrapolation.CLAMP) * s },
+      { rotate: `${lambaian}deg` },
+    ],
+  };
+};
+function splashKonfeti(dx: number, dy: number): FungsiGaya {
+  return (p, s) => {
+    'worklet';
+    const t = interpolate(p, [0.6, 0.95], [0, 1], Extrapolation.CLAMP);
+    return {
+      opacity: interpolate(p, [0.6, 0.65, 0.95], [0, 1, 0], Extrapolation.CLAMP),
+      transform: [{ translateX: dx * s * t }, { translateY: dy * s * t }],
+    };
+  };
+}
+
+/** Kalender jatuh, lembar kemarin sobek memperlihatkan tanggal hari ini, stempel centang, orang melambai. */
+export function IlustrasiSplash({ lebar = 220 }: { lebar?: number }) {
+  const vb: [number, number] = [200, 150];
+  // Tanggal hari ini dan kemarin di kalender.
+  const hariIni = new Date();
+  const kemarin = new Date(hariIni.getTime() - 24 * 60 * 60 * 1000);
+  const garisWaktu = { durasi: DURASI_SPLASH_MS, ulang: false, linear: true };
+  return (
+    <Kanvas vb={vb} lebar={lebar}>
+      <Dasar vb={vb} lebar={lebar}>
+        <Ellipse cx={80} cy={140} rx={60} ry={6} fill={Palette.ink} opacity={0.1} />
+      </Dasar>
+      <Lapisan vb={vb} lebar={lebar} asal={[40, 50]} gaya={splashKalenderJatuh} {...garisWaktu}>
+        <Rect x={30} y={22} width={100} height={112} rx={16} fill="#FFFFFF" />
+        <Rect x={30} y={22} width={100} height={30} rx={14} fill={Palette.primary} />
+        <Rect x={30} y={38} width={100} height={14} fill={Palette.primary} />
+        <Rect x={50} y={12} width={9} height={22} rx={4.5} fill={Palette.ink} />
+        <Rect x={101} y={12} width={9} height={22} rx={4.5} fill={Palette.ink} />
+        <SvgText x={80} y={104} textAnchor="middle" fontFamily="Inter_800ExtraBold" fontSize={44} fill={Palette.ink}>
+          {String(hariIni.getDate())}
+        </SvgText>
+        <SvgText x={80} y={124} textAnchor="middle" fontFamily="Inter_700Bold" fontSize={11} fill={Palette.textMuted}>
+          {BULAN_PENDEK[hariIni.getMonth()]}
+        </SvgText>
+      </Lapisan>
+      <Lapisan vb={vb} lebar={lebar} asal={[40, 36]} gaya={splashLembarSobek} {...garisWaktu}>
+        <Rect x={34} y={54} width={92} height={76} rx={10} fill="#F7F6FB" />
+        <SvgText x={80} y={104} textAnchor="middle" fontFamily="Inter_800ExtraBold" fontSize={44} fill="#B9B5C6">
+          {String(kemarin.getDate())}
+        </SvgText>
+      </Lapisan>
+      <Lapisan vb={vb} lebar={lebar} asal={[63, 75]} gaya={splashStempel} {...garisWaktu}>
+        <Circle cx={126} cy={112} r={20} fill={Palette.ink} />
+        <Path
+          d="M117 112l7 7 12-13"
+          fill="none"
+          stroke="#FFFFFF"
+          strokeWidth={4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Lapisan>
+      {[
+        { dx: -30, dy: -26, warna: Palette.primary },
+        { dx: 22, dy: -34, warna: DAUN },
+        { dx: 30, dy: -6, warna: Palette.primary },
+        { dx: -24, dy: 18, warna: DAUN },
+        { dx: 4, dy: -42, warna: Palette.primary },
+      ].map((k) => (
+        <Lapisan key={`${k.dx},${k.dy}`} vb={vb} lebar={lebar} gaya={splashKonfeti(k.dx, k.dy)} {...garisWaktu}>
+          <Circle cx={126} cy={112} r={3} fill={k.warna} />
+        </Lapisan>
+      ))}
+      <Lapisan vb={vb} lebar={lebar} gaya={splashOrang} {...garisWaktu}>
+        <Path d="M150 140c0-16 6-26 15-26s15 10 15 26z" fill={Palette.primary} />
+        <Circle cx={165} cy={102} r={10} fill={KULIT} />
+        <Path d="M154 101c0-8 5-12 11-12 7 0 12 5 12 11-4-3-8-4-13-3-4 1-7 2-10 4z" fill={Palette.ink} />
+      </Lapisan>
+      <Lapisan vb={vb} lebar={lebar} asal={[89, 85]} gaya={splashTangan} {...garisWaktu}>
+        <Path d="M178 128l10-16" stroke={KULIT} strokeWidth={6} strokeLinecap="round" />
+        <Circle cx={189} cy={110} r={4.5} fill={KULIT} />
+      </Lapisan>
+    </Kanvas>
+  );
+}
+
+const ponselMengambang: FungsiGaya = (p, s) => {
+  'worklet';
+  return { transform: [{ translateY: interpolate(p, [0, 1], [0, -5]) * s }] };
+};
+const garisPindai: FungsiGaya = (p, s) => {
+  'worklet';
+  return { transform: [{ translateY: interpolate(p, [0, 1], [0, 26]) * s }] };
+};
+const pinJatuh: FungsiGaya = (p, s) => {
+  'worklet';
+  return { transform: [{ translateY: interpolate(p, [0, 0.7, 0.85, 1], [-120, 6, -3, 0]) * s }] };
+};
+const gelombangRadius: FungsiGaya = (p) => {
+  'worklet';
+  return {
+    opacity: interpolate(p, [0, 1], [0.9, 0]),
+    transform: [{ scale: interpolate(p, [0, 1], [0.2, 2.6]) }],
+  };
+};
+
+/** Perkenalan 1: ponsel memindai QR dan pin lokasi dengan gelombang radius. */
+export function IlustrasiPresensi({ lebar = 220 }: { lebar?: number }) {
+  const vb: [number, number] = [170, 150];
+  return (
+    <Kanvas vb={vb} lebar={lebar}>
+      <Dasar vb={vb} lebar={lebar}>
+        <Ellipse cx={118} cy={128} rx={18} ry={5} fill={Palette.ink} opacity={0.12} />
+      </Dasar>
+      {[0, 900].map((jeda) => (
+        <Lapisan
+          key={jeda}
+          vb={vb}
+          lebar={lebar}
+          asal={[69, 85]}
+          gaya={gelombangRadius}
+          durasi={1800}
+          jeda={jeda + 500}
+          linear>
+          <Ellipse cx={118} cy={128} rx={16} ry={5} fill="none" stroke={Palette.primary} strokeWidth={2} />
+        </Lapisan>
+      ))}
+      <Lapisan vb={vb} lebar={lebar} gaya={pinJatuh} durasi={600} ulang={false}>
+        <Path d="M118 34c-19 0-32 14-32 31 0 23 32 51 32 51s32-28 32-51c0-17-13-31-32-31z" fill={Palette.primary} />
+        <Circle cx={118} cy={65} r={17} fill="#FFFFFF" />
+      </Lapisan>
+      <Lapisan vb={vb} lebar={lebar} asal={[69, 43]} gaya={muncul} durasi={500} ulang={false} jeda={650}>
+        <Path
+          d="M110 65l6 6 12-13"
+          fill="none"
+          stroke={Palette.ink}
+          strokeWidth={5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Lapisan>
+      <Lapisan vb={vb} lebar={lebar} gaya={ponselMengambang} durasi={1100} bolakBalik>
+        <Rect x={22} y={30} width={56} height={100} rx={12} fill={Palette.ink} />
+        <Rect x={27} y={38} width={46} height={84} rx={7} fill="#FFFFFF" />
+        <Rect x={36} y={56} width={12} height={12} rx={2} fill={Palette.ink} />
+        <Rect x={52} y={56} width={12} height={12} rx={2} fill={Palette.ink} />
+        <Rect x={36} y={72} width={12} height={12} rx={2} fill={Palette.ink} />
+        <Rect x={56} y={76} width={6} height={6} fill={Palette.ink} />
+        <Rect x={34} y={100} width={32} height={10} rx={5} fill={Palette.infoMuted} />
+      </Lapisan>
+      <Lapisan vb={vb} lebar={lebar} gaya={garisPindai} durasi={800} bolakBalik>
+        <Rect x={32} y={52} width={36} height={3} rx={1.5} fill={Palette.primary} />
+      </Lapisan>
+    </Kanvas>
+  );
+}
+
+const isiDariKiri: FungsiGaya = (p) => {
+  'worklet';
+  return { transform: [{ scaleX: p }] };
+};
+const nyalaPerlahan: FungsiGaya = (p) => {
+  'worklet';
+  return { opacity: p };
+};
+
+/** Perkenalan 2: surat izin dan pelacak Diajukan → Diperiksa → Diterima yang terisi. */
+export function IlustrasiIzinLacak({ lebar = 220 }: { lebar?: number }) {
+  const vb: [number, number] = [170, 150];
+  const label = {
+    textAnchor: 'middle' as const,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 8,
+    fill: Palette.textSecondary,
+  };
+  return (
+    <Kanvas vb={vb} lebar={lebar}>
+      <Dasar vb={vb} lebar={lebar}>
+        <Rect x={34} y={14} width={70} height={88} rx={10} fill="#FFFFFF" />
+        <Rect x={44} y={30} width={48} height={5} rx={2.5} fill={Palette.ink} opacity={0.18} />
+        <Rect x={44} y={42} width={38} height={5} rx={2.5} fill={Palette.ink} opacity={0.18} />
+        <Rect x={44} y={54} width={44} height={5} rx={2.5} fill={Palette.ink} opacity={0.18} />
+        <Rect x={44} y={72} width={26} height={10} rx={5} fill={Palette.primary} />
+        <Rect x={24} y={116} width={122} height={4} rx={2} fill={Palette.infoMuted} />
+        <Circle cx={85} cy={118} r={9} fill={Palette.infoMuted} />
+        <Circle cx={146} cy={118} r={9} fill={Palette.infoMuted} />
+        <SvgText x={24} y={140} {...label}>
+          Diajukan
+        </SvgText>
+        <SvgText x={85} y={140} {...label}>
+          Diperiksa
+        </SvgText>
+        <SvgText x={146} y={140} {...label}>
+          Diterima
+        </SvgText>
+      </Dasar>
+      <Lapisan vb={vb} lebar={lebar} asal={[14, 79]} gaya={isiDariKiri} durasi={600} ulang={false} jeda={900}>
+        <Rect x={24} y={116} width={61} height={4} rx={2} fill={Palette.primary} />
+      </Lapisan>
+      <Lapisan vb={vb} lebar={lebar} gaya={nyalaPerlahan} durasi={300} ulang={false} jeda={1450}>
+        <Circle cx={85} cy={118} r={9} fill={Palette.primary} />
+      </Lapisan>
+      <Lapisan vb={vb} lebar={lebar} asal={[50, 79]} gaya={isiDariKiri} durasi={600} ulang={false} jeda={1700}>
+        <Rect x={85} y={116} width={61} height={4} rx={2} fill={Palette.primary} />
+      </Lapisan>
+      <Lapisan vb={vb} lebar={lebar} asal={[86, 79]} gaya={muncul} durasi={500} ulang={false} jeda={2250}>
+        <Circle cx={146} cy={118} r={9} fill={Palette.primary} />
+        <Path
+          d="M142 118l3 3 6-6"
+          fill="none"
+          stroke="#FFFFFF"
+          strokeWidth={2.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Lapisan>
+      {/* Titik "Diajukan" selalu sudah terisi; digambar di atas garis supaya tidak tertutup. */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Dasar vb={vb} lebar={lebar}>
+          <Circle cx={24} cy={118} r={9} fill={Palette.primary} />
+          <Path
+            d="M20 118l3 3 6-6"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth={2.4}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Dasar>
+      </View>
+      <Lapisan vb={vb} lebar={lebar} gaya={penaMenulis} durasi={1100} linear>
+        <Path d="M98 66l24-24 8 8-24 24-11 3z" fill={Palette.ink} />
+        <Path d="M122 42l5-5 8 8-5 5z" fill={Palette.primary} />
+      </Lapisan>
+    </Kanvas>
+  );
+}
+
+const loncengBerbunyi: FungsiGaya = (p) => {
+  'worklet';
+  const sudut = interpolate(p, [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 1], [0, -14, 14, -14, 14, -14, 0, 0]);
+  return { transform: [{ rotate: `${sudut}deg` }] };
+};
+const denyut: FungsiGaya = (p) => {
+  'worklet';
+  return { transform: [{ scale: interpolate(p, [0, 1], [1, 1.25]) }] };
+};
+
+/** Perkenalan 3: grafik kehadiran dan lonceng notifikasi "Sesi dibuka". */
+export function IlustrasiNotifikasi({ lebar = 220 }: { lebar?: number }) {
+  const vb: [number, number] = [170, 150];
+  return (
+    <Kanvas vb={vb} lebar={lebar}>
+      <Dasar vb={vb} lebar={lebar}>
+        <Rect x={20} y={30} width={74} height={96} rx={10} fill="#FFFFFF" />
+        <Rect x={34} y={23} width={36} height={14} rx={6} fill={Palette.ink} />
+        <Rect x={32} y={46} width={48} height={5} rx={2.5} fill={Palette.ink} opacity={0.18} />
+        <Rect x={104} y={108} width={50} height={18} rx={9} fill={Palette.primary} />
+        <SvgText x={129} y={120} textAnchor="middle" fontFamily="Inter_800ExtraBold" fontSize={8} fill="#FFFFFF">
+          Sesi dibuka
+        </SvgText>
+      </Dasar>
+      {[
+        { x: 32, y: 96, h: 18, warna: Palette.primary, jeda: 0 },
+        { x: 51, y: 80, h: 34, warna: Palette.ink, jeda: 300 },
+        { x: 70, y: 64, h: 50, warna: Palette.primary, jeda: 600 },
+      ].map((b) => (
+        <Lapisan
+          key={b.x}
+          vb={vb}
+          lebar={lebar}
+          asal={[50, 76]}
+          gaya={batangNaikTurun}
+          durasi={900}
+          jeda={b.jeda}
+          bolakBalik>
+          <Rect x={b.x} y={b.y} width={12} height={b.h} rx={3} fill={b.warna} />
+        </Lapisan>
+      ))}
+      <Lapisan vb={vb} lebar={lebar} asal={[75, 21]} gaya={loncengBerbunyi} durasi={2400} linear>
+        <Path d="M128 40c-13 0-20 9-20 21v15l-6 9h52l-6-9V61c0-12-7-21-20-21z" fill={Palette.ink} />
+        <Circle cx={128} cy={92} r={6} fill={Palette.ink} />
+        <Rect x={125} y={32} width={6} height={9} rx={3} fill={Palette.ink} />
+      </Lapisan>
+      <Lapisan vb={vb} lebar={lebar} asal={[86, 31]} gaya={denyut} durasi={600} bolakBalik>
+        <Circle cx={146} cy={46} r={10} fill={Palette.primary} />
+        <SvgText x={146} y={50} textAnchor="middle" fontFamily="Inter_800ExtraBold" fontSize={11} fill="#FFFFFF">
+          1
+        </SvgText>
       </Lapisan>
     </Kanvas>
   );
