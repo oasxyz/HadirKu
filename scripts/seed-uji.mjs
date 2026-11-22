@@ -12,6 +12,9 @@
 // Pakai:
 //   node scripts/seed-uji.mjs --asisten <email-asisten> --praktikan <email-praktikan>
 //   node scripts/seed-uji.mjs --hapus          (hapus semua data uji)
+//   node scripts/seed-uji.mjs --hapus --praktikan <email-praktikan>
+//      (juga hapus sisa testing akun praktikan: pengajuan pindah kelas, notifikasi dari
+//       aksi testing, dan kembalikan kelasnya ke kelas uji)
 //
 // Kedua akun harus sudah pernah daftar/masuk di aplikasi (dokumen users/{uid} sudah ada).
 // Jam sesi dihitung dari jam komputer saat skrip dijalankan, jadi jalankan ulang sebelum testing.
@@ -84,6 +87,36 @@ async function hapusSemua() {
     console.log(`  ${koleksi}: ${target.length} dokumen uji dihapus`);
   }
   console.log(`Selesai, ${total} dokumen uji dihapus.`);
+}
+
+/**
+ * Sisa testing di akun praktikan sungguhan yang ID-nya bukan "uji-":
+ * pengajuan pindah kelas (ID = uid), notifikasi dari aksi testing, dan kelas yang berubah.
+ * Sesi yang dibuat lewat aplikasi (ID acak) tidak disentuh; hapus lewat tombol Hapus Sesi.
+ */
+async function hapusSisaPraktikan(emailPraktikan) {
+  const akun = await getAuth().getUserByEmail(emailPraktikan);
+  const uid = akun.uid;
+  const batch = db.batch();
+
+  const pengajuan = db.collection('pengajuanKelas').doc(uid);
+  if ((await pengajuan.get()).exists) batch.delete(pengajuan);
+
+  // Notifikasi untuk praktikan ini yang berasal dari sesi uji atau pindah kelas.
+  const notif = await db.collection('notifications').where('targetUserIds', 'array-contains', uid).get();
+  const notifUji = notif.docs.filter((d) => {
+    const data = d.data();
+    return (
+      (typeof data.sessionId === 'string' && data.sessionId.startsWith(AWALAN)) ||
+      data.type === 'kelas_diterima' ||
+      data.type === 'kelas_ditolak'
+    );
+  });
+  notifUji.forEach((d) => batch.delete(d.ref));
+
+  batch.update(db.collection('users').doc(uid), { kelas: KELAS_UJI });
+  await batch.commit();
+  console.log(`  akun praktikan: pengajuan pindah kelas dihapus, ${notifUji.length} notifikasi testing dihapus, kelas dikembalikan ke ${KELAS_UJI}`);
 }
 
 async function cariAkun(email, peranDiharapkan) {
@@ -263,6 +296,8 @@ async function isiData(emailAsisten, emailPraktikan) {
 try {
   if (process.argv.includes('--hapus')) {
     await hapusSemua();
+    const emailPraktikan = ambilArg('praktikan');
+    if (emailPraktikan) await hapusSisaPraktikan(emailPraktikan);
   } else {
     const emailAsisten = ambilArg('asisten');
     const emailPraktikan = ambilArg('praktikan');
