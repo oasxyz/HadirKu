@@ -28,7 +28,13 @@ import { Platform } from 'react-native';
 
 import { useCurrentUser } from '@/context/auth-context';
 import { COLLECTIONS, db } from '@/services/firebase';
-import type { LeaveRequest, Notification, NotificationType, Session } from '@/types';
+import type {
+  LeaveRequest,
+  Notification,
+  NotificationType,
+  PengajuanKelas,
+  Session,
+} from '@/types';
 import { formatRentangJam, formatTanggal } from '@/utils/format';
 import { Logger } from '@/utils/logger';
 
@@ -370,6 +376,21 @@ export function pesanJadwalBerubah(session: SesiRingkas, namaLab?: string): Pesa
 }
 
 /** Izin diterima/ditolak asisten → praktikan pemohon. */
+export function pesanKelasDiputuskan(
+  pengajuan: Pick<PengajuanKelas, 'userId' | 'kelasBaru'>,
+  keputusan: 'diterima' | 'ditolak',
+): PesanNotifikasi {
+  return {
+    type: keputusan === 'diterima' ? 'kelas_diterima' : 'kelas_ditolak',
+    targetUserIds: [pengajuan.userId],
+    title: keputusan === 'diterima' ? 'Pindah kelas diterima' : 'Pindah kelas ditolak',
+    body:
+      keputusan === 'diterima'
+        ? `Kelas praktikummu sekarang ${pengajuan.kelasBaru}. Sesi baru kelas ini otomatis mencantumkanmu.`
+        : `Pengajuan pindah ke kelas ${pengajuan.kelasBaru} ditolak oleh asisten.`,
+  };
+}
+
 export function pesanIzinDiputuskan(
   izin: Pick<LeaveRequest, 'userId' | 'sessionId'>,
   keputusan: 'diterima' | 'ditolak',

@@ -14,14 +14,12 @@ import {
 } from 'react-native';
 
 import {
-  Badge,
   GlassCard,
-  IconCircle,
-  PrimaryButton,
   Screen,
   SectionTitle,
   TopBar,
 } from '@/components/ui';
+import { useToast } from '@/components/toast';
 import { Palette } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useLabs } from '@/hooks/use-labs';
@@ -44,9 +42,17 @@ export default function KelolaLabScreen() {
   const [radiusInput, setRadiusInput] = useState<string>('50');
   const [fetchingGps, setFetchingGps] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(
-    null
-  );
+  // Umpan balik (sukses/error) kini tampil sebagai toast melayang, bukan kotak di halaman.
+  const { tampilkanToast } = useToast();
+  const setFeedback = (
+    feedback: { type: 'success' | 'error'; message: string } | null,
+  ) => {
+    if (feedback) tampilkanToast(
+        feedback.message,
+        feedback.type === 'error' ? 'error' : 'sukses',
+        feedback.type === 'error' ? 'Lokasi lab bermasalah' : 'Lokasi lab',
+      );
+  };
 
   const isSubmittingRef = useRef<boolean>(false);
 
@@ -227,7 +233,9 @@ export default function KelolaLabScreen() {
                       {lab.namaLab}
                     </Text>
                     {isSelected && (
-                      <Badge label={`${lab.radiusMeter}m`} tone="primary" />
+                      <View style={styles.kotakRadius}>
+                        <Text style={styles.kotakRadiusTeks}>{lab.radiusMeter} m</Text>
+                      </View>
                     )}
                   </Pressable>
                 );
@@ -239,7 +247,6 @@ export default function KelolaLabScreen() {
                 {/* 2. Kartu Koordinat Lokasi */}
                 <GlassCard style={styles.card}>
                   <View style={styles.cardHeader}>
-                    <IconCircle icon="location" tint={0} size={42} />
                     <View style={styles.cardHeaderText}>
                       <Text style={styles.cardTitle}>{selectedLab.namaLab}</Text>
                       <Text style={styles.cardSubtitle}>
@@ -284,10 +291,10 @@ export default function KelolaLabScreen() {
                       disabled={fetchingGps}
                     >
                       {fetchingGps ? (
-                        <ActivityIndicator size="small" color={Palette.primary} />
+                        <ActivityIndicator size="small" color={Palette.ink} />
                       ) : (
                         <Text style={styles.gpsButtonText}>
-                          📍 Gunakan Lokasi Saya
+                          Gunakan Lokasi Saya
                         </Text>
                       )}
                     </Pressable>
@@ -299,7 +306,7 @@ export default function KelolaLabScreen() {
                       ]}
                       onPress={handleUseUndipPreset}
                     >
-                      <Text style={styles.presetButtonText}>🏫 Titik FSM Undip</Text>
+                      <Text style={styles.presetButtonText}>Titik FSM Undip</Text>
                     </Pressable>
                   </View>
                 </GlassCard>
@@ -313,7 +320,9 @@ export default function KelolaLabScreen() {
                         Batas toleransi jarak presensi (20–200 m)
                       </Text>
                     </View>
-                    <Badge label={`${radiusInput || 0} meter`} tone="primary" />
+                    <View style={[styles.kotakRadius, styles.kotakRadiusMagenta]}>
+                      <Text style={styles.kotakRadiusTeks}>{radiusInput || 0} meter</Text>
+                    </View>
                   </View>
 
                   <View style={styles.radiusInputRow}>
@@ -371,34 +380,20 @@ export default function KelolaLabScreen() {
                 </GlassCard>
 
                 {/* Feedback status */}
-                {feedback && (
-                  <View
-                    style={[
-                      styles.feedbackBox,
-                      feedback.type === 'error'
-                        ? styles.feedbackError
-                        : styles.feedbackSuccess,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.feedbackText,
-                        feedback.type === 'error'
-                          ? styles.feedbackTextError
-                          : styles.feedbackTextSuccess,
-                      ]}
-                    >
-                      {feedback.message}
-                    </Text>
-                  </View>
-                )}
-
                 {/* Tombol Simpan */}
-                <PrimaryButton
-                  label={saving ? 'Menyimpan Pengaturan…' : 'Simpan Lokasi Lab'}
+                <Pressable
                   onPress={handleSave}
-                  style={styles.saveButton}
-                />
+                  disabled={saving}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.saveButton,
+                    saving && { opacity: 0.6 },
+                    pressed && styles.pressed,
+                  ]}>
+                  <Text style={styles.saveButtonText}>
+                    {saving ? 'Menyimpan Pengaturan…' : 'Simpan Lokasi Lab'}
+                  </Text>
+                </Pressable>
               </>
             )}
           </View>
@@ -443,18 +438,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: '#F7F6FB',
     borderWidth: 1,
     borderColor: Palette.border,
   },
+  // Lab terpilih: latar hitam berteks putih (sama dengan chip terpilih di layar lain).
   labPillSelected: {
-    backgroundColor: '#FFFFFF',
-    borderColor: Palette.primary,
-    shadowColor: Palette.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: Palette.ink,
+    borderColor: Palette.ink,
   },
   labPillText: {
     fontSize: 14,
@@ -462,10 +453,27 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
   },
   labPillTextSelected: {
-    color: Palette.ink,
+    color: '#FFFFFF',
     fontWeight: '700',
   },
+  kotakRadius: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  kotakRadiusMagenta: {
+    backgroundColor: Palette.primary,
+  },
+  kotakRadiusTeks: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  // Kartu solid, latar sama dengan kartu lain di aplikasi.
   card: {
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
     padding: 18,
     borderRadius: 24,
     gap: 16,
@@ -502,7 +510,7 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: Palette.border,
     borderRadius: 16,
@@ -519,14 +527,12 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 14,
-    backgroundColor: Palette.primaryMuted,
-    borderWidth: 1,
-    borderColor: Palette.primary,
+    backgroundColor: Palette.lavender,
     alignItems: 'center',
     justifyContent: 'center',
   },
   gpsButtonText: {
-    color: Palette.primary,
+    color: Palette.ink,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -534,7 +540,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: Palette.border,
     alignItems: 'center',
@@ -580,7 +586,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Palette.border,
@@ -598,34 +604,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
   },
-  feedbackBox: {
-    padding: 14,
-    borderRadius: 16,
-  },
-  feedbackSuccess: {
-    backgroundColor: 'rgba(34, 197, 94, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.4)',
-  },
-  feedbackError: {
-    backgroundColor: Palette.dangerMuted,
-    borderWidth: 1,
-    borderColor: Palette.danger,
-  },
-  feedbackText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  feedbackTextSuccess: {
-    color: '#15803d',
-    fontWeight: '600',
-  },
-  feedbackTextError: {
-    color: Palette.danger,
-    fontWeight: '600',
-  },
   saveButton: {
+    alignItems: 'center',
+    backgroundColor: Palette.ink,
+    borderRadius: 999,
+    height: 56,
+    justifyContent: 'center',
     marginTop: 8,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   pressed: {
     opacity: 0.75,

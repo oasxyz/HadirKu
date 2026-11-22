@@ -5,6 +5,8 @@
 // 3. Koleksi attendances: validasi ID sessionId_uid, kode sesi, dan validasi radius jarakMeter <= radiusSaatPresensi.
 // 4. Koleksi leaveRequests: ID komposit sessionId_uid, role protection.
 // 5. Koleksi notifications & appConfig: pembacaan dan penulisan operasional.
+// 6. Kelas praktikum (PIC B — Annis): users.kelas diisi sekali oleh praktikan; pindah kelas
+//    lewat koleksi pengajuanKelas yang diputuskan asisten pemegang praktikan.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -41,9 +43,19 @@ service cloud.firestore {
         && request.resource.data.nama is string
         && request.resource.data.nim is string;
 
-      // Role tidak boleh diubah setelah registrasi
-      allow update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.role == resource.data.role;
+      // Pemilik: role tidak boleh diubah, dan kelas hanya boleh diisi sekali
+      // (pindah kelas harus lewat pengajuanKelas).
+      // Asisten pemegang praktikan: hanya field kelas, sesuai pengajuan pindah kelas miliknya.
+      allow update: if signedIn() && (
+        (request.auth.uid == uid
+          && request.resource.data.role == resource.data.role
+          && (!('kelas' in resource.data)
+              || request.resource.data.get('kelas', null) == resource.data.kelas))
+        || (isAsisten()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['kelas'])
+          && request.auth.uid in get(/databases/$(database)/documents/pengajuanKelas/$(uid)).data.asistenIds
+          && request.resource.data.kelas == get(/databases/$(database)/documents/pengajuanKelas/$(uid)).data.kelasBaru)
+      );
 
       allow delete: if false;
     }
@@ -149,6 +161,41 @@ service cloud.firestore {
       // Hanya asisten yang bisa mengubah status keputusan
       allow update: if isAsisten()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'diputuskanOleh', 'diputuskanAt']);
+
+      allow delete: if false;
+    }
+
+    // Koleksi Pengajuan Pindah Kelas (PIC B — Annis)
+    // ID dokumen = uid praktikan; satu pengajuan terbaru per praktikan.
+    // asistenIds = asisten yang memegang praktikan; hanya mereka yang membaca dan memutuskan.
+    match /pengajuanKelas/{uid} {
+      allow read: if signedIn() && (
+        request.auth.uid == uid
+        || (isAsisten() && (resource == null || request.auth.uid in resource.data.asistenIds))
+      );
+
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.userId == uid
+        && request.resource.data.status == 'menunggu'
+        && request.resource.data.kelasBaru is string
+        && request.resource.data.asistenIds is list;
+
+      allow update: if signedIn() && (
+        // Praktikan mengajukan lagi setelah pengajuan sebelumnya diputuskan
+        (request.auth.uid == uid
+          && resource.data.status != 'menunggu'
+          && request.resource.data.userId == uid
+          && request.resource.data.status == 'menunggu'
+          && request.resource.data.kelasBaru is string
+          && request.resource.data.asistenIds is list)
+        // Asisten pemegang memutuskan pengajuan yang masih menunggu
+        || (isAsisten()
+          && request.auth.uid in resource.data.asistenIds
+          && resource.data.status == 'menunggu'
+          && request.resource.data.status in ['diterima', 'ditolak']
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'diputuskanOleh', 'diputuskanAt']))
+      );
 
       allow delete: if false;
     }

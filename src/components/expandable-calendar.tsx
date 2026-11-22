@@ -213,14 +213,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
   },
+  // Tombol putih bergaris berteks hitam, seragam dengan pil bulan di sebelah kiri.
   todayChip: {
-    backgroundColor: Palette.primaryMuted,
+    backgroundColor: '#FFFFFF',
+    borderColor: Palette.border,
     borderRadius: 999,
+    borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
   todayChipText: {
-    color: Palette.primary,
+    color: Palette.ink,
     fontSize: 12,
     fontWeight: '700',
   },

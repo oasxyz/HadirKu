@@ -15,7 +15,13 @@ import {
 } from 'react-native';
 
 import { ExpandableCalendar, toDateString } from '@/components/expandable-calendar';
+import { IlustrasiKosong, IlustrasiSurat } from '@/components/ilustrasi';
+import { PelacakPengajuan } from '@/components/pelacak-pengajuan';
+import { KategoriIzinBadge } from '@/components/status-kehadiran-badge';
+import { useToast } from '@/components/toast';
 import {
+  Badge,
+  type BadgeTone,
   EmptyNote,
   GlassCard,
   Screen,
@@ -31,31 +37,10 @@ import { classifyLeaveReason } from '@/services/ai';
 import { COLLECTIONS, getCompositeId } from '@/services/firebase';
 import type { LeaveRequest } from '@/types';
 import { normalizeLeaveCategory } from '@/types';
-import { formatTanggal } from '@/utils/format';
+import { formatTanggal, formatTanggalSingkat } from '@/utils/format';
+import { BATAS_HARI_KEPUTUSAN_IZIN, masihBolehPutuskanIzin } from '@/utils/waktu-sesi';
 import { Logger, toUserErrorMessage } from '@/utils/logger';
 import { sesiSudahBerakhir } from '@/utils/sesi';
-
-function LocalBadge({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: 'primary' | 'warning' | 'info' | 'danger' | 'muted';
-}) {
-  const palette: Record<typeof tone, { bg: string; fg: string }> = {
-    primary: { bg: Palette.primary, fg: '#FFFFFF' },
-    warning: { bg: 'rgba(217,119,6,0.14)', fg: '#D97706' },
-    info: { bg: 'rgba(109,40,217,0.12)', fg: '#6D28D9' },
-    danger: { bg: 'rgba(225,29,72,0.12)', fg: '#E11D48' },
-    muted: { bg: '#B9B5C6', fg: '#FFFFFF' },
-  };
-  const c = palette[tone];
-  return (
-    <View style={[styles.badge, { backgroundColor: c.bg }]}>
-      <Text style={[styles.badgeText, { color: c.fg }]}>{label}</Text>
-    </View>
-  );
-}
 
 export function PengajuanIzin() {
   const currentUser = useCurrentUser();
@@ -68,6 +53,7 @@ export function PengajuanIzin() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [alasan, setAlasan] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { tampilkanToast } = useToast();
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -164,9 +150,12 @@ export function PengajuanIzin() {
       });
 
       resetForm();
+      tampilkanToast('Pantau statusnya di daftar pengajuan. Kamu akan diberi tahu saat asisten memutuskan.', 'sukses', 'Izin diajukan');
     } catch (err) {
       Logger.error('FIRESTORE', 'LeaveRequestCreate', err);
+      // Form berada di dalam Modal (toast tertutup modal), jadi pesan juga tetap tampil di form.
       setErrorMsg(toUserErrorMessage(err));
+      tampilkanToast('Periksa koneksi internet lalu coba lagi.', 'error', 'Izin gagal diajukan');
     } finally {
       setSubmitting(false);
     }
@@ -222,28 +211,41 @@ export function PengajuanIzin() {
         markedDates={markedDates}
       />
 
-      <Pressable
-        onPress={() => setShowForm(true)}
-        disabled={sesiBisaDiajukan.length === 0}
-        style={({ pressed }) => [
-          styles.addButton,
-          sesiBisaDiajukan.length === 0 && styles.addButtonDisabled,
-          pressed && { opacity: 0.8 },
-        ]}>
-        <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
-        <Text style={styles.addButtonText}>Ajukan Izin untuk Tanggal Ini</Text>
-      </Pressable>
-
-      {sesiBisaDiajukan.length === 0 && (
-        <Text style={styles.hint}>
-          Tidak ada sesi praktikum yang bisa diajukan izin di tanggal ini.
-        </Text>
-      )}
+      {/* Kartu ajukan berilustrasi; tombolnya mati bila tanggal ini tidak punya sesi yang bisa diizinkan. */}
+      <View style={styles.ajukanCard}>
+        <View style={styles.ajukanText}>
+          <Text style={styles.ajukanTitle}>
+            {sesiBisaDiajukan.length > 0
+              ? `Tidak bisa hadir ${formatTanggalSingkat(selectedDate)}?`
+              : formatTanggalSingkat(selectedDate)}
+          </Text>
+          <Text style={styles.ajukanSub}>
+            {sesiBisaDiajukan.length > 0
+              ? 'Ajukan izin sebelum sesi berakhir.'
+              : 'Tidak ada sesi yang bisa diajukan izin di tanggal ini.'}
+          </Text>
+          <Pressable
+            onPress={() => setShowForm(true)}
+            disabled={sesiBisaDiajukan.length === 0}
+            style={({ pressed }) => [
+              styles.addButton,
+              sesiBisaDiajukan.length === 0 && styles.addButtonDisabled,
+              pressed && { opacity: 0.8 },
+            ]}>
+            <Ionicons name="add" size={16} color="#FFFFFF" />
+            <Text style={styles.addButtonText}>Ajukan Izin</Text>
+          </Pressable>
+        </View>
+        <IlustrasiSurat lebar={92} />
+      </View>
 
       <SectionTitle title="Riwayat Pengajuan" />
 
       {sortedHistory.length === 0 ? (
-        <EmptyNote message="Belum ada pengajuan izin." />
+        <GlassCard style={styles.emptyCard}>
+          <IlustrasiKosong lebar={100} />
+          <Text style={styles.emptyText}>Belum ada pengajuan izin.</Text>
+        </GlassCard>
       ) : (
         <View style={{ gap: Spacing.two }}>
           {sortedHistory.map((item) => (
@@ -269,7 +271,7 @@ export function PengajuanIzin() {
                 Ajukan Izin · {formatTanggal(selectedDate)}
               </Text>
 
-              <Text style={styles.label}>Sesi</Text>
+              <Text style={styles.label}>Pilih sesi</Text>
               <View style={{ gap: 6 }}>
                 {sesiBisaDiajukan.map((s) => {
                   const selected = s.id === selectedSessionId;
@@ -281,19 +283,16 @@ export function PengajuanIzin() {
                         styles.sessionOption,
                         selected && styles.sessionOptionSelected,
                       ]}>
+                      {/* Tombol pilihan bulat: kosong, atau hitam bercentang saat dipilih. */}
+                      <View style={[styles.radio, selected && styles.radioTerpilih]}>
+                        {selected ? <Ionicons name="checkmark" size={13} color="#FFFFFF" /> : null}
+                      </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.sessionOptionTitle}>{s.praktikum}</Text>
                         <Text style={styles.sessionOptionSub}>
-                          {s.kelasLab} · {s.jamMulai}-{s.jamSelesai}
+                          {s.jamMulai}–{s.jamSelesai} · {s.kelasLab}
                         </Text>
                       </View>
-                      {selected && (
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={22}
-                          color={Palette.primary}
-                        />
-                      )}
                     </Pressable>
                   );
                 })}
@@ -353,54 +352,72 @@ function IzinCard({
   sessionNama: string;
   sessionTanggal?: string;
 }) {
-  const statusTone: 'primary' | 'warning' | 'danger' =
-    item.status === 'diterima' ? 'primary' : item.status === 'ditolak' ? 'danger' : 'warning';
+  // Aturan warna seragam: Menunggu abu, Diterima magenta, Ditolak hitam.
+  const statusTone: BadgeTone =
+    item.status === 'diterima' ? 'primary' : item.status === 'ditolak' ? 'dark' : 'muted';
   const statusLabel =
     item.status === 'diterima' ? 'Diterima' : item.status === 'ditolak' ? 'Ditolak' : 'Menunggu';
 
   const normalizedKategori = normalizeLeaveCategory(item.kategoriAi);
-  const kategoriTone: 'warning' | 'info' | 'muted' =
-    normalizedKategori === 'sakit'
-      ? 'warning'
-      : normalizedKategori === 'izin'
-      ? 'info'
-      : 'muted';
-  const kategoriLabel =
-    normalizedKategori === 'sakit'
-      ? 'Sakit'
-      : normalizedKategori === 'izin'
-      ? 'Izin'
-      : 'Belum terklasifikasi';
+  // Ringkas dulu; ketuk kartu untuk membuka alasan dan pelacak di tempat (tanpa pindah halaman).
+  // Pengajuan yang masih menunggu langsung terbuka supaya progresnya terlihat.
+  const [terbuka, setTerbuka] = useState(item.status === 'menunggu');
 
   return (
     <GlassCard style={styles.reqCard}>
-      <View style={styles.reqHeader}>
+      <Pressable
+        onPress={() => setTerbuka((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: terbuka }}
+        accessibilityHint={terbuka ? 'Ketuk untuk menutup detail' : 'Ketuk untuk melihat pelacakan izin'}
+        style={({ pressed }) => [styles.reqHeader, pressed && { opacity: 0.7 }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.reqTitle}>{sessionNama}</Text>
           {sessionTanggal ? (
             <Text style={styles.reqMeta}>{formatTanggal(sessionTanggal)}</Text>
           ) : null}
         </View>
-        <LocalBadge label={statusLabel} tone={statusTone} />
-      </View>
+        <Badge label={statusLabel} tone={statusTone} />
+        <Ionicons
+          name={terbuka ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={Palette.textMuted}
+        />
+      </Pressable>
 
-      <Text style={styles.reqAlasan}>{item.alasan}</Text>
+      {terbuka ? (
+        <View style={styles.reqDetail}>
+          <Text style={styles.reqAlasan}>{item.alasan}</Text>
 
-      <View style={styles.aiRow}>
-        <Text style={styles.aiLabel}>Kategori AI</Text>
-        <LocalBadge label={kategoriLabel} tone={kategoriTone} />
-      </View>
+          <View style={styles.aiRow}>
+            <Text style={styles.aiLabel}>Kategori AI</Text>
+            <KategoriIzinBadge kategori={normalizedKategori} />
+          </View>
 
-      {item.status !== 'menunggu' && item.diputuskanOleh && item.diputuskanAt ? (
-        <Text style={styles.decisionText}>
-          Diputuskan {item.diputuskanOleh} ·{' '}
-          {new Date(item.diputuskanAt).toLocaleString('id-ID', {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </Text>
+          <PelacakPengajuan
+            status={item.status}
+            createdAt={item.createdAt}
+            diputuskanAt={item.diputuskanAt}
+          />
+
+          {item.status === 'menunggu' && !masihBolehPutuskanIzin(sessionTanggal) ? (
+            <Text style={styles.decisionText}>
+              Asisten tidak memutuskan sampai batas H+{BATAS_HARI_KEPUTUSAN_IZIN}, jadi sesi ini dihitung Alpha.
+            </Text>
+          ) : null}
+
+          {item.status !== 'menunggu' && item.diputuskanOleh && item.diputuskanAt ? (
+            <Text style={styles.decisionText}>
+              Diputuskan {item.diputuskanOleh} ·{' '}
+              {new Date(item.diputuskanAt).toLocaleString('id-ID', {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
     </GlassCard>
   );
@@ -408,25 +425,36 @@ function IzinCard({
 
 const styles = StyleSheet.create({
   centerCard: { alignItems: 'center', padding: Spacing.four, gap: Spacing.two },
+  ajukanCard: {
+    alignItems: 'center',
+    backgroundColor: Palette.infoMuted,
+    borderRadius: 24,
+    flexDirection: 'row',
+    gap: 4,
+    paddingLeft: 18,
+    paddingRight: 8,
+    paddingVertical: 16,
+  },
+  ajukanText: { flex: 1, alignItems: 'flex-start', gap: 4 },
+  ajukanTitle: { fontSize: 16, fontWeight: '700', color: Palette.text },
+  ajukanSub: { fontSize: 12, color: Palette.textSecondary, lineHeight: 17 },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Palette.primary,
-    padding: 14,
+    gap: 6,
+    backgroundColor: Palette.ink,
     borderRadius: 999,
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
-  addButtonDisabled: { opacity: 0.4 },
-  addButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  hint: {
-    fontSize: 12,
-    color: Palette.textMuted,
-    textAlign: 'center',
-    marginTop: -6,
-  },
+  addButtonDisabled: { opacity: 0.35 },
+  addButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  emptyCard: { alignItems: 'center', gap: 8, paddingVertical: 24 },
+  emptyText: { color: Palette.textMuted, fontSize: 13, textAlign: 'center' },
 
   reqCard: { gap: Spacing.two },
+  reqDetail: { gap: Spacing.two },
   reqHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   reqTitle: { fontSize: 15, fontWeight: '600', color: Palette.text },
   reqMeta: { fontSize: 12, color: Palette.textMuted, marginTop: 2 },
@@ -480,19 +508,34 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
     marginBottom: Spacing.one,
   },
+  // Pilihan sesi: kartu solid; yang dipilih bertepi hitam (bukan latar merah muda).
   sessionOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
     borderWidth: 1,
     borderColor: Palette.border,
     borderRadius: 14,
     padding: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: '#F7F6FB',
   },
   sessionOptionSelected: {
-    borderColor: Palette.primary,
-    backgroundColor: 'rgba(226, 27, 208, 0.08)',
+    borderColor: Palette.ink,
+    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+  },
+  radio: {
+    alignItems: 'center',
+    borderColor: Palette.textMuted,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    height: 22,
+    justifyContent: 'center',
+    width: 22,
+  },
+  radioTerpilih: {
+    backgroundColor: Palette.ink,
+    borderColor: Palette.ink,
   },
   sessionOptionTitle: {
     fontSize: 14, fontWeight: '600', color: Palette.text,
@@ -507,7 +550,7 @@ const styles = StyleSheet.create({
     padding: 12,
     minHeight: 100,
     color: Palette.text,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: '#F7F6FB',
   },
   errorText: { color: Palette.danger, fontSize: 13, marginTop: Spacing.two },
   modalActions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three },
@@ -523,7 +566,7 @@ const styles = StyleSheet.create({
   confirmBtn: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: Palette.primary,
+    backgroundColor: Palette.ink,
     borderRadius: 999,
     paddingVertical: 12,
   },

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
+import { useToast } from '@/components/toast';
 import { DigitBoxes } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
@@ -15,6 +16,7 @@ import { COLLECTIONS, db } from '@/services/firebase';
 import { kirimNotifikasi, pesanSesiDibuka } from '@/services/notifications';
 import { Logger } from '@/utils/logger';
 import { getBatasTutupSesi, sesiSudahBerakhir } from '@/utils/sesi';
+import { jendelaBukaSesi, MENIT_BUKA_LEBIH_AWAL } from '@/utils/waktu-sesi';
 
 type Confirmation = 'open' | 'close' | null;
 
@@ -25,8 +27,16 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
   const [processing, setProcessing] = useState(false);
   const isSubmittingRef = useRef<boolean>(false);
+  const { tampilkanToast } = useToast();
 
   const session = sessions.find((item) => item.id === sessionId);
+
+  // Jam perangkat diperbarui tiap 30 detik supaya tombol Buka Sesi aktif tepat waktu.
+  const [sekarang, setSekarang] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setSekarang(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const tutupSesi = useCallback(async () => {
     await updateSession(sessionId, {
@@ -39,22 +49,26 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
     if (!session || session.status !== 'dibuka') return;
 
     if (sesiSudahBerakhir(session)) {
-      tutupSesi().catch((error) => {
-        Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI', error);
-      });
+      tutupSesi()
+        .then(() => tampilkanToast('Jam praktikum sudah lewat, presensi tidak lagi diterima.', 'info', 'Sesi ditutup otomatis'))
+        .catch((error) => {
+          Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI', error);
+        });
       return;
     }
 
     const batasTutup = getBatasTutupSesi(session);
     const sisaWaktu = Math.max(0, batasTutup.getTime() - Date.now());
     const timer = setTimeout(() => {
-      tutupSesi().catch((error) => {
-        Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI_TIMER', error);
-      });
+      tutupSesi()
+        .then(() => tampilkanToast('Jam praktikum sudah lewat, presensi tidak lagi diterima.', 'info', 'Sesi ditutup otomatis'))
+        .catch((error) => {
+          Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI_TIMER', error);
+        });
     }, sisaWaktu);
 
     return () => clearTimeout(timer);
-  }, [session, tutupSesi]);
+  }, [session, tutupSesi, tampilkanToast]);
 
   if (!session) return null;
 
@@ -68,6 +82,10 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
       isSubmittingRef.current = true;
       setProcessing(true);
       if (confirmation === 'open') {
+        // Cek ulang saat dikonfirmasi: dialog bisa terbuka lama sampai lewat jamnya.
+        if (!jendelaBukaSesi(session!, new Date()).boleh) {
+          throw new Error('DI_LUAR_JAM_BUKA');
+        }
         let asistenCoords: { lat: number; lng: number } | null = null;
         try {
           const { status } = await Location.requestForegroundPermissionsAsync();
@@ -124,11 +142,18 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
             Logger.error('FCM', 'NOTIF_SESI_DIBUKA', err)
           );
         }
+        tampilkanToast('Praktikan sudah bisa presensi dan diberi tahu lewat notifikasi.', 'sukses', 'Sesi dibuka');
       } else if (confirmation === 'close') {
         await tutupSesi();
+        tampilkanToast('Presensi untuk sesi ini sudah tidak diterima.', 'sukses', 'Sesi ditutup');
       }
     } catch (error) {
-      Logger.error('FIRESTORE', 'CONFIRM_SESSION_ACTION', error);
+      if (error instanceof Error && error.message === 'DI_LUAR_JAM_BUKA') {
+        tampilkanToast('Sesi hanya bisa dibuka di jam praktikumnya.', 'error', 'Belum bisa dibuka');
+      } else {
+        Logger.error('FIRESTORE', 'CONFIRM_SESSION_ACTION', error);
+        tampilkanToast('Periksa koneksi internet lalu coba lagi.', 'error', 'Sesi gagal diperbarui');
+      }
     } finally {
       setProcessing(false);
       isSubmittingRef.current = false;
@@ -174,12 +199,12 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
 
           <View style={styles.codeBox}>
             <Text style={styles.codeLabel}>ATAU KETIK KODE</Text>
-            <DigitBoxes value={kodeSesi ?? ''} color={Palette.primary} />
+            <DigitBoxes value={kodeSesi ?? ''} color={Palette.ink} />
           </View>
 
           <View style={styles.attendanceSummary}>
             <Text style={styles.attendanceText}>
-              {attendanceCount} praktikan sudah hadir
+              <Text style={styles.attendanceCount}>{attendanceCount}</Text> praktikan sudah hadir
             </Text>
           </View>
 
@@ -204,19 +229,35 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
     );
   }
 
+  // Sesi hanya bisa dibuka di tanggalnya, mulai 15 menit sebelum jam mulai sampai jam selesai.
+  const jendela = jendelaBukaSesi(session, sekarang);
+  const keteranganBuka = jendela.boleh
+    ? 'Buka sesi untuk membuat kode presensi dan menerima kehadiran praktikan.'
+    : jendela.alasan === 'belum_waktunya'
+      ? `Sesi bisa dibuka mulai ${jendela.bukaMulai.toLocaleDateString('id-ID', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'short',
+        })} pukul ${jendela.bukaMulai.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}, ${MENIT_BUKA_LEBIH_AWAL} menit sebelum jam mulai.`
+      : 'Jam praktikum sesi ini sudah lewat, jadi sesi tidak bisa dibuka lagi.';
+
   return (
     <>
       <View style={styles.card}>
         <View style={styles.statusCopy}>
           <Text style={styles.cardTitle}>Sesi belum dibuka</Text>
-          <Text style={styles.cardDescription}>
-            Buka sesi untuk membuat kode presensi dan menerima kehadiran praktikan.
-          </Text>
+          <Text style={styles.cardDescription}>{keteranganBuka}</Text>
         </View>
 
         <Pressable
           onPress={() => setConfirmation('open')}
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+          disabled={!jendela.boleh}
+          accessibilityState={{ disabled: !jendela.boleh }}
+          style={({ pressed }) => [
+            styles.primaryButton,
+            !jendela.boleh && styles.buttonMati,
+            pressed && styles.pressed,
+          ]}>
           <Text style={styles.buttonText}>Buka Sesi</Text>
         </Pressable>
       </View>
@@ -281,9 +322,10 @@ function ConfirmationModal({
 }
 
 const styles = StyleSheet.create({
+  // Kartu solid, latar sama dengan kartu lain di aplikasi.
   card: {
-    backgroundColor: Palette.card,
-    borderColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
     borderRadius: 24,
     borderWidth: 1,
     padding: Spacing.three,
@@ -292,6 +334,7 @@ const styles = StyleSheet.create({
   },
   openCard: {
     borderColor: Palette.primary,
+    borderWidth: 1.5,
   },
   closedCard: {
     borderColor: 'rgba(23, 21, 28, 0.3)',
@@ -319,7 +362,7 @@ const styles = StyleSheet.create({
   },
   codeBox: {
     alignItems: 'center',
-    backgroundColor: Palette.primaryMuted,
+    backgroundColor: '#FFFFFF',
     borderColor: Palette.border,
     borderRadius: 14,
     borderWidth: 1,
@@ -342,9 +385,13 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     fontSize: 13,
   },
+  attendanceCount: {
+    color: Palette.text,
+    fontWeight: '700',
+  },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: Palette.primary,
+    backgroundColor: Palette.ink,
     borderRadius: 999,
     flexDirection: 'row',
     gap: Spacing.two,
@@ -359,6 +406,9 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     justifyContent: 'center',
     paddingVertical: 13,
+  },
+  buttonMati: {
+    opacity: 0.35,
   },
   buttonText: {
     color: '#FFFFFF',
@@ -418,7 +468,7 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     alignItems: 'center',
-    backgroundColor: Palette.primary,
+    backgroundColor: Palette.ink,
     borderRadius: 999,
     flex: 1,
     justifyContent: 'center',

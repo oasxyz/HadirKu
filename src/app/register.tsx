@@ -2,8 +2,11 @@ import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { IlustrasiSapaan } from '@/components/ilustrasi';
 import { TextField } from '@/components/text-field';
-import { Chip, GlassCard, PrimaryButton, Screen, TopBar } from '@/components/ui';
+import { Chip, GlassCard, Screen, SelectField, TopBar } from '@/components/ui';
+import { OPSI_KELAS } from '@/constants/kelas';
+import { useToast } from '@/components/toast';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import type { Role } from '@/types';
@@ -17,9 +20,16 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('praktikan');
+  const [kelas, setKelas] = useState('');
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorState] = useState<string | null>(null);
+  const { tampilkanToast } = useToast();
+  // Pesan error tampil sebagai toast melayang di atas layar.
+  const setError = (pesan: string | null) => {
+    setErrorState(pesan);
+    if (pesan) tampilkanToast(pesan, 'error', 'Pendaftaran gagal');
+  };
 
   async function handleRegister() {
     if (!nama.trim() || !nim.trim() || !email.trim() || !password) {
@@ -29,6 +39,11 @@ export default function RegisterScreen() {
 
     if (!/^\d{6,20}$/.test(nim.trim())) {
       setError('NIM harus berupa angka (6–20 digit)');
+      return;
+    }
+
+    if (role === 'praktikan' && !kelas) {
+      setError('Pilih kelas praktikummu');
       return;
     }
 
@@ -46,6 +61,7 @@ export default function RegisterScreen() {
         email,
         password,
         role,
+        kelas: role === 'praktikan' ? kelas : undefined,
       });
       // Pendaftaran sukses & otomatis login -> langsung arahkan ke beranda
       router.replace('/jadwal' as Href);
@@ -63,17 +79,16 @@ export default function RegisterScreen() {
       <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1 }}>
+        {/* Banner berilustrasi, gaya sama dengan halaman Login. */}
+        <View style={styles.hero}>
+          <IlustrasiSapaan lebar={300} />
+        </View>
+
         <GlassCard style={styles.sheet}>
           <Text style={styles.heading}>Buat Akun Baru</Text>
           <Text style={styles.subtitle}>
             Lengkapi data diri untuk mengakses presensi dan jadwal praktikum.
           </Text>
-
-          {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
 
           <View style={styles.form}>
             <TextField
@@ -138,13 +153,30 @@ export default function RegisterScreen() {
               </View>
               <Text style={styles.roleHint}>Peran tidak bisa diubah setelah mendaftar.</Text>
             </View>
+
+            {/* Kelas menentukan sesi praktikum yang otomatis diikuti praktikan. */}
+            {role === 'praktikan' ? (
+              <SelectField
+                label="Kelas Praktikum"
+                value={kelas}
+                options={OPSI_KELAS}
+                onSelect={setKelas}
+                error={Boolean(error && !kelas)}
+              />
+            ) : null}
           </View>
 
-          <PrimaryButton
-            label={loading ? 'Mendaftar…' : 'Daftar'}
+          <Pressable
             onPress={handleRegister}
             disabled={loading}
-          />
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.utamaBtn,
+              loading && { opacity: 0.6 },
+              pressed && { opacity: 0.8 },
+            ]}>
+            <Text style={styles.utamaBtnText}>{loading ? 'Mendaftar…' : 'Daftar'}</Text>
+          </Pressable>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Sudah punya akun? </Text>
@@ -159,10 +191,35 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
+  hero: {
+    alignItems: 'center',
+    borderRadius: 32,
+    experimental_backgroundImage:
+      'linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(244, 207, 239, 0.9) 100%)',
+    height: 140,
+    justifyContent: 'flex-end',
+    marginBottom: 14,
+    overflow: 'hidden',
+  } as object,
+  // Kartu solid, latar sama dengan kartu lain di aplikasi.
   sheet: {
-    borderRadius: 36,
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
+    borderRadius: 32,
     gap: 16,
     padding: 24,
+  },
+  utamaBtn: {
+    alignItems: 'center',
+    backgroundColor: Palette.ink,
+    borderRadius: 999,
+    height: 56,
+    justifyContent: 'center',
+  },
+  utamaBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   heading: {
     color: Palette.text,
@@ -174,19 +231,6 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     fontSize: 13,
     lineHeight: 18,
-    textAlign: 'center',
-  },
-  errorBox: {
-    backgroundColor: 'rgba(225, 29, 72, 0.08)',
-    borderColor: 'rgba(225, 29, 72, 0.3)',
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  errorText: {
-    color: Palette.danger,
-    fontSize: 13,
     textAlign: 'center',
   },
   form: {
@@ -222,8 +266,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   loginLink: {
-    color: Palette.primary,
+    color: Palette.text,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

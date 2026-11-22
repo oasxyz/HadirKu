@@ -66,7 +66,7 @@ export function LocationCheckCard({ state, onOpenSettings }: LocationCheckCardPr
   if (state.loading && state.currentCoords === null) {
     return (
       <GlassCard style={styles.locationCard}>
-        <Text style={styles.locationStatusText}>Memeriksa lokasi...</Text>
+        <Text style={styles.locationStatusText}>Memeriksa lokasi…</Text>
       </GlassCard>
     );
   }
@@ -79,23 +79,21 @@ export function LocationCheckCard({ state, onOpenSettings }: LocationCheckCardPr
 
   return (
     <GlassCard style={styles.locationCard}>
+      {/* Kotak status berteks putih (tanpa ikon centang), seragam dengan kartu sesi. */}
       <View style={styles.locationHeader}>
-        <Ionicons
-          name={state.isWithinRadius ? 'checkmark-circle' : 'alert-circle'}
-          size={28}
-          color={state.isWithinRadius ? Palette.primary : Palette.danger}
-        />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.locationTitle}>
-            {state.isWithinRadius ? 'Di Dalam Radius' : 'Di Luar Radius'}
-          </Text>
-          <Text style={styles.locationMeta}>
-            Jarak Anda ke {state.labName ?? 'Lab'}: {jarakText}
-          </Text>
-          <Text style={styles.locationMetaSub}>
-            Batas radius maksimal: {radiusText}
+        <View
+          style={[
+            styles.statusBox,
+            { backgroundColor: state.isWithinRadius ? Palette.primary : Palette.ink },
+          ]}>
+          <Text style={styles.statusText}>
+            {state.isWithinRadius ? 'Di dalam radius' : 'Di luar radius'}
           </Text>
         </View>
+        <Text style={styles.locationTitle}>
+          {jarakText} dari {state.labName ?? 'Lab'}
+        </Text>
+        <Text style={styles.locationMetaSub}>Batas radius maksimal: {radiusText}</Text>
       </View>
 
       {!state.isWithinRadius && (
@@ -111,7 +109,7 @@ export function LocationCheckCard({ state, onOpenSettings }: LocationCheckCardPr
           disabled={state.loading}>
           <Ionicons name="refresh" size={16} color={Palette.text} />
           <Text style={styles.refreshButtonText}>
-            {state.loading ? 'Memuat...' : 'Perbarui Lokasi'}
+            {state.loading ? 'Memperbarui lokasi…' : 'Perbarui Lokasi'}
           </Text>
         </Pressable>
 
@@ -135,19 +133,24 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   locationHeader: {
-    flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: Spacing.two,
+    gap: 4,
+  },
+  statusBox: {
+    borderRadius: 8,
+    marginBottom: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  statusText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   locationTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: Palette.text,
-  },
-  locationMeta: {
-    fontSize: 13,
-    color: Palette.textSecondary,
-    marginTop: 2,
   },
   locationMetaSub: {
     fontSize: 11,
@@ -160,8 +163,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   locationWarning: {
+    // Aturan warna seragam: merah hanya untuk error; kondisi di luar radius memakai hitam.
     fontSize: 12,
-    color: Palette.danger,
+    fontWeight: '600',
+    color: Palette.ink,
     lineHeight: 18,
   },
   actionsRow: {

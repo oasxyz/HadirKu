@@ -26,6 +26,8 @@ export const COLLECTIONS = {
   sessionSecrets: 'sessionCodes', // Alias Sprint 3 ke koleksi yang sama agar tidak memutus hook Sprint 2
   attendances: 'attendances',
   leaveRequests: 'leaveRequests',
+  // Pengajuan pindah kelas praktikum (ID = uid praktikan).
+  pengajuanKelas: 'pengajuanKelas',
   notifications: 'notifications',
   appConfig: 'appConfig',
 } as const;

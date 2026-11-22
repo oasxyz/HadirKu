@@ -273,8 +273,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    // Lebih putih dari GlassCard biasa supaya tidak bercampur dengan peta di belakangnya.
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    // Solid (tidak transparan) supaya tidak bercampur dengan peta; warna sama dengan kartu lain.
+    backgroundColor: '#F7F6FB',
     gap: 12,
     left: 14,
     padding: 14,
@@ -331,10 +331,10 @@ const styles = StyleSheet.create({
     top: 0,
   },
   kartuPutih: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: '#F7F6FB',
   },
   memuatCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: '#F7F6FB',
     alignItems: 'center',
     flexDirection: 'row',
     gap: 10,

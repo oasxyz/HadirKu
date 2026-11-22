@@ -1,0 +1,18 @@
+# Asisten: daftar izin menunggu dan dialog konfirmasi (dibatalkan, data tidak berubah).
+appId: com.oasxyz.HadirKu
+---
+- runFlow:
+    file: subflows/masuk.yaml
+    env:
+      EMAIL: ${ASISTEN_EMAIL}
+      SANDI: ${ASISTEN_SANDI}
+- tapOn: "Izin"
+- extendedWaitUntil:
+    visible: '\d+ izin menunggu keputusan'
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Kontrol ke dokter gigi.*"
+- tapOn: "Terima"
+- assertVisible: 'Terima Izin\?'
+- tapOn: "Batal"
+- assertNotVisible: 'Terima Izin\?'

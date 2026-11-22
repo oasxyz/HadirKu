@@ -1,0 +1,24 @@
+# Praktikan: kartu riwayat izin bisa dibuka di tempat dan menampilkan pelacak.
+appId: com.oasxyz.HadirKu
+---
+- runFlow:
+    file: subflows/masuk.yaml
+    env:
+      EMAIL: ${PRAKTIKAN_EMAIL}
+      SANDI: ${PRAKTIKAN_SANDI}
+- tapOn: "Izin"
+- extendedWaitUntil:
+    visible: "Riwayat Pengajuan"
+    timeout: 15000
+# Izin yang masih menunggu langsung terbuka.
+- scrollUntilVisible:
+    element: "Menunggu asisten"
+- assertVisible: "Kecerdasan Buatan"
+# Izin yang sudah diputuskan tertutup dulu, lalu dibuka dengan ketukan.
+- scrollUntilVisible:
+    element: "Struktur Data"
+- tapOn: "Struktur Data"
+- scrollUntilVisible:
+    element: "Kategori AI"
+- assertVisible: "Diterima"
+- assertVisible: "Diajukan"

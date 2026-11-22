@@ -62,15 +62,18 @@ export const Palette = {
   // Status: Selesai / Berat / Ditutup
   ink: '#17151C',
   
-  // Status: Izin / Kategori Izin
-  info: '#6D28D9',
-  infoMuted: 'rgba(109, 40, 217, 0.12)',
-  
-  // Status: Menunggu / Sakit / GPS Mati / Sedang Memeriksa
-  warning: '#D97706',
-  warningMuted: 'rgba(217, 119, 6, 0.14)',
-  
-  // Status: Alpha / Ditolak / Di Luar Radius / Error Form
+  // Aturan warna seragam tim (keputusan 22 Nov 2026): tidak ada kuning/hijau, merah hanya untuk
+  // pesan error. Token info/warning dipetakan ke ungu muda dan merah muda dari palet HadirKu.
+
+  // Status: Izin / Kategori Izin (ungu muda)
+  info: '#6B4FA0',
+  infoMuted: '#E4DAF1',
+
+  // Status: Sakit / Memeriksa (merah muda)
+  warning: '#A3148F',
+  warningMuted: '#F4CFEF',
+
+  // KHUSUS pesan error form/validasi. Status Alpha, Ditolak, dan Di Luar Radius memakai hitam (ink).
   danger: '#E11D48',
   dangerMuted: 'rgba(225, 29, 72, 0.12)',
   

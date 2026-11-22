@@ -26,6 +26,10 @@ import { usePraktikanList } from "@/hooks/use-users";
 import { useLeaveRequests } from "@/hooks/use-leave-requests";
 import { kirimNotifikasi, pesanIzinDiputuskan } from "@/services/notifications";
 import { KategoriIzinBadge } from "@/components/status-kehadiran-badge";
+import { IlustrasiKosong, IlustrasiSurat } from "@/components/ilustrasi";
+import { BATAS_HARI_KEPUTUSAN_IZIN, masihBolehPutuskanIzin } from "@/utils/waktu-sesi";
+import { PemeriksaanKelas } from "@/components/izin/pemeriksaan-kelas";
+import { useToast } from "@/components/toast";
 import { normalizeLeaveCategory } from "@/types";
 import { formatTanggal } from "@/utils/format";
 import { Logger } from "@/utils/logger";
@@ -67,9 +71,11 @@ export function PemeriksaanIzin() {
   } = useLeaveRequests();
 
   const [filter, setFilter] = useState<FilterWaktu>("hari_ini");
+  const [bagian, setBagian] = useState<"izin" | "kelas">("izin");
   const [decision, setDecision] = useState<Decision>(null);
   const [processing, setProcessing] = useState(false);
   const isSubmittingRef = useRef(false);
+  const { tampilkanToast } = useToast();
 
   useEffect(() => {
     if (!currentUser) {
@@ -85,7 +91,7 @@ export function PemeriksaanIzin() {
         <TopBar title="Pemeriksaan Izin" />
         <GlassCard style={styles.centerCard}>
           <ActivityIndicator size="large" color={Palette.primary} />
-          <Text style={styles.loadingText}>Memuat...</Text>
+          <Text style={styles.loadingText}>Memuat pengajuan izin…</Text>
         </GlassCard>
       </Screen>
     );
@@ -116,6 +122,12 @@ export function PemeriksaanIzin() {
   const assistantRequests = leaveRequests.filter((req) =>
     assistantSessionIds.has(req.sessionId),
   );
+
+  // Izin hanya bisa diputuskan sampai akhir H+3 dari tanggal sesi; yang lewat tidak dihitung menunggu.
+  const tanggalSesiIzin = (sessionId: string) => sessions.find((s) => s.id === sessionId)?.tanggal;
+  const jumlahMenunggu = assistantRequests.filter(
+    (req) => req.status === "menunggu" && masihBolehPutuskanIzin(tanggalSesiIzin(req.sessionId)),
+  ).length;
 
   // 2. Filter by Time (menggunakan tanggal lokal perangkat, bukan UTC)
   const now = new Date();
@@ -159,10 +171,21 @@ export function PemeriksaanIzin() {
     // SRS 3.1 In-Flight Submission Lock: ref berubah seketika, sedangkan state baru
     // terbaca di render berikutnya, jadi ketukan ganda yang cepat tetap tertahan.
     if (!decision || isSubmittingRef.current) return;
+    const izinDipilih = leaveRequests.find((req) => req.id === decision.id);
+    if (izinDipilih && !masihBolehPutuskanIzin(tanggalSesiIzin(izinDipilih.sessionId))) {
+      setDecision(null);
+      tampilkanToast("Batas keputusan izin (H+3 dari tanggal sesi) sudah lewat.", "error", "Izin tidak bisa diputuskan");
+      return;
+    }
     isSubmittingRef.current = true;
     try {
       setProcessing(true);
       await updateLeaveStatus(decision.id, decision.action, currentUser!.nama);
+      tampilkanToast(
+        'Praktikan diberi tahu lewat notifikasi.',
+        'sukses',
+        decision.action === 'diterima' ? 'Izin diterima' : 'Izin ditolak'
+      );
 
       // SRS3-04: beri tahu praktikan pemohon. Dijalankan di latar belakang supaya dialog
       // langsung tertutup; kegagalan notifikasi tidak membatalkan keputusan izin.
@@ -173,6 +196,7 @@ export function PemeriksaanIzin() {
       }
     } catch (err) {
       Logger.error("FIRESTORE", "putuskanIzin", err, { leaveRequestId: decision.id });
+      tampilkanToast("Periksa koneksi internet lalu coba lagi.", "error", "Keputusan gagal disimpan");
     } finally {
       isSubmittingRef.current = false;
       setProcessing(false);
@@ -195,6 +219,47 @@ export function PemeriksaanIzin() {
   return (
     <Screen>
       <TopBar title="Pemeriksaan Izin" />
+
+      {/* Dua jenis persetujuan asisten dalam satu tab. */}
+      <View style={styles.segmen} accessibilityRole="tablist">
+        {([
+          ["izin", "Izin sesi"],
+          ["kelas", "Pindah kelas"],
+        ] as const).map(([nilai, label]) => {
+          const aktif = bagian === nilai;
+          return (
+            <Pressable
+              key={nilai}
+              onPress={() => setBagian(nilai)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: aktif }}
+              style={[styles.segmenItem, aktif && styles.segmenItemAktif]}>
+              <Text style={[styles.segmenTeks, aktif && styles.segmenTeksAktif]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {bagian === "kelas" ? (
+        <PemeriksaanKelas />
+      ) : (
+      <>
+      {/* Kartu ringkas berilustrasi: berapa izin yang masih menunggu keputusan. */}
+      <View style={styles.ringkas}>
+        <View style={styles.ringkasTeks}>
+          <Text style={styles.ringkasJudul}>
+            {jumlahMenunggu > 0
+              ? `${jumlahMenunggu} izin menunggu keputusan`
+              : "Semua izin sudah diputuskan"}
+          </Text>
+          <Text style={styles.ringkasSub}>
+            {jumlahMenunggu > 0
+              ? "Periksa alasan dan saran AI, lalu terima atau tolak."
+              : "Pengajuan baru dari praktikan akan muncul di sini."}
+          </Text>
+        </View>
+        <IlustrasiSurat lebar={88} />
+      </View>
 
       <ScrollView
         horizontal
@@ -219,7 +284,10 @@ export function PemeriksaanIzin() {
       </ScrollView>
 
       {groupEntries.length === 0 ? (
-        <EmptyNote message={getEmptyMessage()} />
+        <View style={styles.kosong}>
+          <IlustrasiKosong lebar={100} />
+          <Text style={styles.kosongTeks}>{getEmptyMessage()}</Text>
+        </View>
       ) : (
         <View style={styles.listContainer}>
           {groupEntries.map((group) => (
@@ -242,7 +310,7 @@ export function PemeriksaanIzin() {
                 const kategori = normalizeLeaveCategory(req.kategoriAi);
 
                 return (
-                  <GlassCard key={req.id} style={styles.reqCard}>
+                  <View key={req.id} style={styles.reqCard}>
                     <View style={styles.reqHeader}>
                       <Avatar nama={praktikan?.nama ?? "?"} size={40} />
                       <View style={styles.reqInfo}>
@@ -264,7 +332,11 @@ export function PemeriksaanIzin() {
                       <KategoriIzinBadge kategori={kategori} />
                     </View>
 
-                    {req.status === "menunggu" ? (
+                    {req.status === "menunggu" && !masihBolehPutuskanIzin(session?.tanggal) ? (
+                      <Text style={styles.decisionText}>
+                        Batas keputusan (H+{BATAS_HARI_KEPUTUSAN_IZIN} dari tanggal sesi) sudah lewat. Izin ini tidak diputuskan dan dihitung Alpha.
+                      </Text>
+                    ) : req.status === "menunggu" ? (
                       <View style={styles.actionButtons}>
                         <Pressable
                           style={({ pressed }) => [
@@ -300,12 +372,15 @@ export function PemeriksaanIzin() {
                           : ""}
                       </Text>
                     )}
-                  </GlassCard>
+                  </View>
                 );
               })}
             </View>
           ))}
         </View>
+      )}
+
+      </>
       )}
 
       {/* Confirmation Modal */}
@@ -391,8 +466,66 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     fontSize: 13,
   },
+  segmen: {
+    backgroundColor: "#F7F6FB",
+    borderColor: Palette.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 4,
+    marginBottom: Spacing.three,
+    padding: 4,
+  },
+  segmenItem: {
+    alignItems: "center",
+    borderRadius: 999,
+    flex: 1,
+    paddingVertical: 10,
+  },
+  segmenItemAktif: {
+    backgroundColor: Palette.ink,
+  },
+  segmenTeks: {
+    color: Palette.textSecondary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  segmenTeksAktif: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  ringkas: {
+    alignItems: "center",
+    backgroundColor: Palette.infoMuted,
+    borderRadius: 24,
+    flexDirection: "row",
+    gap: 4,
+    marginBottom: Spacing.three,
+    paddingLeft: 18,
+    paddingRight: 8,
+    paddingVertical: 14,
+  },
+  ringkasTeks: { flex: 1, gap: 4 },
+  ringkasJudul: { color: Palette.text, fontSize: 16, fontWeight: "700" },
+  ringkasSub: { color: Palette.textSecondary, fontSize: 12, lineHeight: 17 },
+  kosong: {
+    alignItems: "center",
+    backgroundColor: "#F7F6FB",
+    borderColor: Palette.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 8,
+    paddingVertical: 24,
+  },
+  kosongTeks: { color: Palette.textMuted, fontSize: 13, textAlign: "center" },
+  // Kartu solid, latar sama dengan kartu Timeline/Rekap.
   reqCard: {
+    backgroundColor: "#F7F6FB",
+    borderColor: Palette.border,
+    borderRadius: 22,
+    borderWidth: 1,
     gap: Spacing.three,
+    padding: 16,
   },
   reqHeader: {
     flexDirection: "row",
@@ -415,7 +548,7 @@ const styles = StyleSheet.create({
     color: Palette.text,
     fontSize: 14,
     lineHeight: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    backgroundColor: "#FFFFFF",
     padding: Spacing.two,
     borderRadius: 12,
   },

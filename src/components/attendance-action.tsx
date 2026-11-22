@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 
 import { ErrorBoundary } from '@/components/error-boundary';
+import { useToast } from '@/components/toast';
 import { DigitBoxes, Illustration } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
@@ -60,6 +61,7 @@ export function AttendanceAction({
   // Dipakai di dalam handler scan, bukan di state, supaya tidak memicu re-render
   // yang bisa bikin onBarcodeScanned sempat undefined.
   const isSubmittingRef = useRef<boolean>(false);
+  const { tampilkanToast } = useToast();
   const scanLockRef = useRef<boolean>(false);
   const scanReadyAtRef = useRef<number>(Number.POSITIVE_INFINITY);
   const permissionRequestedRef = useRef<boolean>(false);
@@ -143,18 +145,20 @@ export function AttendanceAction({
 
         setKode('');
         setShowManual(false);
+        tampilkanToast('Kehadiranmu sudah tersimpan dan terlihat oleh asisten.', 'sukses', 'Presensi tercatat');
         onSuccess?.();
       } catch (err: unknown) {
         const code = (err as { code?: string }).code ?? '';
         const msg = (err as Error).message ?? '';
 
-        if (msg === 'ALREADY_ATTENDED') {
-          setError('Anda sudah presensi di sesi ini');
-        } else if (code === 'firestore/permission-denied') {
-          setError('Kode sesi tidak sesuai atau sesi sudah ditutup');
-        } else {
-          setError(toUserErrorMessage(err));
-        }
+        const pesan =
+          msg === 'ALREADY_ATTENDED'
+            ? 'Anda sudah presensi di sesi ini'
+            : code === 'firestore/permission-denied'
+              ? 'Kode sesi tidak sesuai atau sesi sudah ditutup'
+              : toUserErrorMessage(err);
+        setError(pesan);
+        tampilkanToast(pesan, 'error', 'Presensi gagal');
         Logger.error('FIRESTORE', 'AttendanceWrite', err, { sessionId });
         // Reset lock supaya user bisa coba lagi via tombol "Coba Lagi" / scan ulang.
         scanLockRef.current = false;
@@ -163,7 +167,7 @@ export function AttendanceAction({
         setSubmitting(false);
       }
     },
-    [currentUser, currentUserId, sessionId, session.pesertaIds, jarakMeter, radiusMeter, locked, onSuccess],
+    [currentUser, currentUserId, sessionId, session.pesertaIds, jarakMeter, radiusMeter, locked, onSuccess, tampilkanToast],
   );
 
   const retryPermission = useCallback(async () => {
@@ -335,7 +339,7 @@ export function AttendanceAction({
 const styles = StyleSheet.create({
   container: { gap: Spacing.three },
   banner: {
-    backgroundColor: Palette.card,
+    backgroundColor: '#F7F6FB',
     borderWidth: 1,
     borderColor: 'rgba(23, 21, 28, 0.3)',
     padding: Spacing.three,
@@ -393,13 +397,13 @@ const styles = StyleSheet.create({
     color: Palette.danger, fontSize: 14, fontWeight: '600', textAlign: 'center',
   },
   scanAgainBtn: {
-    backgroundColor: Palette.primary,
+    backgroundColor: Palette.ink,
     paddingVertical: 10, paddingHorizontal: 24, borderRadius: 999,
   },
   scanAgainText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   scannerPermFrame: {
-    height: 260, borderRadius: 24, backgroundColor: Palette.card,
-    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.9)',
+    height: 260, borderRadius: 24, backgroundColor: '#F7F6FB',
+    borderWidth: 1, borderColor: Palette.border,
     alignItems: 'center', justifyContent: 'center', gap: 10, padding: Spacing.three,
   },
   scannerPermTitle: {
@@ -409,16 +413,17 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary, fontSize: 13, textAlign: 'center',
   },
   permButton: {
-    backgroundColor: Palette.primary,
+    backgroundColor: Palette.ink,
     paddingVertical: 12, paddingHorizontal: 24, borderRadius: 999, marginTop: 6,
   },
   permButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  // Tombol sekunder: putih solid bergaris, teks hitam (seragam dengan tombol Kembali).
   fallbackButton: {
     alignItems: 'center', paddingVertical: 12, borderRadius: 999,
-    borderWidth: 1, borderColor: Palette.primary,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: Palette.border,
   },
   fallbackButtonText: {
-    color: Palette.primary, fontSize: 14, fontWeight: '600',
+    color: Palette.text, fontSize: 14, fontWeight: '600',
   },
   manualContainer: { gap: Spacing.two },
   manualLabel: {
@@ -432,7 +437,7 @@ const styles = StyleSheet.create({
     color: Palette.danger, fontSize: 13, textAlign: 'center',
   },
   submitButton: {
-    backgroundColor: Palette.primary,
+    backgroundColor: Palette.ink,
     padding: 14, borderRadius: 999, alignItems: 'center',
   },
   submitButtonText: {

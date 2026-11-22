@@ -22,7 +22,7 @@ import {
   type Titik,
 } from '@/components/peta/aktivitas-lab';
 import { StatusBadge } from '@/components/status-badge';
-import { Badge, GlassCard, type BadgeTone } from '@/components/ui';
+import { Badge, GlassCard } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import type { Attendance, Role, Session, SessionStatus } from '@/types';
 import { formatRentangJam, formatTanggal } from '@/utils/format';
@@ -33,10 +33,10 @@ const LABEL_STATUS_SINGKAT: Record<SessionStatus, string> = {
   dibuka: 'Dibuka',
   ditutup: 'Selesai',
 };
-const TONE_STATUS_SINGKAT: Record<SessionStatus, BadgeTone> = {
-  belum_dibuka: 'muted',
-  dibuka: 'primary',
-  ditutup: 'dark',
+const WARNA_STATUS_SINGKAT: Record<SessionStatus, string> = {
+  belum_dibuka: Palette.textMuted,
+  dibuka: Palette.primary,
+  ditutup: Palette.ink,
 };
 
 function tanggalHariIni(sekarang: Date): string {
@@ -184,7 +184,7 @@ export function PanelLab({
         ) : null}
 
         <View style={styles.block}>
-          <Text style={styles.blockLabel}>SEDANG BERLANGSUNG</Text>
+          <Text style={styles.blockLabel}>Sedang berlangsung</Text>
           {berlangsung.length === 0 ? (
             <Text style={styles.empty}>{kosongBerlangsung}</Text>
           ) : (
@@ -212,7 +212,7 @@ export function PanelLab({
         </View>
 
         <View style={styles.block}>
-          <Text style={styles.blockLabel}>BERIKUTNYA</Text>
+          <Text style={styles.blockLabel}>Berikutnya</Text>
           {berikutnya ? (
             <View style={styles.session}>
               <View style={styles.sessionTitleRow}>
@@ -233,7 +233,7 @@ export function PanelLab({
         {role === 'asisten' ? (
           <View style={styles.block}>
             <View style={styles.jadwalHeader}>
-              <Text style={styles.blockLabel}>JADWAL HARI INI</Text>
+              <Text style={styles.blockLabel}>Jadwal hari ini</Text>
               {jadwalHariIni.length > 0 ? (
                 <Pressable
                   onPress={() => {
@@ -241,7 +241,8 @@ export function PanelLab({
                     setJadwalTerbuka((sebelum) => !sebelum);
                   }}
                   hitSlop={8}
-                  accessibilityRole="button">
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.jadwalToggleBtn, pressed && styles.pressed]}>
                   <Text style={styles.jadwalToggle}>
                     {jadwalTerbuka ? 'Sembunyikan' : 'Lihat semua'}
                   </Text>
@@ -280,10 +281,15 @@ export function PanelLab({
                         </Text>
                       ) : null}
                     </View>
-                    <Badge
-                      label={LABEL_STATUS_SINGKAT[baris.session.status]}
-                      tone={TONE_STATUS_SINGKAT[baris.session.status]}
-                    />
+                    <View
+                      style={[
+                        styles.kotakStatus,
+                        { backgroundColor: WARNA_STATUS_SINGKAT[baris.session.status] },
+                      ]}>
+                      <Text style={styles.kotakStatusTeks}>
+                        {LABEL_STATUS_SINGKAT[baris.session.status]}
+                      </Text>
+                    </View>
                   </View>
                 ),
               )
@@ -298,8 +304,8 @@ export function PanelLab({
 
 const styles = StyleSheet.create({
   card: {
-    // Lebih putih dari GlassCard biasa supaya tidak bercampur dengan peta di belakangnya.
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    // Solid (tidak transparan) supaya tidak bercampur dengan peta; warna sama dengan kartu lain.
+    backgroundColor: '#F7F6FB',
     padding: 0,
   },
   handleArea: {
@@ -368,14 +374,20 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingTop: 12,
   },
+  // Judul bagian biasa (bukan huruf kapital berjarak) supaya terbaca seperti judul bagian lain.
   blockLabel: {
-    color: Palette.textMuted,
-    fontSize: 11,
+    color: Palette.text,
+    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 1.2,
   },
+  // Tiap sesi jadi kartu putih solid di dalam panel.
   session: {
+    backgroundColor: '#FFFFFF',
+    borderColor: Palette.border,
+    borderRadius: 16,
+    borderWidth: 1,
     gap: 4,
+    padding: 12,
   },
   sessionTitleRow: {
     alignItems: 'center',
@@ -398,10 +410,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  jadwalToggleBtn: {
+    backgroundColor: Palette.lavender,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
   jadwalToggle: {
-    color: Palette.primary,
+    color: Palette.text,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  kotakStatus: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  kotakStatusTeks: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   jadwalRow: {
     alignItems: 'center',
@@ -423,8 +451,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  // Sesi milik sendiri cukup ditebalkan (teks tetap hitam).
   jadwalNamaMilikku: {
-    color: Palette.primary,
+    fontWeight: '800',
   },
   jadwalPemilik: {
     color: Palette.textMuted,
@@ -438,7 +467,7 @@ const styles = StyleSheet.create({
   },
   presensiButton: {
     alignSelf: 'flex-start',
-    backgroundColor: Palette.primary,
+    backgroundColor: Palette.ink,
     borderRadius: 999,
     marginTop: 6,
     paddingHorizontal: 22,
