@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { GlassCard, PrimaryButton, Screen } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
+import { sudahLihatPerkenalan } from '@/utils/perkenalan';
 
 export default function EntryScreen() {
   const { firebaseUser, currentUser, loading, profileError, reloadProfile } = useAuth();
@@ -16,7 +17,8 @@ export default function EntryScreen() {
     if (loading || profileError) return;
 
     if (!firebaseUser) {
-      router.replace('/login' as Href);
+      // Perkenalan hanya muncul sekali, saat aplikasi pertama kali dibuka.
+      router.replace((sudahLihatPerkenalan() ? '/login' : '/perkenalan') as Href);
     } else if (!currentUser) {
       // Akun login terdeteksi tapi belum melengkapi profil di Firestore
       router.replace('/lengkapi-profil' as Href);
