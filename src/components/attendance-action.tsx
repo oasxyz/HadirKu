@@ -85,7 +85,7 @@ export function AttendanceAction({
   }, [permission, requestPermission]);
 
   useEffect(() => {
-    if (!permission?.granted || showManual) {
+    if (!permission?.granted || showManual || locked || session.status !== 'dibuka') {
       setCameraMounted(false);
       setCameraReady(false);
       setScannerActive(false);
@@ -111,7 +111,7 @@ export function AttendanceAction({
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [permission?.granted, showManual]);
+  }, [permission?.granted, showManual, locked, session.status]);
 
   useEffect(() => {
     if (!cameraReady) {
@@ -130,6 +130,10 @@ export function AttendanceAction({
       const trimmed = inputKode.trim();
       if (!currentUser) {
         setError('Pengguna belum masuk');
+        return;
+      }
+      if (session.status !== 'dibuka') {
+        setError('Sesi presensi belum dibuka oleh asisten');
         return;
       }
       if (trimmed.length !== 6 || !/^\d{6}$/.test(trimmed)) {
@@ -199,7 +203,7 @@ export function AttendanceAction({
         setSubmitting(false);
       }
     },
-    [currentUser, currentUserId, sessionId, session.pesertaIds, jarakMeter, radiusMeter, locked, onSuccess],
+    [currentUser, currentUserId, sessionId, session.status, session.pesertaIds, jarakMeter, radiusMeter, locked, onSuccess],
   );
 
   const retryPermission = useCallback(async () => {
@@ -228,6 +232,36 @@ export function AttendanceAction({
     setShowManual(true);
   }, []);
 
+  const refreshCamera = useCallback(() => {
+    setCameraReady(false);
+    setScannerActive(false);
+    setScanned(false);
+    setScannerError(null);
+    setCameraKey((k) => k + 1);
+  }, []);
+
+  if (session.status === 'belum_dibuka') {
+    return (
+      <View style={[styles.banner, styles.lockedBorder]}>
+        <Ionicons name="hourglass-outline" size={24} color={Palette.warning} />
+        <Text style={[styles.bannerText, { color: Palette.warning }]}>
+          Sesi presensi belum dibuka oleh asisten. Fitur scanner kamera dan ketik kode terkunci.
+        </Text>
+      </View>
+    );
+  }
+
+  if (session.status === 'ditutup') {
+    return (
+      <View style={[styles.banner, styles.lockedBorder]}>
+        <Ionicons name="lock-closed" size={24} color={Palette.danger} />
+        <Text style={[styles.bannerText, { color: Palette.danger }]}>
+          Sesi presensi telah ditutup.
+        </Text>
+      </View>
+    );
+  }
+
   if (locked) {
     return (
       <View style={[styles.banner, styles.lockedBorder]}>
@@ -250,7 +284,8 @@ export function AttendanceAction({
               <View style={styles.scannerFrame}>
                 {cameraMounted && (
                   <CameraView
-                    key={cameraKey}
+                    key={`camera-${cameraKey}`}
+                    facing="back"
                     style={StyleSheet.absoluteFill}
                     barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
                     onCameraReady={() => setCameraReady(true)}
@@ -271,6 +306,15 @@ export function AttendanceAction({
                       {cameraReady ? 'Menyiapkan scanner...' : 'Menyiapkan kamera...'}
                     </Text>
                   </View>
+                )}
+
+                {!submitting && (
+                  <TouchableOpacity
+                    style={styles.refreshCameraBtn}
+                    onPress={refreshCamera}>
+                    <Ionicons name="refresh" size={14} color="#FFFFFF" />
+                    <Text style={styles.refreshCameraText}>Muat Ulang Kamera</Text>
+                  </TouchableOpacity>
                 )}
 
                 {submitting && (
@@ -384,6 +428,24 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#000',
     position: 'relative',
+  },
+  refreshCameraBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    zIndex: 10,
+  },
+  refreshCameraText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
   },
   scannerCornerTL: {
     position: 'absolute', top: 12, left: 12, width: 28, height: 28,

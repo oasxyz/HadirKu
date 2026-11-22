@@ -1,9 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AttendanceAction } from '@/components/attendance-action';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { LocationCheckCard } from '@/components/location-check-card';
 import { StatusBadge } from '@/components/status-badge';
 import {
   Chip,
@@ -39,8 +40,9 @@ export default function PresensiScreen() {
   // Guard: sesi tidak ditemukan
   if (!session) {
     return (
-      <Screen withTabBar={false}>
-        <TopBar title="Presensi Praktikum" back fallback="/jadwal" />
+      <Screen
+        withTabBar={false}
+        header={<TopBar title="Presensi Praktikum" back fallback="/jadwal" />}>
         <EmptyNote
           icon="alert-circle-outline"
           message="Sesi praktikum tidak ditemukan atau Anda tidak terdaftar sebagai peserta."
@@ -62,19 +64,19 @@ export default function PresensiScreen() {
   );
   const sudahHadir = existingAttendance !== undefined;
 
-  // Izin diterima?
-  const izinDiterima = leaveRequests.find(
+  // Izin aktif (menunggu atau diterima)
+  const izinAktif = leaveRequests.find(
     (lr) =>
       lr.sessionId === session.id &&
       lr.userId === currentUserId &&
-      lr.status === 'diterima',
+      (lr.status === 'menunggu' || lr.status === 'diterima'),
   );
 
   // Peserta?
   const isPeserta = session.pesertaIds.includes(currentUserId);
 
   // Status global: boleh presensi?
-  const sessionBlocked = isTutup || sudahHadir || izinDiterima !== undefined || !isPeserta;
+  const sessionBlocked = isTutup || sudahHadir || izinAktif !== undefined || !isPeserta;
 
   const locked = sessionBlocked || !locationState.canAttend;
 
@@ -83,9 +85,9 @@ export default function PresensiScreen() {
   const openAppSettings = () => Linking.openSettings();
 
   return (
-    <Screen withTabBar={false}>
-      <TopBar title="Presensi Praktikum" back fallback="/jadwal" />
-
+    <Screen
+      withTabBar={false}
+      header={<TopBar title="Presensi Praktikum" back fallback="/jadwal" />}>
       <ErrorBoundary fallbackTitle="Halaman Presensi Bermasalah">
         {/* ========== 1. KARTU INFORMASI SESI ========== */}
         <GlassCard style={styles.sessionCard}>
@@ -154,22 +156,26 @@ export default function PresensiScreen() {
           </GlassCard>
         )}
 
-        {isPeserta && !sudahHadir && izinDiterima && (
+        {isPeserta && !sudahHadir && izinAktif && (
           <DeviceStatusCard
-            title="Izin Diterima"
-            message="Anda sudah memiliki pengajuan izin yang diterima untuk sesi ini. Presensi tidak diperlukan."
+            title={izinAktif.status === 'diterima' ? 'Izin Diterima' : 'Pengajuan Izin Sedang Diproses'}
+            message={
+              izinAktif.status === 'diterima'
+                ? 'Anda sudah memiliki pengajuan izin yang diterima untuk sesi ini. Presensi tidak diperlukan.'
+                : 'Pengajuan izin Anda sedang menunggu konfirmasi asisten. Fitur presensi untuk sesi ini terkunci.'
+            }
             tone="warning"
             icon="document-text-outline"
           />
         )}
 
         {/* ========== 3. KARTU PEMERIKSAAN LOKASI ========== */}
-        {isPeserta && isDibuka && !sudahHadir && !izinDiterima && (
+        {isPeserta && isDibuka && !sudahHadir && !izinAktif && (
           <LocationCheckCard state={locationState} onOpenSettings={openAppSettings} />
         )}
 
         {/* ========== 4. KARTU AKSI PRESENSI ========== */}
-        {isPeserta && isDibuka && !sudahHadir && !izinDiterima && (
+        {isPeserta && isDibuka && !sudahHadir && !izinAktif && (
           <AttendanceAction
             sessionId={session.id}
             session={session}
@@ -209,122 +215,6 @@ export default function PresensiScreen() {
   );
 }
 
-/**
- * Kartu pemeriksaan lokasi: tampil jarak, badge in/out, tombol Perbarui,
- * atau DeviceStatusCard untuk kondisi error.
- */
-function LocationCheckCard({
-  state,
-  onOpenSettings,
-}: {
-  state: ReturnType<typeof useLocationValidation>;
-  onOpenSettings: () => void;
-}) {
-  // Kondisi error → DeviceStatusCard
-  if (state.permissionStatus === 'denied') {
-    return (
-      <DeviceStatusCard
-        title="Akses Lokasi Ditolak"
-        message="HadirKu memerlukan izin akses lokasi untuk memastikan Anda berada di dalam radius laboratorium."
-        tone="danger"
-        actionLabel="Buka Pengaturan"
-        onAction={onOpenSettings}
-        icon="location-outline"
-      />
-    );
-  }
-  if (state.permissionStatus === 'services_off') {
-    return (
-      <DeviceStatusCard
-        title="Layanan Lokasi Nonaktif"
-        message="Aktifkan GPS pada perangkat Anda agar posisi terhadap laboratorium dapat diperiksa."
-        tone="danger"
-        actionLabel="Coba Lagi"
-        onAction={state.refreshLocation}
-        icon="locate-outline"
-      />
-    );
-  }
-  if (state.permissionStatus === 'timeout') {
-    return (
-      <DeviceStatusCard
-        title="Mencari Titik Koordinat"
-        message="Koordinat lokasi perangkat belum tersedia. Pastikan Anda berada di area dengan sinyal GPS memadai."
-        tone="warning"
-        actionLabel="Muat Ulang Lokasi"
-        onAction={state.refreshLocation}
-        icon="compass-outline"
-      />
-    );
-  }
-  if (state.isMocked) {
-    return (
-      <DeviceStatusCard
-        title="Lokasi Palsu Terdeteksi"
-        message="Matikan aplikasi pemalsu lokasi (Fake GPS) di perangkat Anda untuk melanjutkan presensi."
-        tone="danger"
-        actionLabel="Periksa Ulang"
-        onAction={state.refreshLocation}
-        icon="warning-outline"
-      />
-    );
-  }
-
-  // Loading awal
-  if (state.loading && state.currentCoords === null) {
-    return (
-      <GlassCard style={styles.locationCard}>
-        <Text style={styles.locationStatusText}>Memeriksa lokasi</Text>
-      </GlassCard>
-    );
-  }
-
-  // Tampilan normal: jarak + badge
-  const jarakText =
-    state.jarakMeter !== null ? `${state.jarakMeter} m` : 'Belum terhitung';
-  const radiusText =
-    state.labRadiusMeter !== null ? `${state.labRadiusMeter} m` : '-';
-
-  return (
-    <GlassCard style={styles.locationCard}>
-      <View style={styles.locationHeader}>
-        <Ionicons
-          name={state.isWithinRadius ? 'checkmark-circle' : 'alert-circle'}
-          size={28}
-          color={state.isWithinRadius ? Palette.primary : Palette.danger}
-        />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.locationTitle}>
-            {state.isWithinRadius ? 'Di Dalam Radius' : 'Di Luar Radius'}
-          </Text>
-          <Text style={styles.locationMeta}>
-            Jarak Anda ke {state.labName ?? 'Lab'}: {jarakText}
-          </Text>
-          <Text style={styles.locationMetaSub}>
-            Batas radius maksimal: {radiusText}
-          </Text>
-        </View>
-      </View>
-
-      {!state.isWithinRadius && (
-        <Text style={styles.locationWarning}>
-          Anda berada di luar radius laboratorium. Dekati area praktikum lalu tekan Perbarui Lokasi.
-        </Text>
-      )}
-
-      <Pressable
-        onPress={state.refreshLocation}
-        style={styles.refreshButton}
-        disabled={state.loading}>
-        <Ionicons name="refresh" size={16} color={Palette.text} />
-        <Text style={styles.refreshButtonText}>
-          {state.loading ? 'Memuat' : 'Perbarui Lokasi'}
-        </Text>
-      </Pressable>
-    </GlassCard>
-  );
-}
-
 const styles = StyleSheet.create({
   sessionCard: { gap: Spacing.two },
   sessionHeader: {
@@ -360,52 +250,6 @@ const styles = StyleSheet.create({
   successSubtitle: {
     fontSize: 13,
     color: Palette.textSecondary,
-  },
-
-  locationCard: { gap: Spacing.two },
-  locationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  locationTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Palette.text,
-  },
-  locationMeta: {
-    fontSize: 13,
-    color: Palette.textSecondary,
-  },
-  locationMetaSub: {
-    fontSize: 12,
-    color: Palette.textMuted,
-  },
-  locationStatusText: {
-    fontSize: 13,
-    color: Palette.textSecondary,
-    textAlign: 'center',
-  },
-  locationWarning: {
-    fontSize: 13,
-    color: Palette.danger,
-    lineHeight: 18,
-  },
-  refreshButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  refreshButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Palette.text,
   },
 
   modalOverlay: {

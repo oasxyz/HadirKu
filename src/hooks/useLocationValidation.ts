@@ -40,6 +40,8 @@ export interface LocationValidationState {
   canAttend: boolean;
   /** Refetch manual (tombol "Perbarui Lokasi"). */
   refreshLocation: () => Promise<void>;
+  /** Simulasi koordinat tepat di lab (khusus testing development). */
+  simulateAtLab: () => void;
 }
 
 /**
@@ -139,13 +141,22 @@ export function useLocationValidation(labId: string | null | undefined): Locatio
 
       setPermissionStatus('granted');
 
-      // 2c. Ambil posisi (dengan timeout 10 detik supaya tidak menggantung)
-      const position = await Promise.race([
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-        new Promise<null>((_, reject) =>
-          setTimeout(() => reject(new Error('GPS timeout')), 10_000),
-        ),
-      ]);
+      // 2c. Ambil posisi GPS (prioritas last known cache, fallback current position)
+      let position = await Location.getLastKnownPositionAsync().catch(() => null);
+
+      if (!position) {
+        try {
+          position = await Promise.race([
+            Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+            new Promise<null>((_, reject) =>
+              setTimeout(() => reject(new Error('GPS timeout')), 8_000),
+            ),
+          ]);
+        } catch {
+          // Timeout saat pencarian sinyal baru, coba last known sekali lagi
+          position = await Location.getLastKnownPositionAsync().catch(() => null);
+        }
+      }
 
       if (!position) {
         setPermissionStatus('timeout');
@@ -166,7 +177,7 @@ export function useLocationValidation(labId: string | null | undefined): Locatio
           : false;
       setIsMocked(mocked);
     } catch (err) {
-      Logger.error('GEO', 'RefreshLocation', err);
+      Logger.warn('GEO', 'RefreshLocation', 'Sinyal lokasi belum siap', { error: String(err) });
       setPermissionStatus('timeout');
       setCurrentCoords(null);
       setIsMocked(false);
@@ -202,6 +213,14 @@ export function useLocationValidation(labId: string | null | undefined): Locatio
 
   const mockBlocked = config.enforceMockLocationBlock && isMocked;
 
+  const simulateAtLab = useCallback(() => {
+    if (labData) {
+      setCurrentCoords({ lat: labData.latitude, lng: labData.longitude });
+      setIsMocked(false);
+      setPermissionStatus('granted');
+    }
+  }, [labData]);
+
   const canAttend =
     permissionStatus === 'granted' &&
     !mockBlocked &&
@@ -221,5 +240,6 @@ export function useLocationValidation(labId: string | null | undefined): Locatio
     isWithinRadius,
     canAttend,
     refreshLocation,
+    simulateAtLab,
   };
 }
