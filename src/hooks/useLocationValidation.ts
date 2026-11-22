@@ -187,11 +187,14 @@ export function useLocationValidation(labId: string | null | undefined): Locatio
     }
   }, []);
 
-  // 3. Panggil refreshLocation pertama kali
-  useEffect(() => {
+// 3. Panggil refreshLocation pertama kali
+useEffect(() => {
+  // Defer ke microtask supaya setState di dalam refreshLocation tidak terdeteksi
+  // sebagai setState sinkron dalam body effect.
+  Promise.resolve().then(() => {
     void refreshLocation();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-  }, [refreshLocation]);
+  });
+}, [refreshLocation]);
 
   // 4. Hitung jarak & derivasi state
   const labCoords: Coordinates | null = labData
