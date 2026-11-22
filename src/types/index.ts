@@ -108,7 +108,31 @@ export interface LeaveRequest {
 // Sprint 3: Status akhir kehadiran praktikan untuk Rekap Asisten & Catatan Praktikan
 export type FinalAttendanceStatus = 'hadir' | 'sakit' | 'izin' | 'alpha' | 'belum_hadir';
 
-export type NotificationType = 'sesi_dibuka' | 'jadwal_berubah' | 'izin_diterima' | 'izin_ditolak';
+export type NotificationType =
+  | 'sesi_dibuka'
+  | 'jadwal_berubah'
+  | 'izin_diterima'
+  | 'izin_ditolak'
+  | 'kelas_diterima'
+  | 'kelas_ditolak';
+
+// Pengajuan pindah kelas praktikum. ID dokumen = uid praktikan (satu pengajuan aktif per orang).
+// `asistenIds` = asisten yang sedang memegang praktikan (pembuat sesi yang memuatnya);
+// hanya mereka yang boleh memutuskan.
+export interface PengajuanKelas {
+  id: string;
+  userId: string;
+  nama: string;
+  nim: string;
+  kelasLama: string | null;
+  kelasBaru: string;
+  alasan: string;
+  asistenIds: string[];
+  status: LeaveStatus;
+  createdAt: string;
+  diputuskanOleh: string | null;
+  diputuskanAt: string | null;
+}
 
 export interface Notification {
   id: string;

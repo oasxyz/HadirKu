@@ -31,6 +31,7 @@ const KOLEKSI = [
   'attendances',
   'leaveRequests',
   'notifications',
+  'pengajuanKelas',
   'users',
 ];
 
@@ -219,6 +220,14 @@ async function isiData(emailAsisten, emailPraktikan) {
       createdAt: waktuIso(-7, 7, 30), readBy: [] },
   ].map((n) => ({ ...n, targetUserIds: [praktikan.uid] }));
 
+  // Pengajuan pindah kelas menunggu: Bagus (D2) ingin ke D1, dipegang asisten uji.
+  const pengajuanKelas = [{
+    id: 'uji-praktikan-5', userId: 'uji-praktikan-5', nama: 'Bagus Wijaya (uji)', nim: '24060124990005',
+    kelasLama: 'D2', kelasBaru: KELAS_UJI, alasan: 'Jadwal kuliah kelas D2 bentrok dengan kerja praktik.',
+    asistenIds: [asisten.uid], status: 'menunggu', createdAt: new Date(Date.now() - 15 * 60000).toISOString(),
+    diputuskanOleh: null, diputuskanAt: null,
+  }];
+
   const batch = db.batch();
   temanUji.forEach((t) =>
     batch.set(db.collection('users').doc(t.id), {
@@ -240,11 +249,13 @@ async function isiData(emailAsisten, emailPraktikan) {
   attendances.forEach(({ id, ...data }) => batch.set(db.collection('attendances').doc(id), data));
   leaveRequests.forEach(({ id, ...data }) => batch.set(db.collection('leaveRequests').doc(id), data));
   notifications.forEach(({ id, ...data }) => batch.set(db.collection('notifications').doc(id), data));
+  pengajuanKelas.forEach(({ id, ...data }) => batch.set(db.collection('pengajuanKelas').doc(id), data));
   await batch.commit();
 
   console.log('');
   console.log(`Data uji ditulis: ${sesi.length} sesi, ${attendances.length} presensi, ` +
-    `${leaveRequests.length} izin, ${notifications.length} pemberitahuan, ${temanUji.length} praktikan tambahan.`);
+    `${leaveRequests.length} izin, ${notifications.length} pemberitahuan, ${temanUji.length} praktikan tambahan, ` +
+    `${pengajuanKelas.length} pengajuan pindah kelas.`);
   console.log(`Kode sesi yang sedang dibuka: ${KODE_SESI_UJI}`);
   console.log('Hapus lagi dengan: node scripts/seed-uji.mjs --hapus');
 }

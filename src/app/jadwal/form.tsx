@@ -22,6 +22,7 @@ import {
   TopBar,
 } from '@/components/ui';
 import { kodeKelasDari, OPSI_KELAS } from '@/constants/kelas';
+import { opsiPraktikum } from '@/constants/praktikum';
 import { Palette } from '@/constants/theme';
 import { useLabs } from '@/hooks/use-labs';
 import { useSessions } from '@/hooks/use-sessions';
@@ -145,6 +146,9 @@ function JadwalFormContent({
   const labId = labIdState || (labs.length > 0 ? labs[0].id : '');
   const currentLab = labs.find((l) => l.id === labId);
 
+  // Opsi dropdown praktikum; nama lama di luar daftar tetap muncul saat sesi diubah.
+  const opsiPraktikumForm = useMemo(() => opsiPraktikum(initial?.praktikum), [initial?.praktikum]);
+
   // Opsi Dropdown Lab
   const labOptions = useMemo(
     () =>
@@ -218,7 +222,7 @@ function JadwalFormContent({
   // Validasi per langkah supaya kesalahan ketahuan sebelum pindah ke langkah berikutnya.
   function validasiLangkah(l: Langkah): string | null {
     if (l === 1) {
-      if (!praktikum.trim()) return 'Nama praktikum wajib diisi';
+      if (!praktikum.trim()) return 'Pilih nama praktikum';
       if (!kelasLab) return 'Pilih kelas praktikum';
     }
     if (l === 2) {
@@ -351,15 +355,15 @@ function JadwalFormContent({
           <GlassCard style={styles.card}>
             <Text style={styles.cardSectionHeader}>Informasi Sesi</Text>
 
-            <TextField
+            <SelectField
               label="Nama Praktikum"
               value={praktikum}
-              onChangeText={(text) => {
-                setPraktikum(text);
+              options={opsiPraktikumForm}
+              onSelect={(nama) => {
+                setPraktikum(nama);
                 if (error) setError(null);
               }}
-              placeholder="Contoh: Pemrograman Perangkat Bergerak"
-              error={error && !praktikum.trim() ? 'Wajib diisi' : undefined}
+              error={Boolean(error && !praktikum.trim())}
             />
 
             <View>

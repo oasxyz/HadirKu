@@ -16,6 +16,7 @@ import {
 
 import { ExpandableCalendar, toDateString } from '@/components/expandable-calendar';
 import { IlustrasiKosong, IlustrasiSurat } from '@/components/ilustrasi';
+import { PelacakPengajuan } from '@/components/pelacak-pengajuan';
 import { KategoriIzinBadge } from '@/components/status-kehadiran-badge';
 import { useToast } from '@/components/toast';
 import {
@@ -392,7 +393,11 @@ function IzinCard({
             <KategoriIzinBadge kategori={normalizedKategori} />
           </View>
 
-          <LacakIzin item={item} />
+          <PelacakPengajuan
+            status={item.status}
+            createdAt={item.createdAt}
+            diputuskanAt={item.diputuskanAt}
+          />
 
           {item.status !== 'menunggu' && item.diputuskanOleh && item.diputuskanAt ? (
             <Text style={styles.decisionText}>
@@ -411,100 +416,7 @@ function IzinCard({
   );
 }
 
-function formatWaktuSingkat(iso: string | null): string {
-  if (!iso) return '';
-  const waktu = new Date(iso);
-  if (Number.isNaN(waktu.getTime())) return '';
-  return waktu.toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
-
-/**
- * Pelacakan pengajuan izin: Diajukan → Diperiksa → Diputuskan.
- * Selama `menunggu`, langkah "Diperiksa" sedang berjalan (menunggu asisten).
- * Setelah diputuskan, langkah terakhir menampilkan Diterima/Ditolak beserta waktunya.
- */
-function LacakIzin({ item }: { item: LeaveRequest }) {
-  const sudahDiputuskan = item.status !== 'menunggu';
-  const langkah = [
-    { label: 'Diajukan', waktu: formatWaktuSingkat(item.createdAt), selesai: true, aktif: false },
-    { label: 'Diperiksa', waktu: sudahDiputuskan ? '' : 'Menunggu asisten', selesai: sudahDiputuskan, aktif: !sudahDiputuskan },
-    {
-      label: item.status === 'diterima' ? 'Diterima' : item.status === 'ditolak' ? 'Ditolak' : 'Diputuskan',
-      waktu: formatWaktuSingkat(item.diputuskanAt),
-      selesai: sudahDiputuskan,
-      aktif: false,
-    },
-  ];
-
-  return (
-    <View style={styles.lacak} accessibilityLabel={`Status pengajuan: ${langkah.filter((l) => l.selesai).map((l) => l.label).join(', ')}`}>
-      <View style={styles.lacakGaris}>
-        {langkah.map((l, i) => (
-          <View key={l.label} style={styles.lacakSegmen}>
-            {/* Penghubung kiri/kanan selalu ada (transparan di ujung) supaya titik sejajar dengan label. */}
-            <View
-              style={[
-                styles.lacakPenghubung,
-                i === 0 && styles.lacakPenghubungKosong,
-                i > 0 && (l.selesai || l.aktif) ? styles.lacakPenghubungAktif : null,
-              ]}
-            />
-            <View
-              style={[
-                styles.lacakTitik,
-                l.selesai && styles.lacakTitikSelesai,
-                l.aktif && styles.lacakTitikAktif,
-                item.status === 'ditolak' && i === 2 && styles.lacakTitikDitolak,
-              ]}>
-              {l.selesai ? <Ionicons name={item.status === 'ditolak' && i === 2 ? 'close' : 'checkmark'} size={12} color="#FFFFFF" /> : null}
-            </View>
-            <View
-              style={[
-                styles.lacakPenghubung,
-                i === langkah.length - 1 && styles.lacakPenghubungKosong,
-                i < langkah.length - 1 && (langkah[i + 1].selesai || langkah[i + 1].aktif)
-                  ? styles.lacakPenghubungAktif
-                  : null,
-              ]}
-            />
-          </View>
-        ))}
-      </View>
-      <View style={styles.lacakLabelBaris}>
-        {langkah.map((l) => (
-          <View key={l.label} style={styles.lacakLabelKolom}>
-            <Text style={[styles.lacakLabel, (l.selesai || l.aktif) && styles.lacakLabelAktif]}>{l.label}</Text>
-            {l.waktu ? <Text style={styles.lacakWaktu}>{l.waktu}</Text> : null}
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  lacak: { gap: 6, marginTop: 4 },
-  lacakGaris: { flexDirection: 'row', alignItems: 'center' },
-  lacakSegmen: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  lacakPenghubung: { flex: 1, height: 3, borderRadius: 999, backgroundColor: Palette.lavender },
-  lacakPenghubungAktif: { backgroundColor: Palette.primary },
-  lacakPenghubungKosong: { backgroundColor: 'transparent' },
-  lacakTitik: {
-    alignItems: 'center',
-    backgroundColor: Palette.lavender,
-    borderRadius: 999,
-    height: 22,
-    justifyContent: 'center',
-    width: 22,
-  },
-  lacakTitikSelesai: { backgroundColor: Palette.primary },
-  lacakTitikAktif: { backgroundColor: '#FFFFFF', borderColor: Palette.primary, borderWidth: 2 },
-  lacakTitikDitolak: { backgroundColor: Palette.ink },
-  lacakLabelBaris: { flexDirection: 'row' },
-  lacakLabelKolom: { flex: 1, alignItems: 'center', gap: 1 },
-  lacakLabel: { fontSize: 11, color: Palette.textMuted, fontWeight: '600' },
-  lacakLabelAktif: { color: Palette.text },
-  lacakWaktu: { fontSize: 10, color: Palette.textMuted, textAlign: 'center' },
   centerCard: { alignItems: 'center', padding: Spacing.four, gap: Spacing.two },
   ajukanCard: {
     alignItems: 'center',

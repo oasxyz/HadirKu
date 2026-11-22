@@ -27,6 +27,7 @@ import { useLeaveRequests } from "@/hooks/use-leave-requests";
 import { kirimNotifikasi, pesanIzinDiputuskan } from "@/services/notifications";
 import { KategoriIzinBadge } from "@/components/status-kehadiran-badge";
 import { IlustrasiKosong, IlustrasiSurat } from "@/components/ilustrasi";
+import { PemeriksaanKelas } from "@/components/izin/pemeriksaan-kelas";
 import { useToast } from "@/components/toast";
 import { normalizeLeaveCategory } from "@/types";
 import { formatTanggal } from "@/utils/format";
@@ -69,6 +70,7 @@ export function PemeriksaanIzin() {
   } = useLeaveRequests();
 
   const [filter, setFilter] = useState<FilterWaktu>("hari_ini");
+  const [bagian, setBagian] = useState<"izin" | "kelas">("izin");
   const [decision, setDecision] = useState<Decision>(null);
   const [processing, setProcessing] = useState(false);
   const isSubmittingRef = useRef(false);
@@ -207,6 +209,30 @@ export function PemeriksaanIzin() {
     <Screen>
       <TopBar title="Pemeriksaan Izin" />
 
+      {/* Dua jenis persetujuan asisten dalam satu tab. */}
+      <View style={styles.segmen} accessibilityRole="tablist">
+        {([
+          ["izin", "Izin sesi"],
+          ["kelas", "Pindah kelas"],
+        ] as const).map(([nilai, label]) => {
+          const aktif = bagian === nilai;
+          return (
+            <Pressable
+              key={nilai}
+              onPress={() => setBagian(nilai)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: aktif }}
+              style={[styles.segmenItem, aktif && styles.segmenItemAktif]}>
+              <Text style={[styles.segmenTeks, aktif && styles.segmenTeksAktif]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {bagian === "kelas" ? (
+        <PemeriksaanKelas />
+      ) : (
+      <>
       {/* Kartu ringkas berilustrasi: berapa izin yang masih menunggu keputusan. */}
       <View style={styles.ringkas}>
         <View style={styles.ringkasTeks}>
@@ -339,6 +365,9 @@ export function PemeriksaanIzin() {
         </View>
       )}
 
+      </>
+      )}
+
       {/* Confirmation Modal */}
       <Modal
         visible={!!decision}
@@ -421,6 +450,34 @@ const styles = StyleSheet.create({
   groupCount: {
     color: Palette.textSecondary,
     fontSize: 13,
+  },
+  segmen: {
+    backgroundColor: "#F7F6FB",
+    borderColor: Palette.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 4,
+    marginBottom: Spacing.three,
+    padding: 4,
+  },
+  segmenItem: {
+    alignItems: "center",
+    borderRadius: 999,
+    flex: 1,
+    paddingVertical: 10,
+  },
+  segmenItemAktif: {
+    backgroundColor: Palette.ink,
+  },
+  segmenTeks: {
+    color: Palette.textSecondary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  segmenTeksAktif: {
+    color: "#FFFFFF",
+    fontWeight: "700",
   },
   ringkas: {
     alignItems: "center",
