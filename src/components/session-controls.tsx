@@ -16,6 +16,7 @@ import { COLLECTIONS, db } from '@/services/firebase';
 import { kirimNotifikasi, pesanSesiDibuka } from '@/services/notifications';
 import { Logger } from '@/utils/logger';
 import { getBatasTutupSesi, sesiSudahBerakhir } from '@/utils/sesi';
+import { jendelaBukaSesi, MENIT_BUKA_LEBIH_AWAL } from '@/utils/waktu-sesi';
 
 type Confirmation = 'open' | 'close' | null;
 
@@ -29,6 +30,13 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
   const { tampilkanToast } = useToast();
 
   const session = sessions.find((item) => item.id === sessionId);
+
+  // Jam perangkat diperbarui tiap 30 detik supaya tombol Buka Sesi aktif tepat waktu.
+  const [sekarang, setSekarang] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setSekarang(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const tutupSesi = useCallback(async () => {
     await updateSession(sessionId, {
@@ -74,6 +82,10 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
       isSubmittingRef.current = true;
       setProcessing(true);
       if (confirmation === 'open') {
+        // Cek ulang saat dikonfirmasi: dialog bisa terbuka lama sampai lewat jamnya.
+        if (!jendelaBukaSesi(session!, new Date()).boleh) {
+          throw new Error('DI_LUAR_JAM_BUKA');
+        }
         let asistenCoords: { lat: number; lng: number } | null = null;
         try {
           const { status } = await Location.requestForegroundPermissionsAsync();
@@ -136,8 +148,12 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
         tampilkanToast('Presensi untuk sesi ini sudah tidak diterima.', 'sukses', 'Sesi ditutup');
       }
     } catch (error) {
-      Logger.error('FIRESTORE', 'CONFIRM_SESSION_ACTION', error);
-      tampilkanToast('Periksa koneksi internet lalu coba lagi.', 'error', 'Sesi gagal diperbarui');
+      if (error instanceof Error && error.message === 'DI_LUAR_JAM_BUKA') {
+        tampilkanToast('Sesi hanya bisa dibuka di jam praktikumnya.', 'error', 'Belum bisa dibuka');
+      } else {
+        Logger.error('FIRESTORE', 'CONFIRM_SESSION_ACTION', error);
+        tampilkanToast('Periksa koneksi internet lalu coba lagi.', 'error', 'Sesi gagal diperbarui');
+      }
     } finally {
       setProcessing(false);
       isSubmittingRef.current = false;
@@ -213,19 +229,35 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
     );
   }
 
+  // Sesi hanya bisa dibuka di tanggalnya, mulai 15 menit sebelum jam mulai sampai jam selesai.
+  const jendela = jendelaBukaSesi(session, sekarang);
+  const keteranganBuka = jendela.boleh
+    ? 'Buka sesi untuk membuat kode presensi dan menerima kehadiran praktikan.'
+    : jendela.alasan === 'belum_waktunya'
+      ? `Sesi bisa dibuka mulai ${jendela.bukaMulai.toLocaleDateString('id-ID', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'short',
+        })} pukul ${jendela.bukaMulai.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}, ${MENIT_BUKA_LEBIH_AWAL} menit sebelum jam mulai.`
+      : 'Jam praktikum sesi ini sudah lewat, jadi sesi tidak bisa dibuka lagi.';
+
   return (
     <>
       <View style={styles.card}>
         <View style={styles.statusCopy}>
           <Text style={styles.cardTitle}>Sesi belum dibuka</Text>
-          <Text style={styles.cardDescription}>
-            Buka sesi untuk membuat kode presensi dan menerima kehadiran praktikan.
-          </Text>
+          <Text style={styles.cardDescription}>{keteranganBuka}</Text>
         </View>
 
         <Pressable
           onPress={() => setConfirmation('open')}
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+          disabled={!jendela.boleh}
+          accessibilityState={{ disabled: !jendela.boleh }}
+          style={({ pressed }) => [
+            styles.primaryButton,
+            !jendela.boleh && styles.buttonMati,
+            pressed && styles.pressed,
+          ]}>
           <Text style={styles.buttonText}>Buka Sesi</Text>
         </Pressable>
       </View>
@@ -374,6 +406,9 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     justifyContent: 'center',
     paddingVertical: 13,
+  },
+  buttonMati: {
+    opacity: 0.35,
   },
   buttonText: {
     color: '#FFFFFF',

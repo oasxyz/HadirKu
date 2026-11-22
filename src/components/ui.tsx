@@ -245,7 +245,8 @@ export function SelectField({ label, value, options, onSelect, error }: { label:
   );
 }
 
-export function DateTimeField({ label, value, mode = 'date', onChange, error }: { label: string; value?: Date; mode?: 'date' | 'time'; onChange: (date: Date) => void; error?: boolean }) {
+// `minimumDate` (opsional) mencegah memilih tanggal sebelum batas itu, mis. tanggal yang sudah lewat.
+export function DateTimeField({ label, value, mode = 'date', onChange, error, minimumDate }: { label: string; value?: Date; mode?: 'date' | 'time'; onChange: (date: Date) => void; error?: boolean; minimumDate?: Date }) {
   const [isPickerVisible, setPickerVisibility] = useState(false);
   
   const displayValue = value ? (mode === 'date' ? value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' }) : value.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })) : 'Pilih...';
@@ -262,6 +263,7 @@ export function DateTimeField({ label, value, mode = 'date', onChange, error }: 
         isVisible={isPickerVisible}
         mode={mode}
         date={value || new Date()}
+        minimumDate={mode === 'date' ? minimumDate : undefined}
         onConfirm={(date: Date) => { setPickerVisibility(false); onChange(date); }}
         onCancel={() => setPickerVisibility(false)}
       />

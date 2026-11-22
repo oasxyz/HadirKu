@@ -38,6 +38,7 @@ import { COLLECTIONS, getCompositeId } from '@/services/firebase';
 import type { LeaveRequest } from '@/types';
 import { normalizeLeaveCategory } from '@/types';
 import { formatTanggal, formatTanggalSingkat } from '@/utils/format';
+import { BATAS_HARI_KEPUTUSAN_IZIN, masihBolehPutuskanIzin } from '@/utils/waktu-sesi';
 import { Logger, toUserErrorMessage } from '@/utils/logger';
 import { sesiSudahBerakhir } from '@/utils/sesi';
 
@@ -398,6 +399,12 @@ function IzinCard({
             createdAt={item.createdAt}
             diputuskanAt={item.diputuskanAt}
           />
+
+          {item.status === 'menunggu' && !masihBolehPutuskanIzin(sessionTanggal) ? (
+            <Text style={styles.decisionText}>
+              Asisten tidak memutuskan sampai batas H+{BATAS_HARI_KEPUTUSAN_IZIN}, jadi sesi ini dihitung Alpha.
+            </Text>
+          ) : null}
 
           {item.status !== 'menunggu' && item.diputuskanOleh && item.diputuskanAt ? (
             <Text style={styles.decisionText}>

@@ -27,6 +27,7 @@ import { useLeaveRequests } from "@/hooks/use-leave-requests";
 import { kirimNotifikasi, pesanIzinDiputuskan } from "@/services/notifications";
 import { KategoriIzinBadge } from "@/components/status-kehadiran-badge";
 import { IlustrasiKosong, IlustrasiSurat } from "@/components/ilustrasi";
+import { BATAS_HARI_KEPUTUSAN_IZIN, masihBolehPutuskanIzin } from "@/utils/waktu-sesi";
 import { PemeriksaanKelas } from "@/components/izin/pemeriksaan-kelas";
 import { useToast } from "@/components/toast";
 import { normalizeLeaveCategory } from "@/types";
@@ -122,7 +123,11 @@ export function PemeriksaanIzin() {
     assistantSessionIds.has(req.sessionId),
   );
 
-  const jumlahMenunggu = assistantRequests.filter((req) => req.status === "menunggu").length;
+  // Izin hanya bisa diputuskan sampai akhir H+3 dari tanggal sesi; yang lewat tidak dihitung menunggu.
+  const tanggalSesiIzin = (sessionId: string) => sessions.find((s) => s.id === sessionId)?.tanggal;
+  const jumlahMenunggu = assistantRequests.filter(
+    (req) => req.status === "menunggu" && masihBolehPutuskanIzin(tanggalSesiIzin(req.sessionId)),
+  ).length;
 
   // 2. Filter by Time (menggunakan tanggal lokal perangkat, bukan UTC)
   const now = new Date();
@@ -166,6 +171,12 @@ export function PemeriksaanIzin() {
     // SRS 3.1 In-Flight Submission Lock: ref berubah seketika, sedangkan state baru
     // terbaca di render berikutnya, jadi ketukan ganda yang cepat tetap tertahan.
     if (!decision || isSubmittingRef.current) return;
+    const izinDipilih = leaveRequests.find((req) => req.id === decision.id);
+    if (izinDipilih && !masihBolehPutuskanIzin(tanggalSesiIzin(izinDipilih.sessionId))) {
+      setDecision(null);
+      tampilkanToast("Batas keputusan izin (H+3 dari tanggal sesi) sudah lewat.", "error", "Izin tidak bisa diputuskan");
+      return;
+    }
     isSubmittingRef.current = true;
     try {
       setProcessing(true);
@@ -321,7 +332,11 @@ export function PemeriksaanIzin() {
                       <KategoriIzinBadge kategori={kategori} />
                     </View>
 
-                    {req.status === "menunggu" ? (
+                    {req.status === "menunggu" && !masihBolehPutuskanIzin(session?.tanggal) ? (
+                      <Text style={styles.decisionText}>
+                        Batas keputusan (H+{BATAS_HARI_KEPUTUSAN_IZIN} dari tanggal sesi) sudah lewat. Izin ini tidak diputuskan dan dihitung Alpha.
+                      </Text>
+                    ) : req.status === "menunggu" ? (
                       <View style={styles.actionButtons}>
                         <Pressable
                           style={({ pressed }) => [

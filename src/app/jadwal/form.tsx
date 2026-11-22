@@ -34,6 +34,7 @@ import type { Session } from '@/types';
 import { getAuthErrorMessage } from '@/utils/auth-error';
 import { cariBentrokAsisten, cariBentrokLab } from '@/utils/bentrok-lab';
 import { formatTanggalSingkat } from '@/utils/format';
+import { JAM_BUKA_LAB, JAM_TUTUP_LAB, validasiWaktuSesi } from '@/utils/waktu-sesi';
 import { Logger } from '@/utils/logger';
 
 // Jumlah baris praktikan per halaman pada tabel peserta.
@@ -152,6 +153,13 @@ function JadwalFormContent({
   const labId = labIdState || (labs.length > 0 ? labs[0].id : '');
   const currentLab = labs.find((l) => l.id === labId);
 
+  // Tanggal yang sudah lewat tidak bisa dipilih di kalender (awal hari ini).
+  const [hariIniAwal] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+
   // Opsi dropdown praktikum; nama lama di luar daftar tetap muncul saat sesi diubah.
   const opsiPraktikumForm = useMemo(() => opsiPraktikum(initial?.praktikum), [initial?.praktikum]);
 
@@ -233,9 +241,19 @@ function JadwalFormContent({
     }
     if (l === 2) {
       if (!labId) return 'Laboratorium wajib dipilih';
-      if (timeToHm(jamMulaiDate) >= timeToHm(jamSelesaiDate)) {
-        return 'Jam selesai harus lebih lambat dari jam mulai';
-      }
+      // Jam selesai > jam mulai, dalam jam operasional lab, dan tidak di waktu yang sudah lewat.
+      const salahWaktu = validasiWaktuSesi(
+        {
+          tanggal: dateToYmd(tanggalDate),
+          jamMulai: timeToHm(jamMulaiDate),
+          jamSelesai: timeToHm(jamSelesaiDate),
+        },
+        new Date(),
+        initial
+          ? { tanggal: initial.tanggal, jamMulai: initial.jamMulai, jamSelesai: initial.jamSelesai }
+          : undefined,
+      );
+      if (salahWaktu) return salahWaktu;
       const rencana = {
         labId,
         tanggal: dateToYmd(tanggalDate),
@@ -447,6 +465,7 @@ function JadwalFormContent({
               label="Tanggal Pelaksanaan"
               mode="date"
               value={tanggalDate}
+              minimumDate={hariIniAwal}
               onChange={(d) => {
                 setTanggalDate(d);
                 if (error) setError(null);
@@ -478,6 +497,9 @@ function JadwalFormContent({
                 />
               </View>
             </View>
+            <Text style={styles.kelasInfo}>
+              Jam operasional lab {JAM_BUKA_LAB}–{JAM_TUTUP_LAB}. Waktu yang sudah lewat tidak bisa dipilih.
+            </Text>
           </GlassCard>
           ) : null}
 
