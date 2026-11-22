@@ -13,8 +13,8 @@ import { useCurrentUser } from '@/context/auth-context';
 import { useLeaveRequests } from '@/hooks/use-leave-requests';
 import { useSessions } from '@/hooks/use-sessions';
 import type { FinalAttendanceStatus } from '@/types';
-import { computeFinalStatus, summarizeStatuses } from '@/utils/attendance-status';
 import { formatTanggal } from '@/utils/format';
+import { hitungStatusKehadiran, ringkasKehadiran } from '@/utils/status-kehadiran';
 
 // Peta label + warna untuk 4 status + belum hadir
 const STATUS_META: Record<
@@ -47,16 +47,18 @@ export default function CatatanScreen() {
     );
   }
 
-  // Ambil semua sesi di mana praktikan adalah peserta, urut terbaru dulu
+  // Ambil semua sesi di mana praktikan adalah peserta, urut terbaru dulu.
+  // Status akhir dihitung memakai helper dari PIC Rekap biar konsisten
+  // antara halaman Rekap (asisten) dan Catatan (praktikan).
   const myRows = sessions
     .filter((s) => s.pesertaIds.includes(currentUserId))
     .map((s) => ({
       session: s,
-      status: computeFinalStatus(s, currentUserId, attendances, leaveRequests),
+      status: hitungStatusKehadiran(s, currentUserId, attendances, leaveRequests),
     }))
     .sort((a, b) => (a.session.tanggal < b.session.tanggal ? 1 : -1));
 
-  const summary = summarizeStatuses(myRows);
+  const summary = ringkasKehadiran(myRows.map((row) => row.status));
 
   if (myRows.length === 0) {
     return (

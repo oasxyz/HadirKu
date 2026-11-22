@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AttendanceAction } from '@/components/attendance-action';
 import { ErrorBoundary } from '@/components/error-boundary';
