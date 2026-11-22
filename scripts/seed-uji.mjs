@@ -168,10 +168,11 @@ async function isiData(emailAsisten, emailPraktikan) {
   const sesi = [
     // Presensi praktikan (QR / kode 123456), Kelola Sesi "dibuka", Timeline "Dibuka".
     { id: 'uji-dibuka-sekarang', praktikum: 'Pemrograman Mobile', kelasLab: 'D1', labId: 'dekanat-fsm',
-      tanggal: tanggal(0), jamMulai: jam(-30), jamSelesai: jam(90), status: 'dibuka' },
-    // Tombol Buka Sesi (asisten) dan "Sesi Belum Dibuka" (praktikan).
+      tanggal: tanggal(0), jamMulai: jam(-30), jamSelesai: jam(40), status: 'dibuka' },
+    // Tombol Buka Sesi (asisten) dan "Sesi Belum Dibuka" (praktikan). Dimulai setelah sesi di atas
+    // selesai (satu asisten satu sesi), jadi tombol Buka Sesi aktif ±30 menit setelah seeder jalan.
     { id: 'uji-belum-dibuka-nanti', praktikum: 'Basis Data', kelasLab: 'D1', labId: 'lab-informatika-b',
-      tanggal: tanggal(0), jamMulai: jam(180), jamSelesai: jam(300), status: 'belum_dibuka' },
+      tanggal: tanggal(0), jamMulai: jam(45), jamSelesai: jam(165), status: 'belum_dibuka' },
     // Rekap: Hadir.
     { id: 'uji-kemarin-hadir', praktikum: 'Jaringan Komputer', kelasLab: 'D1', labId: 'lab-informatika-c',
       tanggal: tanggal(-1), jamMulai: '08:00', jamSelesai: '10:00', status: 'ditutup' },
