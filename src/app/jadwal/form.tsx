@@ -719,10 +719,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
+  // Judul + jumlah di atas, tombol Pilih Semua/Reset di bawahnya supaya tidak terpotong di HP sempit.
   pesertaHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 10,
   },
   pesertaCounter: {
     fontSize: 12,
@@ -797,11 +797,11 @@ const styles = StyleSheet.create({
   },
   tabelKolomKelas: {
     textAlign: 'center',
-    width: 44,
+    width: 38,
   },
   tabelKolomNim: {
     textAlign: 'right',
-    width: 116,
+    width: 112,
   },
   kelasInfo: {
     color: Palette.textSecondary,
@@ -816,7 +816,7 @@ const styles = StyleSheet.create({
   },
   tabelTeksNim: {
     color: Palette.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     fontVariant: ['tabular-nums'],
   },
   kotakCek: {
