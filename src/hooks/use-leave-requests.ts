@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { useCurrentUser } from '@/context/auth-context';
 import { db, COLLECTIONS } from '@/services/firebase';
 import type { LeaveRequest } from '@/types';
+import { waktuIso, waktuIsoAtauSekarang } from '@/utils/waktu';
 
 export function useLeaveRequests() {
   const currentUser = useCurrentUser();
@@ -68,9 +69,10 @@ export function useLeaveRequests() {
             alasan: data.alasan ?? '',
             kategoriAi: data.kategoriAi ?? null,
             status: data.status ?? 'menunggu',
-            createdAt: createdAtStr,
+            // Sprint 3 menulis serverTimestamp(); diseragamkan ke ISO string.
+            createdAt: waktuIsoAtauSekarang(data.createdAt),
             diputuskanOleh: data.diputuskanOleh ?? null,
-            diputuskanAt: diputuskanAtStr,
+            diputuskanAt: waktuIso(data.diputuskanAt),
           });
         });
         setState({
