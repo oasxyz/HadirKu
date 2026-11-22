@@ -11,8 +11,11 @@ import { ScreenBackground } from '@/components/screen-background';
 import { AppProvider } from '@/context/app-context';
 import { AuthProvider } from '@/context/auth-context';
 import { seedInitialLabsIfNeeded } from '@/services/firebase';
+import { FONT_INTER, pasangFontInter } from '@/constants/font-inter';
 
 SplashScreen.preventAutoHideAsync();
+// Semua Text/TextInput memakai font Inter (lihat src/constants/font-inter.tsx).
+pasangFontInter();
 
 // Tema navigasi transparan: kalau tidak, React Navigation menutup gradien dengan latar abu-abu bawaannya.
 const transparentTheme = {
@@ -21,7 +24,8 @@ const transparentTheme = {
 };
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({ ...Ionicons.font });
+  // Splash tetap tampil sampai ikon dan font Inter selesai dimuat.
+  const [fontsLoaded] = useFonts({ ...Ionicons.font, ...FONT_INTER });
 
   useEffect(() => {
     // Sprint 3: Pastikan 4 laboratorium default (Gedung AP, Lab B, Lab C, Lab D) terisi di Firestore
