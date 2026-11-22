@@ -4,6 +4,7 @@ import { router, type Href } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -147,27 +148,7 @@ export function PengajuanIzin() {
     setShowForm(false);
   };
 
-  const handleSubmit = async () => {
-    setErrorMsg(null);
-    const trimmed = alasan.trim();
-
-    if (!selectedSessionId) {
-      setErrorMsg('Pilih sesi terlebih dahulu');
-      return;
-    }
-    if (trimmed.length < 10) {
-      setErrorMsg('Alasan terlalu pendek, jelaskan minimal 10 karakter');
-      return;
-    }
-
-    // Cek belum ada dokumen untuk composite ID ini (doc id = sessionId_uid)
-    const compositeId = getCompositeId(selectedSessionId, currentUser.id);
-    const existing = myLeaves.find((lr) => lr.id === compositeId);
-    if (existing && (existing.status === 'menunggu' || existing.status === 'diterima')) {
-      setErrorMsg('Anda sudah punya pengajuan aktif untuk sesi ini');
-      return;
-    }
-
+  const doSubmit = async (trimmed: string, compositeId: string) => {
     setSubmitting(true);
     try {
       // Klasifikasi AI dulu (hasil dipakai saat write)
@@ -201,8 +182,42 @@ export function PengajuanIzin() {
     }
   };
 
+  const handleSubmit = async () => {
+    setErrorMsg(null);
+    const trimmed = alasan.trim();
+
+    if (!selectedSessionId) {
+      setErrorMsg('Pilih sesi terlebih dahulu');
+      return;
+    }
+    if (trimmed.length < 10) {
+      setErrorMsg('Alasan terlalu pendek, jelaskan minimal 10 karakter');
+      return;
+    }
+
+    // Cek belum ada dokumen untuk composite ID ini (doc id = sessionId_uid)
+    const compositeId = getCompositeId(selectedSessionId, currentUser.id);
+    const existing = myLeaves.find((lr) => lr.id === compositeId);
+    if (existing && (existing.status === 'menunggu' || existing.status === 'diterima')) {
+      setErrorMsg('Anda sudah punya pengajuan aktif untuk sesi ini');
+      return;
+    }
+
+    Alert.alert(
+      'Konfirmasi Pengajuan Izin',
+      'Setelah diajukan, izin tidak dapat dibatalkan dan fitur presensi untuk sesi ini akan otomatis dikunci. Apakah Anda yakin ingin melanjutkan?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Ya, Ajukan Izin',
+          onPress: () => doSubmit(trimmed, compositeId),
+        },
+      ],
+    );
+  };
+
   const sortedHistory = [...myLeaves].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    String(b.createdAt || '').localeCompare(String(a.createdAt || '')),
   );
 
   return (

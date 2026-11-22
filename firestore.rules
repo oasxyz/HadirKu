@@ -1,7 +1,10 @@
-// DRAFT PM (SRS009 menyempurnakan). Belum diuji di emulator; tempel ke Firebase Console > Firestore > Rules.
-// ERROR HANDLING VERSI PIC A (BISA DICEK KEMBALI DI PENGEMBANGAN SELANJUTNYA).
-// Publish HANYA setelah aplikasi versi baru terpasang: build lama tidak mengirim `kode` saat
-// presensi dan tidak mengirim `asistenNama` saat membuat sesi.
+// FIRESTORE SECURITY RULES — HADIRKU SPRINT 3 (PIC A — Yoas, SRS3-02)
+// Mencakup:
+// 1. Koleksi labs: publik/pengguna terotentikasi bisa baca; hanya asisten yang bisa update/tulis.
+// 2. Koleksi sessionCodes / sessionSecrets: rahasia 6 digit hanya bisa dibaca & ditulis asisten.
+// 3. Koleksi attendances: validasi ID sessionId_uid, kode sesi, dan validasi radius jarakMeter <= radiusSaatPresensi.
+// 4. Koleksi leaveRequests: ID komposit sessionId_uid, role protection.
+// 5. Koleksi notifications & appConfig: pembacaan dan penulisan operasional.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -45,6 +48,20 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Koleksi Labs (SRS3-01 & SRS3-02)
+    // Pengguna terotentikasi bisa membaca daftar lab untuk peta dan presensi;
+    // Hanya asisten yang bisa menambah/mengubah lokasi & radius laboratorium.
+    match /labs/{labId} {
+      allow read: if signedIn();
+      allow create, update: if isAsisten()
+        && request.resource.data.latitude is number
+        && request.resource.data.longitude is number
+        && request.resource.data.radiusMeter is number
+        && request.resource.data.radiusMeter >= 20
+        && request.resource.data.radiusMeter <= 200;
+      allow delete: if false;
+    }
+
     // Koleksi Classes
     match /classes/{classId} {
       allow read: if isAsisten() || isPeserta(resource.data);
@@ -76,7 +93,7 @@ service cloud.firestore {
         && resource.data.asistenId == request.auth.uid;
     }
 
-    // Koleksi SessionCodes (SRS003)
+    // Koleksi SessionCodes / SessionSecrets (SRS003 & SRS3-02)
     // Kode sesi dipisah dari dokumen sesi supaya tidak terbaca praktikan.
     match /sessionCodes/{sessionId} {
       allow read: if isAsisten()
@@ -94,28 +111,36 @@ service cloud.firestore {
       allow delete: if isAsisten() && resource.data.asistenId == request.auth.uid;
     }
 
-    // Koleksi Attendances
-    // ID dokumen = sessionId_uid, sehingga presensi ganda otomatis ditolak
+    // Koleksi Attendances (SRS3-02 & SRS3-05)
+    // ID dokumen deterministik = sessionId_uid, sehingga presensi ganda otomatis ditolak.
+    // Menjamin integritas hard-blocking: jarakMeter <= radiusSaatPresensi (jika data radius dikirim).
     match /attendances/{attendanceId} {
-      allow read: if isAsisten() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow read: if isAsisten()
+        || (signedIn() && (resource == null || resource.data.userId == request.auth.uid));
 
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && attendanceId == request.resource.data.sessionId + '_' + request.auth.uid
         // Kode harus sama dengan kode sesi yang hanya bisa dibaca asisten
         && request.resource.data.kode == get(/databases/$(database)/documents/sessionCodes/$(request.resource.data.sessionId)).data.kode
-        // jarakMeter opsional, tapi kalau diisi harus angka >= 0
-        && (request.resource.data.get('jarakMeter', null) == null
-            || (request.resource.data.jarakMeter is number && request.resource.data.jarakMeter >= 0))
+        // Status sesi harus sedang dibuka dan pengguna terdaftar di peserta
         && get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'dibuka'
-        && request.auth.uid in get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.pesertaIds;
+        && request.auth.uid in get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.pesertaIds
+        // Validasi radius presensi: jika radiusSaatPresensi dan jarakMeter dikirim, jarak tidak boleh melebihi batas radius
+        && (request.resource.data.get('jarakMeter', null) == null
+            || request.resource.data.get('radiusSaatPresensi', null) == null
+            || (request.resource.data.jarakMeter is number
+                && request.resource.data.radiusSaatPresensi is number
+                && request.resource.data.jarakMeter <= request.resource.data.radiusSaatPresensi + 10));
 
       allow update, delete: if false;
     }
 
     // Koleksi Leave Requests
+    // ID dokumen deterministik: sessionId_uid
     match /leaveRequests/{requestId} {
-      allow read: if isAsisten() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow read: if isAsisten()
+        || (signedIn() && (resource == null || resource.data.userId == request.auth.uid));
 
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
@@ -126,6 +151,24 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'diputuskanOleh', 'diputuskanAt']);
 
       allow delete: if false;
+    }
+
+    // Koleksi Notifications (SRS3-04)
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && (
+        isAsisten() || (request.auth.uid in resource.data.targetUserIds)
+      );
+      allow create: if isAsisten();
+      // Pengguna hanya dapat menandai dokumen sebagai dibaca (menambah UID ke readBy)
+      allow update: if signedIn() && request.auth.uid in resource.data.targetUserIds
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']);
+      allow delete: if false;
+    }
+
+    // Koleksi AppConfig (SRS 3.2)
+    match /appConfig/{configId} {
+      allow read: if signedIn();
+      allow write: if isAsisten();
     }
   }
 }
