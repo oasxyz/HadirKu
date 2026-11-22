@@ -24,6 +24,11 @@ export type GrupLab = {
   labs: Lab[];
 };
 
+/** "Lab Informatika B" → "Lab B", supaya chip dan segmen muat satu baris di layar HP. */
+export function namaLabSingkat(namaLab: string): string {
+  return namaLab.replace(/^(Lab|Laboratorium)\s+Informatika\s+/i, 'Lab ');
+}
+
 /**
  * Nama gedung untuk label marker dan judul panel.
  * - Beberapa lab dalam satu titik dengan `deskripsi` sama (mis. "Gedung E"): pakai deskripsi itu.
@@ -34,7 +39,9 @@ export function namaGrup(grup: GrupLab): string {
   if (grup.labs.length === 1) return grup.labs[0].namaLab;
   const deskripsi = grup.labs[0].deskripsi?.trim();
   const semuaSama = Boolean(deskripsi) && grup.labs.every((lab) => lab.deskripsi?.trim() === deskripsi);
-  return semuaSama && deskripsi ? deskripsi : grup.labs.map((lab) => lab.namaLab).join(', ');
+  return semuaSama && deskripsi
+    ? deskripsi
+    : grup.labs.map((lab) => namaLabSingkat(lab.namaLab)).join(', ');
 }
 
 /**

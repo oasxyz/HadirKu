@@ -11,6 +11,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import {
   kelompokkanLab,
   namaGrup,
+  namaLabSingkat,
   sedangBerlangsung,
   type GrupLab,
 } from '@/components/peta/aktivitas-lab';
@@ -51,6 +52,7 @@ export default function PetaScreen() {
   const lokasi = useLokasiPengguna();
   const [labTerpilih, setLabTerpilih] = useState<string | null>(null);
   const [pusatkan, setPusatkan] = useState(0);
+  const [petaSiap, setPetaSiap] = useState(false);
 
   useEffect(() => {
     if (!currentUser) router.replace('/login' as Href);
@@ -179,8 +181,19 @@ export default function PetaScreen() {
           onPilihLab={async (labId) => setLabTerpilih(labId)}
           // Ketuk area kosong peta: tutup panel.
           onKetukPeta={async () => setLabTerpilih(null)}
+          onSiap={async () => setPetaSiap(true)}
         />
       </ErrorBoundary>
+
+      {!petaSiap ? (
+        // Peta (WebView) butuh waktu memuat; tanpa ini layar terlihat kosong seperti macet.
+        <View style={styles.memuatWrap} pointerEvents="none">
+          <GlassCard style={styles.memuatCard}>
+            <ActivityIndicator color={Palette.primary} />
+            <Text style={styles.memuatText}>Memuat peta…</Text>
+          </GlassCard>
+        </View>
+      ) : null}
 
       <GlassCard style={[styles.header, { top: insets.top + 10 }]}>
         <View style={styles.headerRow}>
@@ -200,7 +213,7 @@ export default function PetaScreen() {
             {labs.map((lab) => (
               <Chip
                 key={lab.id}
-                label={lab.namaLab}
+                label={namaLabSingkat(lab.namaLab)}
                 selected={lab.id === labTerpilih}
                 onPress={() => setLabTerpilih(lab.id)}
               />
@@ -262,5 +275,26 @@ const styles = StyleSheet.create({
     left: 14,
     position: 'absolute',
     right: 14,
+  },
+  memuatWrap: {
+    alignItems: 'center',
+    bottom: 0,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  memuatCard: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  memuatText: {
+    color: Palette.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

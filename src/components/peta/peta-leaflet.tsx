@@ -39,6 +39,8 @@ type Props = {
   pusatkanKePengguna?: number;
   onPilihLab?: (labId: string) => Promise<void>;
   onKetukPeta?: () => Promise<void>;
+  /** Dipanggil sekali saat peta pertama kali tampil (untuk menyembunyikan indikator memuat). */
+  onSiap?: () => Promise<void>;
 };
 
 const MAGENTA = '#E21BD0';
@@ -46,13 +48,26 @@ const INK = '#17151C';
 const UNGU = '#6B4FA0';
 const PUSAT_AWAL: [number, number] = [-7.0486, 110.4411];
 
-// Tile CartoDB Positron (data OpenStreetMap, tanpa kunci) diberi filter supaya bernuansa
-// lavender pucat seperti mockup.
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+// Tile Esri World Street Map (tanpa kunci). CARTO kini mewajibkan API key dan server
+// OpenStreetMap memblokir aplikasi, jadi keduanya tidak dipakai.
+// Dua lapisan dari tile yang sama:
+// 1. Dasar: dibuat abu, kontras dinaikkan di sekitar nada terang sehingga jalan tetap putih
+//    sedangkan blok di antara jalan sedikit lebih gelap, lalu diberi warna lavender yang
+//    mendekati #ECE8F1 (warna latar peta di mockup). Bagian "invert → brightness(2.5) →
+//    brightness(0.4) → invert" memberi batas bawah kecerahan (~0.6), supaya jalan besar yang
+//    aslinya oranye/kuning tampil ungu keabu-abuan, bukan garis hitam, saat peta di-zoom jauh.
+//    Efek sampingnya tulisan ikut pudar.
+// 2. Label: tile hitam-putih berkontras tinggi dengan mix-blend-mode multiply. Bagian putih jadi
+//    "tembus", jadi yang tersisa hanya tulisan nama jalan berwarna gelap di atas lapisan dasar.
+//    Hanya tampil mulai zoom 17: di zoom lebih jauh, tulisan Esri sama gelapnya dengan garis
+//    tepi jalan, sehingga filter ikut menghitamkan jaringan jalan dan menabrak tulisan.
+const TILE_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
 const GAYA = `
   html, body { margin: 0; padding: 0; background: #ECE8F1; }
   .leaflet-container { background: #ECE8F1; font-family: system-ui, sans-serif; }
-  .leaflet-tile-pane { filter: sepia(0.22) hue-rotate(220deg) saturate(1.35) brightness(1.02) contrast(0.96); }
+  .tile-dasar { filter: grayscale(1) brightness(0.6) contrast(4) brightness(1.14) invert(1) brightness(2.5) brightness(0.4) invert(1) sepia(0.2) hue-rotate(218deg) saturate(1); }
+  .tile-label { filter: grayscale(1) contrast(3); mix-blend-mode: multiply; }
   .leaflet-control-attribution { font-size: 9px; background: rgba(255,255,255,0.7) !important; }
   .pin-hadirku { background: none; border: none; }
 `;
@@ -110,11 +125,17 @@ export default function PetaLeaflet({
   pusatkanKePengguna = 0,
   onPilihLab,
   onKetukPeta,
+  onSiap,
 }: Props) {
   const wadahRef = useRef<HTMLDivElement | null>(null);
   const petaRef = useRef<L.Map | null>(null);
   const lapisanRef = useRef<L.LayerGroup | null>(null);
   const sudahDipusatkanRef = useRef(false);
+  // Disimpan di ref supaya efek pembuatan peta (sekali jalan) tetap memanggil fungsi terbaru.
+  const onSiapRef = useRef(onSiap);
+  useEffect(() => {
+    onSiapRef.current = onSiap;
+  }, [onSiap]);
 
   // 1. Buat peta sekali.
   useEffect(() => {
@@ -122,17 +143,41 @@ export default function PetaLeaflet({
     const peta = L.map(wadahRef.current, {
       center: PUSAT_AWAL,
       zoom: 17,
+      // Cukup sampai skala kota; lebih jauh dari ini peta kampus jadi kosong dan pucat.
+      minZoom: 14,
       zoomControl: false,
       attributionControl: true,
     });
+    // Esri belum punya tile detail di atas zoom 17 untuk area kampus ("Map data not yet
+    // available"), jadi zoom lebih dekat memakai tile zoom 17 yang diperbesar.
+    const tile = L.tileLayer(TILE_URL, {
+      className: 'tile-dasar',
+      maxZoom: 19,
+      maxNativeZoom: 17,
+      attribution: 'Tiles &copy; Esri',
+    }).addTo(peta);
     L.tileLayer(TILE_URL, {
-      subdomains: 'abcd',
-      maxZoom: 20,
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      className: 'tile-label',
+      minZoom: 17,
+      maxZoom: 19,
+      maxNativeZoom: 17,
     }).addTo(peta);
     lapisanRef.current = L.layerGroup().addTo(peta);
     petaRef.current = peta;
+
+    // Beri tahu layar bahwa peta sudah tampil: saat tile pertama selesai dimuat, atau paling
+    // lambat 8 detik (mis. koneksi lambat) supaya indikator memuat tidak menggantung.
+    let sudahSiap = false;
+    const tandaiSiap = () => {
+      if (sudahSiap) return;
+      sudahSiap = true;
+      onSiapRef.current?.();
+    };
+    tile.once('load', tandaiSiap);
+    const cadangan = setTimeout(tandaiSiap, 8000);
+
     return () => {
+      clearTimeout(cadangan);
       peta.remove();
       petaRef.current = null;
       lapisanRef.current = null;

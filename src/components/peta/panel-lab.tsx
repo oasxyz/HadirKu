@@ -7,6 +7,7 @@ import {
   aktivitasLab,
   jarakMeter,
   namaGrup,
+  namaLabSingkat,
   type GrupLab,
   type Titik,
 } from '@/components/peta/aktivitas-lab';
@@ -108,8 +109,10 @@ export function PanelLab({
                   accessibilityRole="tab"
                   accessibilityState={{ selected: aktif }}
                   style={[styles.segmentItem, aktif && styles.segmentItemActive]}>
-                  <Text style={[styles.segmentText, aktif && styles.segmentTextActive]}>
-                    {item.namaLab}
+                  <Text
+                    style={[styles.segmentText, aktif && styles.segmentTextActive]}
+                    numberOfLines={1}>
+                    {namaLabSingkat(item.namaLab)}
                   </Text>
                 </Pressable>
               );
