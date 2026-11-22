@@ -9,6 +9,13 @@ import {
   serverTimestamp,
   writeBatch,
 } from '@react-native-firebase/firestore';
+
+import {
+  DAFTAR_PRAKTIKUM,
+  KELAS_KULIAH,
+  type KelasKuliah,
+  type KelasPraktikum,
+} from '@/constants/praktikum';
 import type { Lab } from '@/types';
 
 // React Native Firebase hanya berjalan di development build Android/iOS.
@@ -42,7 +49,7 @@ export function getCompositeId(sessionId: string, userId: string): string {
   return `${sessionId}_${userId}`;
 }
 
-// Seeding 4 laboratorium default (Gedung AP, Lab B, Lab C, Lab D) jika koleksi labs masih kosong.
+// Seeding 4 laboratorium default jika koleksi labs masih kosong.
 export async function seedInitialLabsIfNeeded(): Promise<void> {
   try {
     const labsRef = collection(db, COLLECTIONS.labs);
@@ -103,7 +110,7 @@ export async function seedInitialLabsIfNeeded(): Promise<void> {
   }
 }
 
-// Daftar komponen nama untuk menghasilkan 200 nama praktikan yang realistis dan unik
+// 20 nama depan x 10 nama tengah = 200 kombinasi nama unik tanpa akhiran nomor / (uji)
 const NAMA_DEPAN = [
   'Adi', 'Budi', 'Citra', 'Dewi', 'Eka', 'Fajar', 'Gita', 'Hadi', 'Indra', 'Joko',
   'Kartika', 'Lestari', 'Muhammad', 'Nabila', 'Oki', 'Putri', 'Rizky', 'Siti', 'Taufik', 'Wahyu',
@@ -115,58 +122,151 @@ const NAMA_TENGAH = [
 ] as const;
 
 /**
- * Seeder 200 data praktikan untuk simulasi riil di koleksi `users`.
- * Aman & Idempotent: mengecek dokumen pertama terlebih dahulu agar tidak menulis ulang jika sudah ada.
- * Catatan: Panggil fungsi ini saat sudah login sebagai akun Asisten.
+ * Membagi 40 mahasiswa dalam 1 kelas kuliah (pos 0..39) menjadi tepat 20 di <Kelas>1
+ * dan 20 di <Kelas>2 per mata praktikum, sehingga mahasiswa bisa di D1 pada satu praktikum
+ * dan D2 pada praktikum lain namun tetap dalam batas kelas kuliahnya.
+ */
+function buildKelasPraktikumMap(
+  kelasKuliah: KelasKuliah,
+  posInClass: number,
+): Record<string, KelasPraktikum> {
+  const map: Record<string, KelasPraktikum> = {};
+  DAFTAR_PRAKTIKUM.forEach((praktikum, pIdx) => {
+    const shifted = (posInClass + pIdx * 7) % 40;
+    const sub = shifted < 20 ? '1' : '2';
+    map[praktikum] = `${kelasKuliah}${sub}` as KelasPraktikum;
+  });
+  return map;
+}
+
+function bersihkanLabelUji(nama: string): string {
+  return nama
+    .replace(/\s*\(uji\)\s*/gi, ' ')
+    .replace(/\s*\(\d{3}\)\s*$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
+ * Seeder & migrasi 200 praktikan di koleksi `users`.
+ * - Menghapus label `(uji)` dan nomor `(001)` dari data praktikan dummy lama.
+ * - Mengisi `kelasKuliah` (A-E), `kelas` default (A1-E2), dan `kelasPraktikum` per praktikum.
+ * - Aman & Idempotent: langsung return 0 bila seluruh data sudah bersih dan terisi.
+ * Catatan: Panggil saat sudah login sebagai akun Asisten.
  */
 export async function seedDummyPraktikan200IfNeeded(): Promise<number> {
   try {
-    const firstSeedRef = doc(db, COLLECTIONS.users, 'seed-praktikan-001');
-    const existingCheck = await getDocs(
-      query(collection(db, COLLECTIONS.users), limit(25))
-    );
+    const usersCol = collection(db, COLLECTIONS.users);
+    const existingSnap = await getDocs(usersCol);
 
-    // Cek apakah dokumen seed sudah pernah dibuat sebelumnya
-    const alreadySeeded = existingCheck.docs.some((d) =>
-      d.id.startsWith('seed-praktikan-')
-    );
-    if (alreadySeeded) {
-      return 0;
-    }
+    const existingSeedDocs = new Map<string, Record<string, unknown>>();
+    const pendingWrites: Array<{ docId: string; payload: Record<string, unknown> }> = [];
 
-    const batch = writeBatch(db);
+    // 1. Bersihkan dokumen praktikan lama yang masih mengandung "(uji)" (mis. NIM 2406012499xxxx)
+    let ujiIndex = 0;
+    existingSnap.forEach((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      if (docSnap.id.startsWith('seed-praktikan-')) {
+        existingSeedDocs.set(docSnap.id, data);
+        return;
+      }
+
+      const rawNama = typeof data.nama === 'string' ? data.nama : '';
+      if (data.role === 'praktikan' && /\(uji\)/i.test(rawNama)) {
+        const kelasKuliah = (
+          typeof data.kelasKuliah === 'string' &&
+          KELAS_KULIAH.includes(data.kelasKuliah as KelasKuliah)
+            ? data.kelasKuliah
+            : KELAS_KULIAH[ujiIndex % KELAS_KULIAH.length]
+        ) as KelasKuliah;
+        const posInClass = ujiIndex % 40;
+        const kelasPraktikum =
+          (data.kelasPraktikum as Record<string, KelasPraktikum> | undefined) ??
+          buildKelasPraktikumMap(kelasKuliah, posInClass);
+        const defaultKelas =
+          typeof data.kelas === 'string' && data.kelas.trim()
+            ? data.kelas
+            : `${kelasKuliah}${posInClass < 20 ? '1' : '2'}`;
+
+        pendingWrites.push({
+          docId: docSnap.id,
+          payload: {
+            nama: bersihkanLabelUji(rawNama),
+            kelas: defaultKelas,
+            kelasKuliah,
+            kelasPraktikum,
+          },
+        });
+        ujiIndex += 1;
+      }
+    });
+
+    // 2. Pastikan 200 dokumen seed-praktikan-001..200 lengkap, bersih, dan punya peta kelas
     const totalToSeed = 200;
-
     for (let i = 1; i <= totalToSeed; i++) {
       const numStr = String(i).padStart(3, '0');
       const docId = `seed-praktikan-${numStr}`;
 
       const depan = NAMA_DEPAN[(i - 1) % NAMA_DEPAN.length];
       const tengah = NAMA_TENGAH[Math.floor((i - 1) / NAMA_DEPAN.length) % NAMA_TENGAH.length];
-
-      const nama = `${depan} ${tengah} (${numStr})`;
+      const nama = `${depan} ${tengah}`;
       const nim = `24060124140${numStr}`;
       const email = `praktikan.${numStr}@students.undip.ac.id`;
 
-      const userRef = doc(db, COLLECTIONS.users, docId);
-      batch.set(userRef, {
-        id: docId,
-        nama,
-        nim,
-        role: 'praktikan',
-        email,
-        pushTokens: [],
-      });
+      const kelasKuliah = KELAS_KULIAH[Math.floor((i - 1) / 40)];
+      const posInClass = (i - 1) % 40;
+      const defaultKelas = `${kelasKuliah}${posInClass < 20 ? '1' : '2'}` as KelasPraktikum;
+      const kelasPraktikum = buildKelasPraktikumMap(kelasKuliah, posInClass);
+
+      const existing = existingSeedDocs.get(docId);
+      const existingMap = existing?.kelasPraktikum as Record<string, string> | undefined;
+      const isUpToDate =
+        existing !== undefined &&
+        existing.nama === nama &&
+        existing.kelas === defaultKelas &&
+        existing.kelasKuliah === kelasKuliah &&
+        existingMap !== undefined &&
+        DAFTAR_PRAKTIKUM.every((p) => typeof existingMap[p] === 'string');
+
+      if (!isUpToDate) {
+        pendingWrites.push({
+          docId,
+          payload: {
+            id: docId,
+            nama,
+            nim,
+            role: 'praktikan',
+            email,
+            kelas: defaultKelas,
+            kelasKuliah,
+            kelasPraktikum,
+            ...(existing ? {} : { pushTokens: [] }),
+          },
+        });
+      }
     }
 
-    // Pastikan firstSeedRef tercatat dalam batch
-    void firstSeedRef;
-    await batch.commit();
+    if (pendingWrites.length === 0) {
+      return 0;
+    }
+
+    // Commit per 400 dokumen (batas maksimum Firestore writeBatch adalah 500 operasi)
+    const CHUNK_SIZE = 400;
+    for (let start = 0; start < pendingWrites.length; start += CHUNK_SIZE) {
+      const chunk = pendingWrites.slice(start, start + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      chunk.forEach(({ docId, payload }) => {
+        batch.set(doc(db, COLLECTIONS.users, docId), payload, { merge: true });
+      });
+      await batch.commit();
+    }
 
     if (__DEV__) {
-      console.log(`[FIRESTORE][seedDummyPraktikan200] Berhasil menambahkan ${totalToSeed} praktikan.`);
+      console.log(
+        `[FIRESTORE][seedDummyPraktikan200] Berhasil menyinkronkan ${pendingWrites.length} praktikan (bersih tanpa label uji & kelas A1-E2).`,
+      );
     }
-    return totalToSeed;
+    return pendingWrites.length;
   } catch (error) {
     if (__DEV__) {
       console.warn('[FIRESTORE][seedDummyPraktikan200] Gagal seeding praktikan:', error);

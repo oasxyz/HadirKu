@@ -6,7 +6,9 @@ export interface User {
   nim: string;
   role: Role;
   email?: string;
-  kelas?: string; // Kelas praktikum praktikan, mis. "D1" (lihat constants/kelas.ts)
+  kelas?: string; // Kelas praktikum default/aktif praktikan, mis. "D1" (lihat constants/kelas.ts)
+  kelasKuliah?: string; // Batas kelas mata kuliah praktikan, mis. "A".."E"
+  kelasPraktikum?: Record<string, string>; // Peta nama praktikum -> sub-kelas, mis. { "Basis Data": "D1", "Sistem Operasi": "D2" }
   pushTokens?: string[]; // Sprint 3: Token FCM untuk push notification
 }
 
