@@ -9,7 +9,7 @@ import {
   signOut as firebaseSignOut,
   type User as FirebaseUser,
 } from '@react-native-firebase/auth';
-import { doc, getDoc, setDoc } from '@react-native-firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from '@react-native-firebase/firestore';
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 import { auth, db, COLLECTIONS } from '@/services/firebase';
@@ -29,6 +29,8 @@ interface SignUpParams {
   email: string;
   password: string;
   role: Role;
+  /** Wajib untuk praktikan, diabaikan untuk asisten. */
+  kelas?: string;
 }
 
 interface AuthContextValue {
@@ -40,7 +42,9 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<{ hasProfile: boolean }>;
   signUp: (params: SignUpParams) => Promise<void>;
   signInWithGoogle: () => Promise<{ isNewUser: boolean }>;
-  completeProfile: (params: { nama: string; nim: string; role: Role }) => Promise<void>;
+  completeProfile: (params: { nama: string; nim: string; role: Role; kelas?: string }) => Promise<void>;
+  /** Praktikan mengganti kelasnya sendiri (diizinkan firestore.rules untuk dokumen milik sendiri). */
+  ubahKelas: (kelas: string) => Promise<void>;
   reloadProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -66,6 +70,7 @@ async function loadProfileFromFirestore(user: FirebaseUser): Promise<User | null
     nim: data?.nim ?? '',
     role: data?.role ?? 'praktikan',
     email: user.email ?? data?.email ?? '',
+    kelas: typeof data?.kelas === 'string' ? data.kelas : undefined,
   };
 }
 
@@ -112,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { hasProfile: profile !== null };
   }
 
-  async function signUp({ nama, nim, email, password, role }: SignUpParams) {
+  async function signUp({ nama, nim, email, password, role, kelas }: SignUpParams) {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
     const uid = cred.user.uid;
 
@@ -121,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       nim: nim.trim(),
       role,
       email: email.trim().toLowerCase(),
+      ...(role === 'praktikan' && kelas ? { kelas } : {}),
     };
 
     try {
@@ -176,7 +182,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { isNewUser: profile === null };
   }
 
-  async function completeProfile({ nama, nim, role }: { nama: string; nim: string; role: Role }) {
+  async function completeProfile({
+    nama,
+    nim,
+    role,
+    kelas,
+  }: {
+    nama: string;
+    nim: string;
+    role: Role;
+    kelas?: string;
+  }) {
     if (!auth.currentUser) {
       throw new Error('Tidak ada akun yang sedang aktif');
     }
@@ -189,6 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       nim: nim.trim(),
       role,
       email: email.trim().toLowerCase(),
+      ...(role === 'praktikan' && kelas ? { kelas } : {}),
     };
 
     // Simpan ke Firestore dan perbarui state currentUser
@@ -199,6 +216,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ...userData,
     });
     setProfileError(null);
+  }
+
+  async function ubahKelas(kelas: string) {
+    if (!auth.currentUser) {
+      throw new Error('Tidak ada akun yang sedang aktif');
+    }
+    await updateDoc(doc(db, COLLECTIONS.users, auth.currentUser.uid), { kelas });
+    setCurrentUser((sebelum) => (sebelum ? { ...sebelum, kelas } : sebelum));
   }
 
   async function reloadProfile() {
@@ -236,6 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signInWithGoogle,
         completeProfile,
+        ubahKelas,
         reloadProfile,
         signOut,
       }}>

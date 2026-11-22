@@ -228,14 +228,16 @@ export function SelectField({ label, value, options, onSelect, error }: { label:
               {options.map((opt) => (
                 <Pressable key={opt.value} style={styles.modalOption} onPress={() => { onSelect(opt.value); setModalVisible(false); }}>
                   <View>
-                    <Text style={[styles.modalOptionText, value === opt.value && { color: Palette.primary, fontWeight: '700' }]}>{opt.label}</Text>
+                    <Text style={[styles.modalOptionText, value === opt.value && { color: Palette.ink, fontWeight: '700' }]}>{opt.label}</Text>
                     {opt.subtitle && <Text style={styles.modalOptionSubtitle}>{opt.subtitle}</Text>}
                   </View>
-                  {value === opt.value && <Ionicons name="checkmark-circle" size={24} color={Palette.primary} />}
+                  {value === opt.value && <Ionicons name="checkmark-circle" size={24} color={Palette.ink} />}
                 </Pressable>
               ))}
             </ScrollView>
-            <PrimaryButton label="Tutup" onPress={() => setModalVisible(false)} style={{ marginTop: 16 }} />
+            <Pressable onPress={() => setModalVisible(false)} style={({ pressed }) => [styles.tombolTutup, pressed && styles.pressed]}>
+              <Text style={styles.tombolTutupTeks}>Tutup</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -346,6 +348,8 @@ const styles = StyleSheet.create({
   statusCard: { backgroundColor: '#F7F6FB', borderColor: Palette.border, borderRadius: 18, borderWidth: 1, padding: 16, gap: 8 },
   statusCardIlustrasi: { alignItems: 'center', paddingVertical: 22 },
   teksTengah: { textAlign: 'center' },
+  tombolTutup: { alignItems: 'center', backgroundColor: Palette.ink, borderRadius: 999, height: 52, justifyContent: 'center', marginTop: 16 },
+  tombolTutupTeks: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   statusCardTitle: { color: Palette.text, fontSize: 15, fontWeight: '700' },
   statusCardMessage: { fontSize: 13, color: Palette.textSecondary, lineHeight: 18 },
   statusCardButton: { alignSelf: 'flex-start', backgroundColor: Palette.ink, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 },

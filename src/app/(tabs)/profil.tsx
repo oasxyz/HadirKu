@@ -6,7 +6,8 @@ import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, Text, View } 
 import { IlustrasiSapaan } from '@/components/ilustrasi';
 import { KartuKondisi } from '@/components/peta/kartu-kondisi';
 import { useToast } from '@/components/toast';
-import { Avatar, Badge, GlassCard, Screen, SectionTitle, TopBar } from '@/components/ui';
+import { Avatar, Badge, GlassCard, Screen, SectionTitle, SelectField, TopBar } from '@/components/ui';
+import { OPSI_KELAS } from '@/constants/kelas';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import {
@@ -39,7 +40,7 @@ const LABEL_STATUS_PUSH: Record<StatusPush, string> = {
 };
 
 export default function ProfilScreen() {
-  const { firebaseUser, currentUser, signOut } = useAuth();
+  const { firebaseUser, currentUser, signOut, ubahKelas } = useAuth();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const push = usePushNotifikasi();
   const { tampilkanToast } = useToast();
@@ -50,6 +51,16 @@ export default function ProfilScreen() {
   const roleLabel = currentUser ? (isAsisten ? 'Asisten Laboratorium' : 'Praktikan') : 'Profil Belum Lengkap';
   const emailDisplay = currentUser?.email || firebaseUser?.email || '-';
   const nimDisplay = currentUser?.nim || 'Belum diisi';
+
+  async function handleUbahKelas(kelas: string) {
+    if (kelas === currentUser?.kelas) return;
+    try {
+      await ubahKelas(kelas);
+      tampilkanToast(`Sesi baru untuk kelas ${kelas} akan otomatis mencantumkanmu.`, 'sukses', 'Kelas diperbarui');
+    } catch {
+      tampilkanToast('Periksa koneksi internet lalu coba lagi.', 'error', 'Kelas gagal disimpan');
+    }
+  }
 
   async function handleLogout() {
     setShowLogoutConfirm(false);
@@ -96,6 +107,24 @@ export default function ProfilScreen() {
           </View>
         ))}
       </View>
+
+      {/* Praktikan memilih kelasnya sendiri; asisten memakai kelas ini untuk mengisi peserta sesi. */}
+      {!isAsisten && currentUser ? (
+        <View style={[styles.infoCard, styles.kelasCard]}>
+          <SelectField
+            label="Kelas Praktikum"
+            value={currentUser.kelas}
+            options={OPSI_KELAS}
+            onSelect={handleUbahKelas}
+            error={!currentUser.kelas}
+          />
+          {!currentUser.kelas ? (
+            <Text style={styles.kelasHint}>
+              Pilih kelasmu supaya otomatis terdaftar di sesi praktikum kelas tersebut.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       {push.status === 'ditolak' ? (
         <GlassCard>
@@ -241,6 +270,15 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     paddingHorizontal: 18,
+  },
+  kelasCard: {
+    gap: 6,
+    paddingVertical: 14,
+  },
+  kelasHint: {
+    color: Palette.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
   },
   infoRow: {
     alignItems: 'center',

@@ -38,6 +38,7 @@ export function usePraktikanList() {
             nim: data.nim ?? '',
             role: 'praktikan',
             email: data.email ?? '',
+            kelas: typeof data.kelas === 'string' ? data.kelas : undefined,
           });
         });
         setState({ userId: currentUser.id, praktikanList: users, loading: false });

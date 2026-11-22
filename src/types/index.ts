@@ -6,6 +6,7 @@ export interface User {
   nim: string;
   role: Role;
   email?: string;
+  kelas?: string; // Kelas praktikum praktikan, mis. "D1" (lihat constants/kelas.ts)
   pushTokens?: string[]; // Sprint 3: Token FCM untuk push notification
 }
 

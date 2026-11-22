@@ -21,6 +21,7 @@ import {
   SelectField,
   TopBar,
 } from '@/components/ui';
+import { kodeKelasDari, OPSI_KELAS } from '@/constants/kelas';
 import { Palette } from '@/constants/theme';
 import { useLabs } from '@/hooks/use-labs';
 import { useSessions } from '@/hooks/use-sessions';
@@ -114,7 +115,8 @@ function JadwalFormContent({
   // Field states
   const [praktikum, setPraktikum] = useState(initial?.praktikum ?? '');
   const [labIdState, setLabIdState] = useState<string | null>(initial?.labId ?? null);
-  const [kelasLab, setKelasLab] = useState(initial?.kelasLab ?? '');
+  // Kelas memakai kode baku (A1–F2). Sesi lama berteks bebas yang tidak cocok harus dipilih ulang.
+  const [kelasLab, setKelasLab] = useState(kodeKelasDari(initial?.kelasLab) ?? '');
 
   // Date and Time states (Date objects for DateTimeField)
   const [tanggalDate, setTanggalDate] = useState<Date>(() =>
@@ -191,11 +193,33 @@ function JadwalFormContent({
     setPesertaIds([]);
   }
 
+  // Memilih kelas langsung mengisi peserta dengan semua praktikan kelas itu.
+  // Tabel di langkah 3 tetap bisa dipakai untuk menambah/mengurangi (mis. praktikan pindahan).
+  function pilihKelas(kelas: string) {
+    if (error) setError(null);
+    if (kelas === kelasLab) return;
+    setKelasLab(kelas);
+    const anggota = praktikanList.filter((p) => p.kelas === kelas).map((p) => p.id);
+    setPesertaIds(anggota);
+    setHalamanPeserta(0);
+    if (anggota.length === 0) {
+      tampilkanToast(
+        `Belum ada praktikan yang memilih kelas ${kelas}. Peserta bisa dipilih manual di langkah 3.`,
+        'info',
+        'Kelas masih kosong'
+      );
+    }
+  }
+
+  const jumlahAnggotaKelas = kelasLab
+    ? praktikanList.filter((p) => p.kelas === kelasLab).length
+    : 0;
+
   // Validasi per langkah supaya kesalahan ketahuan sebelum pindah ke langkah berikutnya.
   function validasiLangkah(l: Langkah): string | null {
     if (l === 1) {
       if (!praktikum.trim()) return 'Nama praktikum wajib diisi';
-      if (!kelasLab.trim()) return 'Kelas praktikum wajib diisi';
+      if (!kelasLab) return 'Pilih kelas praktikum';
     }
     if (l === 2) {
       if (!labId) return 'Laboratorium wajib dipilih';
@@ -338,16 +362,20 @@ function JadwalFormContent({
               error={error && !praktikum.trim() ? 'Wajib diisi' : undefined}
             />
 
-            <TextField
-              label="Kelas"
-              value={kelasLab}
-              onChangeText={(text) => {
-                setKelasLab(text);
-                if (error) setError(null);
-              }}
-              placeholder="Contoh: Kelas A / Sesi 1"
-              error={error && !kelasLab.trim() ? 'Wajib diisi' : undefined}
-            />
+            <View>
+              <SelectField
+                label="Kelas"
+                value={kelasLab}
+                options={OPSI_KELAS}
+                onSelect={pilihKelas}
+                error={Boolean(error && !kelasLab)}
+              />
+              {kelasLab ? (
+                <Text style={styles.kelasInfo}>
+                  {jumlahAnggotaKelas} praktikan kelas {kelasLab} otomatis jadi peserta
+                </Text>
+              ) : null}
+            </View>
           </GlassCard>
           ) : null}
 
@@ -433,6 +461,7 @@ function JadwalFormContent({
                 <Text style={styles.cardSectionHeader}>Peserta Praktikum</Text>
                 <Text style={styles.pesertaCounter}>
                   {pesertaIds.length} praktikan terpilih
+                  {kelasLab ? ` · otomatis dari kelas ${kelasLab}` : ''}
                 </Text>
               </View>
               <View style={styles.pesertaActionButtons}>
@@ -472,6 +501,7 @@ function JadwalFormContent({
                 <View style={styles.tabelHeader}>
                   <View style={styles.tabelKolomCek} />
                   <Text style={[styles.tabelJudul, styles.tabelKolomNama]}>Nama</Text>
+                  <Text style={[styles.tabelJudul, styles.tabelKolomKelas]}>Kelas</Text>
                   <Text style={[styles.tabelJudul, styles.tabelKolomNim]}>NIM</Text>
                 </View>
                 {pesertaHalamanIni.map((p) => {
@@ -495,6 +525,9 @@ function JadwalFormContent({
                       </View>
                       <Text style={[styles.tabelTeks, styles.tabelKolomNama]} numberOfLines={1}>
                         {p.nama}
+                      </Text>
+                      <Text style={[styles.tabelTeksNim, styles.tabelKolomKelas]} numberOfLines={1}>
+                        {p.kelas ?? '–'}
                       </Text>
                       <Text style={[styles.tabelTeksNim, styles.tabelKolomNim]} numberOfLines={1}>
                         {p.nim}
@@ -702,7 +735,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   tabelBarisTerpilih: {
-    backgroundColor: Palette.primaryMuted,
+    backgroundColor: '#F7F6FB',
   },
   tabelKolomCek: {
     width: 32,
@@ -711,9 +744,19 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 8,
   },
+  tabelKolomKelas: {
+    textAlign: 'center',
+    width: 44,
+  },
   tabelKolomNim: {
     textAlign: 'right',
-    width: 128,
+    width: 116,
+  },
+  kelasInfo: {
+    color: Palette.textSecondary,
+    fontSize: 12,
+    marginTop: 6,
+    paddingHorizontal: 4,
   },
   tabelTeks: {
     color: Palette.text,
@@ -735,8 +778,8 @@ const styles = StyleSheet.create({
     width: 20,
   },
   kotakCekAktif: {
-    backgroundColor: Palette.primary,
-    borderColor: Palette.primary,
+    backgroundColor: Palette.ink,
+    borderColor: Palette.ink,
   },
   paginasi: {
     alignItems: 'center',

@@ -21,6 +21,9 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
 const AWALAN = 'uji-';
+// Kelas uji: praktikan utama dan teman uji ada di kelas ini, jadi Tambah Sesi kelas D1
+// langsung mengisi mereka sebagai peserta.
+const KELAS_UJI = 'D1';
 const KODE_SESI_UJI = '123456';
 const KOLEKSI = [
   'sessions',
@@ -94,7 +97,7 @@ async function cariAkun(email, peranDiharapkan) {
   if (data.role !== peranDiharapkan) {
     throw new Error(`Akun ${email} berperan "${data.role}", bukan "${peranDiharapkan}".`);
   }
-  return { uid: akun.uid, nama: data.nama ?? email };
+  return { uid: akun.uid, nama: data.nama ?? email, kelas: data.kelas };
 }
 
 async function isiData(emailAsisten, emailPraktikan) {
@@ -109,12 +112,15 @@ async function isiData(emailAsisten, emailPraktikan) {
 
   // Praktikan tambahan supaya rekap punya isi (bukan akun login sungguhan).
   const temanUji = [
-    { id: 'uji-praktikan-1', nama: 'Rizky Pratama (uji)', nim: '24060124990001' },
-    { id: 'uji-praktikan-2', nama: 'Siti Rahmawati (uji)', nim: '24060124990002' },
-    { id: 'uji-praktikan-3', nama: 'Dewi Kusuma (uji)', nim: '24060124990003' },
-    { id: 'uji-praktikan-4', nama: 'Joko Santoso (uji)', nim: '24060124990004' },
+    { id: 'uji-praktikan-1', nama: 'Rizky Pratama (uji)', nim: '24060124990001', kelas: KELAS_UJI },
+    { id: 'uji-praktikan-2', nama: 'Siti Rahmawati (uji)', nim: '24060124990002', kelas: KELAS_UJI },
+    { id: 'uji-praktikan-3', nama: 'Dewi Kusuma (uji)', nim: '24060124990003', kelas: KELAS_UJI },
+    { id: 'uji-praktikan-4', nama: 'Joko Santoso (uji)', nim: '24060124990004', kelas: KELAS_UJI },
+    // Kelas lain supaya terlihat bahwa memilih D1 tidak ikut memilih mereka.
+    { id: 'uji-praktikan-5', nama: 'Bagus Wijaya (uji)', nim: '24060124990005', kelas: 'D2' },
+    { id: 'uji-praktikan-6', nama: 'Nadia Putri (uji)', nim: '24060124990006', kelas: 'C1' },
   ];
-  const teman = temanUji.map((t) => t.id);
+  const teman = temanUji.filter((t) => t.kelas === KELAS_UJI).map((t) => t.id);
   const semuaPeserta = [praktikan.uid, ...teman];
 
   const sesiDasar = {
@@ -127,34 +133,34 @@ async function isiData(emailAsisten, emailPraktikan) {
   // Tiap sesi menguji satu keadaan di aplikasi.
   const sesi = [
     // Presensi praktikan (QR / kode 123456), Kelola Sesi "dibuka", Timeline "Dibuka".
-    { id: 'uji-dibuka-sekarang', praktikum: 'Pemrograman Mobile', kelasLab: 'Kelas A', labId: 'dekanat-fsm',
+    { id: 'uji-dibuka-sekarang', praktikum: 'Pemrograman Mobile', kelasLab: 'D1', labId: 'dekanat-fsm',
       tanggal: tanggal(0), jamMulai: jam(-30), jamSelesai: jam(90), status: 'dibuka' },
     // Tombol Buka Sesi (asisten) dan "Sesi Belum Dibuka" (praktikan).
-    { id: 'uji-belum-dibuka-nanti', praktikum: 'Basis Data', kelasLab: 'Kelas B', labId: 'lab-informatika-b',
+    { id: 'uji-belum-dibuka-nanti', praktikum: 'Basis Data', kelasLab: 'D1', labId: 'lab-informatika-b',
       tanggal: tanggal(0), jamMulai: jam(180), jamSelesai: jam(300), status: 'belum_dibuka' },
     // Rekap: Hadir.
-    { id: 'uji-kemarin-hadir', praktikum: 'Jaringan Komputer', kelasLab: 'Kelas A', labId: 'lab-informatika-c',
+    { id: 'uji-kemarin-hadir', praktikum: 'Jaringan Komputer', kelasLab: 'D1', labId: 'lab-informatika-c',
       tanggal: tanggal(-1), jamMulai: '08:00', jamSelesai: '10:00', status: 'ditutup' },
     // Rekap: Sakit (izin sakit diterima).
-    { id: 'uji-lalu-sakit', praktikum: 'Struktur Data', kelasLab: 'Kelas C', labId: 'lab-informatika-d',
+    { id: 'uji-lalu-sakit', praktikum: 'Struktur Data', kelasLab: 'D1', labId: 'lab-informatika-d',
       tanggal: tanggal(-3), jamMulai: '13:00', jamSelesai: '15:00', status: 'ditutup' },
     // Rekap: Izin (izin biasa diterima).
-    { id: 'uji-lalu-izin', praktikum: 'Pemrograman Web', kelasLab: 'Kelas A', labId: 'dekanat-fsm',
+    { id: 'uji-lalu-izin', praktikum: 'Pemrograman Web', kelasLab: 'D1', labId: 'dekanat-fsm',
       tanggal: tanggal(-5), jamMulai: '10:00', jamSelesai: '12:00', status: 'ditutup' },
     // Rekap: Alpha (izin ditolak dan tidak hadir).
-    { id: 'uji-lalu-alpha', praktikum: 'Sistem Operasi', kelasLab: 'Kelas B', labId: 'lab-informatika-b',
+    { id: 'uji-lalu-alpha', praktikum: 'Sistem Operasi', kelasLab: 'D1', labId: 'lab-informatika-b',
       tanggal: tanggal(-7), jamMulai: '08:00', jamSelesai: '10:00', status: 'ditutup' },
     // Pemeriksaan izin (menunggu) dan pelacak izin "Diperiksa".
-    { id: 'uji-besok-izin-menunggu', praktikum: 'Kecerdasan Buatan', kelasLab: 'Kelas A', labId: 'lab-informatika-c',
+    { id: 'uji-besok-izin-menunggu', praktikum: 'Kecerdasan Buatan', kelasLab: 'D1', labId: 'lab-informatika-c',
       tanggal: tanggal(1), jamMulai: '09:00', jamSelesai: '11:00', status: 'belum_dibuka' },
     // Ajukan izin baru (belum ada pengajuan).
-    { id: 'uji-lusa-bebas', praktikum: 'Interaksi Manusia Komputer', kelasLab: 'Kelas B', labId: 'lab-informatika-d',
+    { id: 'uji-lusa-bebas', praktikum: 'Interaksi Manusia Komputer', kelasLab: 'D1', labId: 'lab-informatika-d',
       tanggal: tanggal(2), jamMulai: '13:00', jamSelesai: '15:00', status: 'belum_dibuka' },
   ].map((s) => ({ ...sesiDasar, ...s }));
 
   // Sesi milik asisten lain: Peta asisten menampilkan "Bukan sesimu".
   sesi.push({
-    id: 'uji-asisten-lain', praktikum: 'Grafika Komputer', kelasLab: 'Kelas D', labId: 'lab-informatika-c',
+    id: 'uji-asisten-lain', praktikum: 'Grafika Komputer', kelasLab: 'D1', labId: 'lab-informatika-c',
     tanggal: tanggal(0), jamMulai: jam(-15), jamSelesai: jam(105), status: 'dibuka',
     asistenId: 'uji-asisten-lain', asistenNama: 'Rani (uji)', pesertaIds: teman,
     updatedAt: new Date().toISOString(),
@@ -203,7 +209,7 @@ async function isiData(emailAsisten, emailPraktikan) {
 
   const notifications = [
     { id: 'uji-notif-1', type: 'sesi_dibuka', sessionId: 'uji-dibuka-sekarang',
-      title: 'Sesi Pemrograman Mobile dibuka', body: 'Kelas A di Dekanat FSM. Segera lakukan presensi.',
+      title: 'Sesi Pemrograman Mobile dibuka', body: 'Kelas D1 di Dekanat FSM. Segera lakukan presensi.',
       createdAt: new Date(Date.now() - 30 * 60000).toISOString(), readBy: [] },
     { id: 'uji-notif-2', type: 'izin_diterima', sessionId: 'uji-lalu-sakit',
       title: 'Izin diterima', body: `Izin untuk Struktur Data diterima oleh ${asisten.nama}.`,
@@ -216,9 +222,13 @@ async function isiData(emailAsisten, emailPraktikan) {
   const batch = db.batch();
   temanUji.forEach((t) =>
     batch.set(db.collection('users').doc(t.id), {
-      nama: t.nama, nim: t.nim, role: 'praktikan', email: `${t.id}@contoh.test`,
+      nama: t.nama, nim: t.nim, role: 'praktikan', email: `${t.id}@contoh.test`, kelas: t.kelas,
     }),
   );
+  // Praktikan utama ikut kelas uji (hanya bila belum memilih kelas sendiri).
+  if (!praktikan.kelas) {
+    batch.update(db.collection('users').doc(praktikan.uid), { kelas: KELAS_UJI });
+  }
   sesi.forEach(({ id, ...data }) => batch.set(db.collection('sessions').doc(id), data));
   sesi
     .filter((s) => s.status === 'dibuka')

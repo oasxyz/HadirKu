@@ -4,7 +4,8 @@ import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } fro
 
 import { IlustrasiSapaan } from '@/components/ilustrasi';
 import { TextField } from '@/components/text-field';
-import { Chip, GlassCard, Screen, TopBar } from '@/components/ui';
+import { Chip, GlassCard, Screen, SelectField, TopBar } from '@/components/ui';
+import { OPSI_KELAS } from '@/constants/kelas';
 import { useToast } from '@/components/toast';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
@@ -19,6 +20,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('praktikan');
+  const [kelas, setKelas] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
@@ -40,6 +42,11 @@ export default function RegisterScreen() {
       return;
     }
 
+    if (role === 'praktikan' && !kelas) {
+      setError('Pilih kelas praktikummu');
+      return;
+    }
+
     if (password.length < 6) {
       setError('Kata sandi minimal 6 karakter');
       return;
@@ -54,6 +61,7 @@ export default function RegisterScreen() {
         email,
         password,
         role,
+        kelas: role === 'praktikan' ? kelas : undefined,
       });
       // Pendaftaran sukses & otomatis login -> langsung arahkan ke beranda
       router.replace('/jadwal' as Href);
@@ -145,6 +153,17 @@ export default function RegisterScreen() {
               </View>
               <Text style={styles.roleHint}>Peran tidak bisa diubah setelah mendaftar.</Text>
             </View>
+
+            {/* Kelas menentukan sesi praktikum yang otomatis diikuti praktikan. */}
+            {role === 'praktikan' ? (
+              <SelectField
+                label="Kelas Praktikum"
+                value={kelas}
+                options={OPSI_KELAS}
+                onSelect={setKelas}
+                error={Boolean(error && !kelas)}
+              />
+            ) : null}
           </View>
 
           <Pressable
