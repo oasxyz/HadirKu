@@ -87,6 +87,35 @@ export function sedangBerlangsung(session: Session, sekarang: Date): boolean {
   return sekarang >= mulai && sekarang < selesai;
 }
 
+export type BarisJadwal =
+  | { jenis: 'sesi'; session: Session }
+  | { jenis: 'kosong'; mulai: string; selesai: string };
+
+/**
+ * Jadwal satu lab pada satu tanggal, urut jam mulai, dengan jeda antar-sesi sebagai "kosong".
+ * Jeda hanya dihitung di antara sesi (tidak ada jam operasional lab di data). Sesi yang
+ * bertumpuk (bentrok) tetap ditampilkan berurutan tanpa baris kosong di antaranya.
+ */
+export function jadwalLabPadaTanggal(sessions: Session[], labId: string, tanggal: string): BarisJadwal[] {
+  const urut = sessions
+    .filter((session) => session.labId === labId && session.tanggal === tanggal)
+    .sort((a, b) => a.jamMulai.localeCompare(b.jamMulai) || a.jamSelesai.localeCompare(b.jamSelesai));
+
+  const baris: BarisJadwal[] = [];
+  let selesaiTerakhir: string | null = null;
+  urut.forEach((session) => {
+    // Format HH:mm bisa dibandingkan sebagai teks.
+    if (selesaiTerakhir !== null && session.jamMulai > selesaiTerakhir) {
+      baris.push({ jenis: 'kosong', mulai: selesaiTerakhir, selesai: session.jamMulai });
+    }
+    baris.push({ jenis: 'sesi', session });
+    if (selesaiTerakhir === null || session.jamSelesai > selesaiTerakhir) {
+      selesaiTerakhir = session.jamSelesai;
+    }
+  });
+  return baris;
+}
+
 export type AktivitasLab = {
   berlangsung: Session[];
   berikutnya: Session | null;

@@ -239,7 +239,7 @@ export default function PetaScreen() {
           />
         </View>
       ) : kondisi ? (
-        <GlassCard style={[styles.bottom, { bottom: bawah }]}>{kondisi}</GlassCard>
+        <GlassCard style={[styles.bottom, styles.kartuPutih, { bottom: bawah }]}>{kondisi}</GlassCard>
       ) : null}
     </View>
   );
@@ -250,6 +250,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    // Lebih putih dari GlassCard biasa supaya tidak bercampur dengan peta di belakangnya.
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     gap: 12,
     left: 14,
     padding: 14,
@@ -285,7 +287,11 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
+  kartuPutih: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+  },
   memuatCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     alignItems: 'center',
     flexDirection: 'row',
     gap: 10,
