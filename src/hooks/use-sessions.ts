@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { useCurrentUser } from '@/context/auth-context';
 import { db, COLLECTIONS } from '@/services/firebase';
 import type { Attendance, Coordinates, Session } from '@/types';
+import { waktuIsoAtauSekarang } from '@/utils/waktu';
 
 type SessionsState = {
   userId: string | null;
@@ -128,8 +129,12 @@ export function useSessions() {
             id: d.id,
             sessionId: data.sessionId,
             userId: data.userId,
-            waktuPresensi: data.waktuPresensi,
+            // Sprint 3 menulis serverTimestamp(); diseragamkan ke ISO string.
+            waktuPresensi: waktuIsoAtauSekarang(data.waktuPresensi),
             jarakMeter: typeof data.jarakMeter === 'number' ? data.jarakMeter : null,
+            radiusSaatPresensi:
+              typeof data.radiusSaatPresensi === 'number' ? data.radiusSaatPresensi : undefined,
+            metode: data.metode === 'qr' || data.metode === 'kode' ? data.metode : undefined,
           });
         });
         setAttendanceState({ userId: currentUser.id, attendances: list });
