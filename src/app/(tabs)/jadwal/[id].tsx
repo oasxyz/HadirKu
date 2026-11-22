@@ -1,47 +1,68 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AttendanceAction } from '@/components/attendance-action';
+import { LocationCheckCard } from '@/components/location-check-card';
 import SessionControls from '@/components/session-controls';
 import { StatusBadge } from '@/components/status-badge';
 import {
   Avatar,
   Chip,
+  DeviceStatusCard,
   EmptyNote,
   GlassCard,
+  Illustration,
   RoundButton,
   Screen,
   SectionTitle,
   TopBar,
 } from '@/components/ui';
-import { Palette } from '@/constants/theme';
+import { Palette, Spacing } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
+import { useLeaveRequests } from '@/hooks/use-leave-requests';
+import { useLocationValidation } from '@/hooks/useLocationValidation';
 import { useSessions } from '@/hooks/use-sessions';
 import { usePraktikanList } from '@/hooks/use-users';
 import { formatRentangJam, formatTanggal } from '@/utils/format';
+import { sesiSudahBerakhir } from '@/utils/sesi';
 
 export default function SesiDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const currentUser = useCurrentUser();
   const { sessions, attendances, deleteSession } = useSessions();
   const { praktikanList } = usePraktikanList();
+  const { leaveRequests } = useLeaveRequests();
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const session = sessions.find((item) => item.id === id);
   const isAsisten = currentUser?.role === 'asisten';
+  const locationState = useLocationValidation(session?.labId);
 
   if (!session) {
     return (
-      <Screen>
-        <TopBar title="Detail Sesi" back fallback="/jadwal" />
+      <Screen header={<TopBar title="Detail Sesi" back fallback="/jadwal" />}>
         <EmptyNote message="Sesi praktikum tidak ditemukan atau telah dihapus." />
       </Screen>
     );
   }
+
+  const currentUserId = currentUser?.id ?? '';
+  const isPeserta = session.pesertaIds.includes(currentUserId);
+  const myAttendance = attendances.find(
+    (a) => a.sessionId === session.id && a.userId === currentUserId,
+  );
+  const myLeave = leaveRequests.find(
+    (lr) =>
+      lr.sessionId === session.id &&
+      lr.userId === currentUserId &&
+      (lr.status === 'menunggu' || lr.status === 'diterima'),
+  );
+  const sesiBerakhir = sesiSudahBerakhir(session);
+  const isDitutup = session.status === 'ditutup' || sesiBerakhir;
 
   // Nama asisten disalin ke dokumen sesi saat sesi dibuat (denormalisasi), sehingga
   // praktikan tidak perlu membaca dokumen users asisten (dilarang firestore.rules).
@@ -75,26 +96,27 @@ export default function SesiDetailScreen() {
   }
 
   return (
-    <Screen>
-      <TopBar
-        title="Detail Sesi"
-        back
-        fallback="/jadwal"
-        right={
-          isAsisten && session.status !== 'ditutup' ? (
-            <RoundButton
-              icon="create-outline"
-              onPress={() =>
-                router.push({
-                  pathname: '/jadwal/form' as any,
-                  params: { id: session.id },
-                })
-              }
-            />
-          ) : null
-        }
-      />
-
+    <Screen
+      header={
+        <TopBar
+          title="Detail Sesi"
+          back
+          fallback="/jadwal"
+          right={
+            isAsisten && session.status !== 'ditutup' ? (
+              <RoundButton
+                icon="create-outline"
+                onPress={() =>
+                  router.push({
+                    pathname: '/jadwal/form' as any,
+                    params: { id: session.id },
+                  })
+                }
+              />
+            ) : null
+          }
+        />
+      }>
       <View style={styles.person}>
         <View style={styles.personText}>
           <Text style={styles.personRole}>Asisten Pembimbing</Text>
@@ -123,18 +145,77 @@ export default function SesiDetailScreen() {
         <Ionicons name="flask" size={64} color="rgba(226, 27, 208, 0.35)" />
       </View>
 
-      {/* Komponen Sesi & Presensi (PIC B & C) */}
+      {/* Komponen Sesi (Asisten) atau Presensi (Praktikan) */}
       <SectionTitle title={isAsisten ? 'Kelola Sesi' : 'Presensi'} />
       {isAsisten ? (
         <SessionControls sessionId={session.id} />
       ) : (
-<AttendanceAction
-  sessionId={session.id}
-  session={session}
-  jarakMeter={null}
-  radiusMeter={null}
-  locked={false}
-/>      )}
+        <View style={{ gap: Spacing.two }}>
+          {!isPeserta ? (
+            <DeviceStatusCard
+              title="Bukan Peserta"
+              message="Anda tidak terdaftar sebagai praktikan pada sesi praktikum ini."
+              tone="warning"
+              icon="person-remove-outline"
+            />
+          ) : myAttendance ? (
+            <GlassCard style={styles.successCard}>
+              <Illustration icon="checkmark-circle" />
+              <Text style={styles.successTitle}>Sudah Hadir</Text>
+              <Text style={styles.successSubtitle}>
+                Tercatat pada{' '}
+                {new Date(myAttendance.waktuPresensi).toLocaleTimeString('id-ID', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
+            </GlassCard>
+          ) : myLeave ? (
+            <DeviceStatusCard
+              title={
+                myLeave.status === 'diterima'
+                  ? 'Izin Diterima'
+                  : 'Pengajuan Izin Sedang Diproses'
+              }
+              message={
+                myLeave.status === 'diterima'
+                  ? 'Pengajuan izin Anda telah diterima untuk sesi ini. Presensi tidak diperlukan.'
+                  : 'Pengajuan izin Anda sedang menunggu konfirmasi asisten. Fitur presensi untuk sesi ini terkunci.'
+              }
+              tone="warning"
+              icon="document-text-outline"
+            />
+          ) : isDitutup ? (
+            <DeviceStatusCard
+              title="Sesi Sudah Ditutup"
+              message="Presensi untuk sesi praktikum ini telah berakhir."
+              tone="danger"
+              icon="lock-closed-outline"
+            />
+          ) : session.status === 'belum_dibuka' ? (
+            <DeviceStatusCard
+              title="Sesi Belum Dibuka"
+              message="Asisten belum membuka sesi presensi. Silakan tunggu sampai sesi dibuka."
+              tone="warning"
+              icon="hourglass-outline"
+            />
+          ) : (
+            <View style={{ gap: Spacing.two }}>
+              <LocationCheckCard
+                state={locationState}
+                onOpenSettings={() => Linking.openSettings()}
+              />
+              <AttendanceAction
+                sessionId={session.id}
+                session={session}
+                jarakMeter={locationState.jarakMeter}
+                radiusMeter={locationState.labRadiusMeter}
+                locked={!locationState.canAttend}
+              />
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Rekap Kehadiran untuk Asisten */}
       {isAsisten ? (
@@ -386,5 +467,25 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  successCard: {
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 24,
+  },
+  successTitle: {
+    color: Palette.text,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  successSubtitle: {
+    color: Palette.textMuted,
+    fontSize: 13,
+  },
+  presensiHint: {
+    color: Palette.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
 });

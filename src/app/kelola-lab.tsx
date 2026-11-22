@@ -188,13 +188,13 @@ export default function KelolaLabScreen() {
   }
 
   return (
-    <Screen withTabBar={false}>
+    <Screen
+      withTabBar={false}
+      header={<TopBar title="Kelola Lokasi Lab" back fallback="/jadwal" />}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <TopBar title="Kelola Lokasi Lab" back fallback="/jadwal" />
-
         {loading ? (
           <GlassCard style={styles.loadingCard}>
             <ActivityIndicator size="small" color={Palette.primary} />

@@ -23,15 +23,34 @@ export function initials(nama: string): string {
   return nama.replace(/\(.*?\)/g, '').trim().split(/\s+/).slice(0, 2).map((kata) => kata[0]?.toUpperCase() ?? '').join('');
 }
 
-export function Screen({ children, withTabBar = true }: { children: React.ReactNode; withTabBar?: boolean }) {
+export function Screen({
+  children,
+  header,
+  withTabBar = true,
+}: {
+  children: React.ReactNode;
+  header?: React.ReactNode;
+  withTabBar?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.screen, gradientStyle]}>
+      {header ? (
+        <View style={[styles.fixedHeader, { paddingTop: insets.top + 14 }]}>
+          {header}
+        </View>
+      ) : null}
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets={true}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + (withTabBar ? TAB_BAR_SPACE : 32) }]}>
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: header ? 14 : insets.top + 18,
+            paddingBottom: insets.bottom + (withTabBar ? TAB_BAR_SPACE : 32),
+          },
+        ]}>
         {children}
       </ScrollView>
     </View>
@@ -270,6 +289,14 @@ export function DeviceStatusCard({ title, message, tone = 'warning', actionLabel
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  fixedHeader: {
+    alignSelf: 'center',
+    maxWidth: 520,
+    paddingHorizontal: 20,
+    width: '100%',
+    zIndex: 100,
+    paddingBottom: 8,
+  },
   content: { alignSelf: 'center', gap: 18, maxWidth: 520, paddingHorizontal: 20, width: '100%' },
   pressed: { opacity: 0.7 },
   roundButton: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.78)', borderColor: 'rgba(255, 255, 255, 0.95)', borderRadius: 999, borderWidth: 1, boxShadow: shadow, justifyContent: 'center' },

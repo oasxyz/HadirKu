@@ -46,6 +46,21 @@ export function useLeaveRequests() {
         const list: LeaveRequest[] = [];
         snapshot?.forEach((d) => {
           const data = d.data();
+
+          let createdAtStr = new Date().toISOString();
+          if (typeof data.createdAt === 'string') {
+            createdAtStr = data.createdAt;
+          } else if (data.createdAt && typeof data.createdAt.toDate === 'function') {
+            createdAtStr = data.createdAt.toDate().toISOString();
+          }
+
+          let diputuskanAtStr: string | null = null;
+          if (typeof data.diputuskanAt === 'string') {
+            diputuskanAtStr = data.diputuskanAt;
+          } else if (data.diputuskanAt && typeof data.diputuskanAt.toDate === 'function') {
+            diputuskanAtStr = data.diputuskanAt.toDate().toISOString();
+          }
+
           list.push({
             id: d.id,
             sessionId: data.sessionId,
@@ -53,9 +68,9 @@ export function useLeaveRequests() {
             alasan: data.alasan ?? '',
             kategoriAi: data.kategoriAi ?? null,
             status: data.status ?? 'menunggu',
-            createdAt: data.createdAt ?? new Date().toISOString(),
+            createdAt: createdAtStr,
             diputuskanOleh: data.diputuskanOleh ?? null,
-            diputuskanAt: data.diputuskanAt ?? null,
+            diputuskanAt: diputuskanAtStr,
           });
         });
         setState({

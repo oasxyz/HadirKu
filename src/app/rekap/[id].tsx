@@ -68,8 +68,9 @@ export default function RekapDetailScreen() {
 
   if (sessionsLoading || usersLoading || izinLoading) {
     return (
-      <Screen withTabBar={false}>
-        <TopBar title="Rekap" back fallback="/rekap" />
+      <Screen
+        withTabBar={false}
+        header={<TopBar title="Rekap" back fallback="/rekap" />}>
         <GlassCard style={styles.loadingCard}>
           <ActivityIndicator size="large" color={Palette.primary} />
           <Text style={styles.loadingText}>Memuat...</Text>
@@ -80,8 +81,9 @@ export default function RekapDetailScreen() {
 
   if (error) {
     return (
-      <Screen withTabBar={false}>
-        <TopBar title="Rekap" back fallback="/rekap" />
+      <Screen
+        withTabBar={false}
+        header={<TopBar title="Rekap" back fallback="/rekap" />}>
         <EmptyNote
           icon="cloud-offline-outline"
           message="Tidak ada koneksi internet. Terjadi kesalahan, coba lagi."
@@ -94,8 +96,9 @@ export default function RekapDetailScreen() {
 
   if (!session) {
     return (
-      <Screen withTabBar={false}>
-        <TopBar title="Rekap" back fallback="/rekap" />
+      <Screen
+        withTabBar={false}
+        header={<TopBar title="Rekap" back fallback="/rekap" />}>
         <EmptyNote message="Sesi tidak ditemukan." />
       </Screen>
     );
@@ -157,9 +160,9 @@ export default function RekapDetailScreen() {
     : peserta;
 
   return (
-    <Screen withTabBar={false}>
-      <TopBar title="Rekap" back fallback="/rekap" />
-
+    <Screen
+      withTabBar={false}
+      header={<TopBar title="Rekap" back fallback="/rekap" />}>
       <View style={styles.titleBlock}>
         <Text style={styles.title}>{session.praktikum}</Text>
         <View style={styles.chips}>

@@ -115,7 +115,8 @@ service cloud.firestore {
     // ID dokumen deterministik = sessionId_uid, sehingga presensi ganda otomatis ditolak.
     // Menjamin integritas hard-blocking: jarakMeter <= radiusSaatPresensi (jika data radius dikirim).
     match /attendances/{attendanceId} {
-      allow read: if isAsisten() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow read: if isAsisten()
+        || (signedIn() && (resource == null || resource.data.userId == request.auth.uid));
 
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
@@ -138,7 +139,8 @@ service cloud.firestore {
     // Koleksi Leave Requests
     // ID dokumen deterministik: sessionId_uid
     match /leaveRequests/{requestId} {
-      allow read: if isAsisten() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow read: if isAsisten()
+        || (signedIn() && (resource == null || resource.data.userId == request.auth.uid));
 
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid

@@ -63,8 +63,9 @@ export default function JadwalFormRoute() {
 
   if (id && sessionsLoading) {
     return (
-      <Screen withTabBar={false}>
-        <TopBar title="Ubah Sesi Praktikum" back fallback="/jadwal" />
+      <Screen
+        withTabBar={false}
+        header={<TopBar title="Ubah Sesi Praktikum" back fallback="/jadwal" />}>
         <GlassCard style={styles.loadingCard}>
           <ActivityIndicator size="large" color={Palette.primary} />
           <Text style={styles.loadingText}>Memuat sesi…</Text>
@@ -77,8 +78,9 @@ export default function JadwalFormRoute() {
 
   if (id && !existingSession) {
     return (
-      <Screen withTabBar={false}>
-        <TopBar title="Ubah Sesi Praktikum" back fallback="/jadwal" />
+      <Screen
+        withTabBar={false}
+        header={<TopBar title="Ubah Sesi Praktikum" back fallback="/jadwal" />}>
         <EmptyNote message="Sesi praktikum tidak ditemukan atau telah dihapus." />
       </Screen>
     );
@@ -262,17 +264,19 @@ function JadwalFormContent({
   }
 
   return (
-    <Screen withTabBar={false}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
+    <Screen
+      withTabBar={false}
+      header={
         <TopBar
           title={isEdit ? 'Ubah Sesi Praktikum' : 'Tambah Sesi Praktikum'}
           back
           fallback="/jadwal"
         />
-
+      }>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
         <View style={styles.formContainer}>
           {/* Card 1: Informasi Praktikum & Waktu */}
           <GlassCard style={styles.card}>
