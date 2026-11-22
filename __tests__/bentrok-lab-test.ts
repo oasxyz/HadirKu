@@ -1,6 +1,6 @@
 // Uji aturan: satu lab tidak boleh dipakai dua sesi pada jam yang tumpang tindih.
 import type { Session } from '@/types';
-import { cariBentrokLab } from '@/utils/bentrok-lab';
+import { cariBentrokAsisten, cariBentrokLab } from '@/utils/bentrok-lab';
 
 function sesi(data: Partial<Session>): Session {
   return {
@@ -57,5 +57,24 @@ describe('cariBentrokLab', () => {
 
   it('tanpa lab tidak dicek', () => {
     expect(cariBentrokLab(ada, rencana('10:00', '12:00', { labId: undefined }))).toBeNull();
+  });
+});
+
+describe('cariBentrokAsisten', () => {
+  const punyaku = [sesi({ id: 'mengajar', asistenId: 'aku', labId: 'lab-b' })];
+  const jadwal = (jamMulai: string, jamSelesai: string, tanggal = '2026-11-22') => ({ tanggal, jamMulai, jamSelesai });
+
+  it('asisten yang sama, jam tumpang tindih di lab lain → bentrok', () => {
+    expect(cariBentrokAsisten(punyaku, 'aku', jadwal('11:00', '13:00'))?.id).toBe('mengajar');
+  });
+
+  it('asisten lain di jam yang sama → bukan bentrok asisten', () => {
+    expect(cariBentrokAsisten(punyaku, 'orang-lain', jadwal('11:00', '13:00'))).toBeNull();
+  });
+
+  it('bersambung, hari lain, atau sesi yang sedang diubah → tidak bentrok', () => {
+    expect(cariBentrokAsisten(punyaku, 'aku', jadwal('12:00', '14:00'))).toBeNull();
+    expect(cariBentrokAsisten(punyaku, 'aku', jadwal('10:00', '12:00', '2026-11-23'))).toBeNull();
+    expect(cariBentrokAsisten(punyaku, 'aku', jadwal('10:30', '11:30'), 'mengajar')).toBeNull();
   });
 });

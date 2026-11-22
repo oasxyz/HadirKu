@@ -25,3 +25,27 @@ export function cariBentrokLab(
       .sort((a, b) => a.jamMulai.localeCompare(b.jamMulai))[0] ?? null
   );
 }
+
+/**
+ * Satu asisten hanya bisa mengajar satu sesi pada satu waktu (lab mana pun).
+ * Mengembalikan sesi asisten itu yang jamnya tumpang tindih dengan rencana.
+ */
+export function cariBentrokAsisten(
+  sessions: Session[],
+  asistenId: string,
+  rencana: Pick<Session, 'tanggal' | 'jamMulai' | 'jamSelesai'>,
+  abaikanId?: string,
+): Session | null {
+  return (
+    sessions
+      .filter(
+        (s) =>
+          s.id !== abaikanId &&
+          s.asistenId === asistenId &&
+          s.tanggal === rencana.tanggal &&
+          s.jamMulai < rencana.jamSelesai &&
+          rencana.jamMulai < s.jamSelesai,
+      )
+      .sort((a, b) => a.jamMulai.localeCompare(b.jamMulai))[0] ?? null
+  );
+}
