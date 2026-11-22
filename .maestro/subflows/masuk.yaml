@@ -1,14 +1,32 @@
 # Subflow: buka aplikasi dari keadaan bersih lalu masuk dengan email + kata sandi.
 # Dipanggil flow lain dengan env EMAIL dan SANDI (jangan tulis kata sandi di file).
+#
+# Development build (HP lewat USB/scrcpy + Metro): isi DEV_URL dengan alamat yang ditulis
+# Metro, mis. -e DEV_URL="exp+hadirku://expo-development-client/?url=http%3A%2F%2F192.168.1.5%3A8081".
+# APK preview: DEV_URL tidak perlu diisi.
 appId: com.oasxyz.HadirKu
 ---
 - launchApp:
     clearState: true
     permissions:
       all: allow
+# Development build: sambungkan ke Metro lewat tautan, lalu tutup pengenalan menu developer.
+- runFlow:
+    when:
+      true: ${DEV_URL || false}
+    commands:
+      - openLink: ${DEV_URL}
+      # clearState menghapus bundle yang tersimpan, jadi JS diunduh ulang dari Metro.
+      # Lewat --tunnel ini bisa lebih dari satu menit; tunggu sampai tulisan "Loading from" hilang.
+      - extendedWaitUntil:
+          notVisible: 'Loading from.*'
+          timeout: 300000
+      - tapOn:
+          text: "Continue"
+          optional: true
 - extendedWaitUntil:
     visible: "Masuk dengan Google"
-    timeout: 30000
+    timeout: 120000
 - tapOn: "nama@univ.ac.id"
 - inputText: ${EMAIL}
 - tapOn: "Masukkan kata sandi"

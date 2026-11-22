@@ -1,6 +1,7 @@
 # Praktikan: presensi dengan kode manual 123456 di sesi "Pemrograman Mobile" (Dekanat FSM).
-# Syarat: seeder baru dijalankan, dan appConfig.enforceMockLocationBlock = false selama uji,
-# karena lokasi dari setLocation dianggap lokasi palsu oleh aplikasi.
+# Syarat: seeder baru dijalankan.
+# Lokasi: di development build, flow menekan tombol "Simulasi Lokasi di Lab (Testing)" bila
+# posisi HP di luar radius. Di APK preview tombol itu tidak ada, jadi HP harus berada di lab.
 appId: com.oasxyz.HadirKu
 ---
 - runFlow:
@@ -8,10 +9,6 @@ appId: com.oasxyz.HadirKu
     env:
       EMAIL: ${PRAKTIKAN_EMAIL}
       SANDI: ${PRAKTIKAN_SANDI}
-# Koordinat Dekanat FSM; sesuaikan bila titik lab diubah di Kelola Lokasi Lab.
-- setLocation:
-    latitude: -7.0490375
-    longitude: 110.441484375
 - tapOn: "Buka detail sesi"
 - extendedWaitUntil:
     visible: "Presensi"
@@ -19,12 +16,15 @@ appId: com.oasxyz.HadirKu
 - scrollUntilVisible:
     element: "Perbarui Lokasi"
 - tapOn: "Perbarui Lokasi"
+- tapOn:
+    text: 'Simulasi Lokasi di Lab \(Testing\)'
+    optional: true
 - extendedWaitUntil:
     visible: "Di dalam radius"
     timeout: 20000
 - scrollUntilVisible:
-    element: "Kamera bermasalah? Ketik kode 6 digit"
-- tapOn: "Kamera bermasalah? Ketik kode 6 digit"
+    element: 'Kamera bermasalah\? Ketik kode 6 digit'
+- tapOn: 'Kamera bermasalah\? Ketik kode 6 digit'
 - inputText: "123456"
 - hideKeyboard
 - tapOn: "Kirim Presensi"
