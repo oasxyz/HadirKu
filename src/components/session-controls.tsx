@@ -42,7 +42,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
 
     if (sesiSudahBerakhir(session)) {
       tutupSesi()
-        .then(() => tampilkanToast('Sesi ditutup otomatis karena jam praktikum sudah lewat.', 'info'))
+        .then(() => tampilkanToast('Jam praktikum sudah lewat, presensi tidak lagi diterima.', 'info', 'Sesi ditutup otomatis'))
         .catch((error) => {
           Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI', error);
         });
@@ -53,7 +53,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
     const sisaWaktu = Math.max(0, batasTutup.getTime() - Date.now());
     const timer = setTimeout(() => {
       tutupSesi()
-        .then(() => tampilkanToast('Sesi ditutup otomatis karena jam praktikum sudah lewat.', 'info'))
+        .then(() => tampilkanToast('Jam praktikum sudah lewat, presensi tidak lagi diterima.', 'info', 'Sesi ditutup otomatis'))
         .catch((error) => {
           Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI_TIMER', error);
         });
@@ -130,14 +130,14 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
             Logger.error('FCM', 'NOTIF_SESI_DIBUKA', err)
           );
         }
-        tampilkanToast('Sesi dibuka. Praktikan sudah bisa presensi.');
+        tampilkanToast('Praktikan sudah bisa presensi dan diberi tahu lewat notifikasi.', 'sukses', 'Sesi dibuka');
       } else if (confirmation === 'close') {
         await tutupSesi();
-        tampilkanToast('Sesi ditutup.');
+        tampilkanToast('Presensi untuk sesi ini sudah tidak diterima.', 'sukses', 'Sesi ditutup');
       }
     } catch (error) {
       Logger.error('FIRESTORE', 'CONFIRM_SESSION_ACTION', error);
-      tampilkanToast('Gagal memperbarui sesi. Periksa koneksi internet lalu coba lagi.', 'error');
+      tampilkanToast('Periksa koneksi internet lalu coba lagi.', 'error', 'Sesi gagal diperbarui');
     } finally {
       setProcessing(false);
       isSubmittingRef.current = false;
@@ -183,12 +183,12 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
 
           <View style={styles.codeBox}>
             <Text style={styles.codeLabel}>ATAU KETIK KODE</Text>
-            <DigitBoxes value={kodeSesi ?? ''} color={Palette.primary} />
+            <DigitBoxes value={kodeSesi ?? ''} color={Palette.ink} />
           </View>
 
           <View style={styles.attendanceSummary}>
             <Text style={styles.attendanceText}>
-              {attendanceCount} praktikan sudah hadir
+              <Text style={styles.attendanceCount}>{attendanceCount}</Text> praktikan sudah hadir
             </Text>
           </View>
 
@@ -290,9 +290,10 @@ function ConfirmationModal({
 }
 
 const styles = StyleSheet.create({
+  // Kartu solid, latar sama dengan kartu lain di aplikasi.
   card: {
-    backgroundColor: Palette.card,
-    borderColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
     borderRadius: 24,
     borderWidth: 1,
     padding: Spacing.three,
@@ -301,6 +302,7 @@ const styles = StyleSheet.create({
   },
   openCard: {
     borderColor: Palette.primary,
+    borderWidth: 1.5,
   },
   closedCard: {
     borderColor: 'rgba(23, 21, 28, 0.3)',
@@ -328,7 +330,7 @@ const styles = StyleSheet.create({
   },
   codeBox: {
     alignItems: 'center',
-    backgroundColor: Palette.primaryMuted,
+    backgroundColor: '#FFFFFF',
     borderColor: Palette.border,
     borderRadius: 14,
     borderWidth: 1,
@@ -351,9 +353,13 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     fontSize: 13,
   },
+  attendanceCount: {
+    color: Palette.text,
+    fontWeight: '700',
+  },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: Palette.primary,
+    backgroundColor: Palette.ink,
     borderRadius: 999,
     flexDirection: 'row',
     gap: Spacing.two,
@@ -427,7 +433,7 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     alignItems: 'center',
-    backgroundColor: Palette.primary,
+    backgroundColor: Palette.ink,
     borderRadius: 999,
     flex: 1,
     justifyContent: 'center',

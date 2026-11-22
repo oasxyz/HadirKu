@@ -3,8 +3,9 @@ import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { IlustrasiLaptop } from '@/components/ilustrasi';
 import { TextField } from '@/components/text-field';
-import { GlassCard, PrimaryButton, Screen } from '@/components/ui';
+import { GlassCard, Screen } from '@/components/ui';
 import { useToast } from '@/components/toast';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
@@ -21,7 +22,7 @@ export default function LoginScreen() {
   // Pesan error tampil sebagai toast melayang di atas layar.
   const setError = (pesan: string | null) => {
     setErrorState(pesan);
-    if (pesan) tampilkanToast(pesan, 'error');
+    if (pesan) tampilkanToast(pesan, 'error', 'Gagal masuk');
   };
 
   async function handleLogin() {
@@ -70,17 +71,12 @@ export default function LoginScreen() {
 
   return (
     <Screen withTabBar={false}>
-      {/* Hero Visual 3 Busur + Badge */}
       <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1 }}>
+        {/* Banner lilac berilustrasi, gaya sama dengan kartu sesi di Beranda. */}
         <View style={styles.hero}>
-          <View style={[styles.arc, { width: 330, height: 330, top: 6, borderColor: '#DDD6EA' }]} />
-          <View style={[styles.arc, { width: 256, height: 256, top: 43, borderColor: '#C5B1E2' }]} />
-          <View style={[styles.arc, { width: 182, height: 182, top: 80, borderColor: '#EDA9E6' }]} />
-          <View style={styles.heroBadge}>
-            <Ionicons name="school" size={36} color={Palette.primary} />
-          </View>
+          <IlustrasiLaptop lebar={210} />
         </View>
 
         {/* Kartu Login */}
@@ -119,11 +115,17 @@ export default function LoginScreen() {
             />
           </View>
 
-          <PrimaryButton
-            label={loading ? 'Memproses…' : 'Masuk'}
+          <Pressable
             onPress={handleLogin}
             disabled={loading}
-          />
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.masukBtn,
+              loading && { opacity: 0.6 },
+              pressed && { opacity: 0.8 },
+            ]}>
+            <Text style={styles.masukBtnText}>{loading ? 'Memproses…' : 'Masuk'}</Text>
+          </Pressable>
 
           <Pressable
             onPress={handleGoogleLogin}
@@ -151,29 +153,34 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   hero: {
     alignItems: 'center',
-    height: 196,
+    borderRadius: 32,
+    experimental_backgroundImage:
+      'linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(244, 207, 239, 0.9) 100%)',
+    height: 210,
+    justifyContent: 'flex-end',
     overflow: 'hidden',
-  },
-  arc: {
-    borderRadius: 999,
-    borderWidth: 26,
-    position: 'absolute',
-  },
-  heroBadge: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    height: 84,
-    justifyContent: 'center',
-    position: 'absolute',
-    top: 102,
-    width: 84,
-  },
+    paddingBottom: 8,
+  } as object,
+  // Kartu solid, latar sama dengan kartu lain di aplikasi.
   sheet: {
-    borderRadius: 36,
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
+    borderRadius: 32,
     gap: 16,
-    marginTop: -18,
+    marginTop: 14,
     padding: 24,
+  },
+  masukBtn: {
+    alignItems: 'center',
+    backgroundColor: Palette.ink,
+    borderRadius: 999,
+    height: 56,
+    justifyContent: 'center',
+  },
+  masukBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   heading: {
     color: Palette.text,
@@ -184,25 +191,12 @@ const styles = StyleSheet.create({
   },
   headingBold: {
     fontWeight: '700',
-    color: Palette.primary,
+    color: Palette.text,
   },
   subtitle: {
     color: Palette.textSecondary,
     fontSize: 13,
     lineHeight: 19,
-    textAlign: 'center',
-  },
-  errorBox: {
-    backgroundColor: 'rgba(225, 29, 72, 0.08)',
-    borderColor: 'rgba(225, 29, 72, 0.3)',
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  errorText: {
-    color: Palette.danger,
-    fontSize: 13,
     textAlign: 'center',
   },
   form: {
@@ -236,8 +230,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   registerLink: {
-    color: Palette.primary,
+    color: Palette.text,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 
 import { ExpandableCalendar, toDateString } from '@/components/expandable-calendar';
+import { IlustrasiKosong, IlustrasiSurat } from '@/components/ilustrasi';
 import { KategoriIzinBadge } from '@/components/status-kehadiran-badge';
 import { useToast } from '@/components/toast';
 import {
@@ -35,7 +36,7 @@ import { classifyLeaveReason } from '@/services/ai';
 import { COLLECTIONS, getCompositeId } from '@/services/firebase';
 import type { LeaveRequest } from '@/types';
 import { normalizeLeaveCategory } from '@/types';
-import { formatTanggal } from '@/utils/format';
+import { formatTanggal, formatTanggalSingkat } from '@/utils/format';
 import { Logger, toUserErrorMessage } from '@/utils/logger';
 import { sesiSudahBerakhir } from '@/utils/sesi';
 
@@ -147,12 +148,12 @@ export function PengajuanIzin() {
       });
 
       resetForm();
-      tampilkanToast('Pengajuan izin terkirim. Menunggu keputusan asisten.');
+      tampilkanToast('Pantau statusnya di daftar pengajuan. Kamu akan diberi tahu saat asisten memutuskan.', 'sukses', 'Izin diajukan');
     } catch (err) {
       Logger.error('FIRESTORE', 'LeaveRequestCreate', err);
       // Form berada di dalam Modal (toast tertutup modal), jadi pesan juga tetap tampil di form.
       setErrorMsg(toUserErrorMessage(err));
-      tampilkanToast('Pengajuan izin gagal dikirim. Periksa koneksi internet lalu coba lagi.', 'error');
+      tampilkanToast('Periksa koneksi internet lalu coba lagi.', 'error', 'Izin gagal diajukan');
     } finally {
       setSubmitting(false);
     }
@@ -208,28 +209,41 @@ export function PengajuanIzin() {
         markedDates={markedDates}
       />
 
-      <Pressable
-        onPress={() => setShowForm(true)}
-        disabled={sesiBisaDiajukan.length === 0}
-        style={({ pressed }) => [
-          styles.addButton,
-          sesiBisaDiajukan.length === 0 && styles.addButtonDisabled,
-          pressed && { opacity: 0.8 },
-        ]}>
-        <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
-        <Text style={styles.addButtonText}>Ajukan Izin untuk Tanggal Ini</Text>
-      </Pressable>
-
-      {sesiBisaDiajukan.length === 0 && (
-        <Text style={styles.hint}>
-          Tidak ada sesi praktikum yang bisa diajukan izin di tanggal ini.
-        </Text>
-      )}
+      {/* Kartu ajukan berilustrasi; tombolnya mati bila tanggal ini tidak punya sesi yang bisa diizinkan. */}
+      <View style={styles.ajukanCard}>
+        <View style={styles.ajukanText}>
+          <Text style={styles.ajukanTitle}>
+            {sesiBisaDiajukan.length > 0
+              ? `Tidak bisa hadir ${formatTanggalSingkat(selectedDate)}?`
+              : formatTanggalSingkat(selectedDate)}
+          </Text>
+          <Text style={styles.ajukanSub}>
+            {sesiBisaDiajukan.length > 0
+              ? 'Ajukan izin sebelum sesi berakhir.'
+              : 'Tidak ada sesi yang bisa diajukan izin di tanggal ini.'}
+          </Text>
+          <Pressable
+            onPress={() => setShowForm(true)}
+            disabled={sesiBisaDiajukan.length === 0}
+            style={({ pressed }) => [
+              styles.addButton,
+              sesiBisaDiajukan.length === 0 && styles.addButtonDisabled,
+              pressed && { opacity: 0.8 },
+            ]}>
+            <Ionicons name="add" size={16} color="#FFFFFF" />
+            <Text style={styles.addButtonText}>Ajukan Izin</Text>
+          </Pressable>
+        </View>
+        <IlustrasiSurat lebar={92} />
+      </View>
 
       <SectionTitle title="Riwayat Pengajuan" />
 
       {sortedHistory.length === 0 ? (
-        <EmptyNote message="Belum ada pengajuan izin." />
+        <GlassCard style={styles.emptyCard}>
+          <IlustrasiKosong lebar={100} />
+          <Text style={styles.emptyText}>Belum ada pengajuan izin.</Text>
+        </GlassCard>
       ) : (
         <View style={{ gap: Spacing.two }}>
           {sortedHistory.map((item) => (
@@ -346,9 +360,18 @@ function IzinCard({
     item.status === 'diterima' ? 'Diterima' : item.status === 'ditolak' ? 'Ditolak' : 'Menunggu';
 
   const normalizedKategori = normalizeLeaveCategory(item.kategoriAi);
+  // Ringkas dulu; ketuk kartu untuk membuka alasan dan pelacak di tempat (tanpa pindah halaman).
+  // Pengajuan yang masih menunggu langsung terbuka supaya progresnya terlihat.
+  const [terbuka, setTerbuka] = useState(item.status === 'menunggu');
+
   return (
     <GlassCard style={styles.reqCard}>
-      <View style={styles.reqHeader}>
+      <Pressable
+        onPress={() => setTerbuka((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: terbuka }}
+        accessibilityHint={terbuka ? 'Ketuk untuk menutup detail' : 'Ketuk untuk melihat pelacakan izin'}
+        style={({ pressed }) => [styles.reqHeader, pressed && { opacity: 0.7 }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.reqTitle}>{sessionNama}</Text>
           {sessionTanggal ? (
@@ -356,27 +379,36 @@ function IzinCard({
           ) : null}
         </View>
         <Badge label={statusLabel} tone={statusTone} />
-      </View>
+        <Ionicons
+          name={terbuka ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={Palette.textMuted}
+        />
+      </Pressable>
 
-      <Text style={styles.reqAlasan}>{item.alasan}</Text>
+      {terbuka ? (
+        <View style={styles.reqDetail}>
+          <Text style={styles.reqAlasan}>{item.alasan}</Text>
 
-      <View style={styles.aiRow}>
-        <Text style={styles.aiLabel}>Kategori AI</Text>
-        <KategoriIzinBadge kategori={normalizedKategori} />
-      </View>
+          <View style={styles.aiRow}>
+            <Text style={styles.aiLabel}>Kategori AI</Text>
+            <KategoriIzinBadge kategori={normalizedKategori} />
+          </View>
 
-      <LacakIzin item={item} />
+          <LacakIzin item={item} />
 
-      {item.status !== 'menunggu' && item.diputuskanOleh && item.diputuskanAt ? (
-        <Text style={styles.decisionText}>
-          Diputuskan {item.diputuskanOleh} ·{' '}
-          {new Date(item.diputuskanAt).toLocaleString('id-ID', {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </Text>
+          {item.status !== 'menunggu' && item.diputuskanOleh && item.diputuskanAt ? (
+            <Text style={styles.decisionText}>
+              Diputuskan {item.diputuskanOleh} ·{' '}
+              {new Date(item.diputuskanAt).toLocaleString('id-ID', {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
     </GlassCard>
   );
@@ -477,25 +509,36 @@ const styles = StyleSheet.create({
   lacakLabelAktif: { color: Palette.text },
   lacakWaktu: { fontSize: 10, color: Palette.textMuted, textAlign: 'center' },
   centerCard: { alignItems: 'center', padding: Spacing.four, gap: Spacing.two },
+  ajukanCard: {
+    alignItems: 'center',
+    backgroundColor: Palette.infoMuted,
+    borderRadius: 24,
+    flexDirection: 'row',
+    gap: 4,
+    paddingLeft: 18,
+    paddingRight: 8,
+    paddingVertical: 16,
+  },
+  ajukanText: { flex: 1, alignItems: 'flex-start', gap: 4 },
+  ajukanTitle: { fontSize: 16, fontWeight: '700', color: Palette.text },
+  ajukanSub: { fontSize: 12, color: Palette.textSecondary, lineHeight: 17 },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Palette.primary,
-    padding: 14,
+    gap: 6,
+    backgroundColor: Palette.ink,
     borderRadius: 999,
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
-  addButtonDisabled: { opacity: 0.4 },
-  addButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  hint: {
-    fontSize: 12,
-    color: Palette.textMuted,
-    textAlign: 'center',
-    marginTop: -6,
-  },
+  addButtonDisabled: { opacity: 0.35 },
+  addButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  emptyCard: { alignItems: 'center', gap: 8, paddingVertical: 24 },
+  emptyText: { color: Palette.textMuted, fontSize: 13, textAlign: 'center' },
 
   reqCard: { gap: Spacing.two },
+  reqDetail: { gap: Spacing.two },
   reqHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   reqTitle: { fontSize: 15, fontWeight: '600', color: Palette.text },
   reqMeta: { fontSize: 12, color: Palette.textMuted, marginTop: 2 },

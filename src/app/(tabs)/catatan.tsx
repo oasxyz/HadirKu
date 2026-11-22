@@ -5,8 +5,8 @@ import {
   StatusKehadiranBadge,
   WARNA_ANGKA_STATUS,
 } from '@/components/status-kehadiran-badge';
+import { IlustrasiKosong, IlustrasiPapanKlip } from '@/components/ilustrasi';
 import {
-  EmptyNote,
   GlassCard,
   Screen,
   SectionTitle,
@@ -27,6 +27,13 @@ function tanggalValid(tanggal: string): boolean {
   const [y, m, d] = tanggal.split('-').map(Number);
   const tgl = new Date(y, m - 1, d);
   return tgl.getFullYear() === y && tgl.getMonth() === m - 1 && tgl.getDate() === d;
+}
+
+/** Satu kalimat di bawah judul ringkasan, mis. "9 dari 10 sesi selesai kamu hadiri". */
+function keteranganRingkasan(s: ReturnType<typeof ringkasKehadiran>): string {
+  const selesai = s.hadir + s.sakit + s.izin + s.alpha;
+  if (selesai === 0) return 'Belum ada sesi yang selesai.';
+  return `${s.hadir} dari ${selesai} sesi selesai kamu hadiri`;
 }
 
 export default function CatatanScreen() {
@@ -69,7 +76,10 @@ export default function CatatanScreen() {
     return (
       <Screen>
         <TopBar title="Catatan Kehadiran" />
-        <EmptyNote message="Kamu belum terdaftar di sesi praktikum manapun." />
+        <GlassCard style={styles.emptyCard}>
+          <IlustrasiKosong lebar={110} />
+          <Text style={styles.emptyText}>Kamu belum terdaftar di sesi praktikum manapun.</Text>
+        </GlassCard>
       </Screen>
     );
   }
@@ -79,8 +89,14 @@ export default function CatatanScreen() {
       <TopBar title="Catatan Kehadiran" />
 
       {/* Ringkasan 4 status, warna sama dengan kotak ringkasan di Rekap */}
-      <GlassCard style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Ringkasan Kehadiran</Text>
+      <GlassCard style={[styles.summaryCard, styles.summaryGradien]}>
+        <View style={styles.summaryTop}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.summaryTitle}>Ringkasan Kehadiran</Text>
+            <Text style={styles.summarySub}>{keteranganRingkasan(summary)}</Text>
+          </View>
+          <IlustrasiPapanKlip lebar={88} />
+        </View>
         <View style={styles.summaryGrid}>
           <SummaryCell status="hadir" count={summary.hadir} />
           <SummaryCell status="sakit" count={summary.sakit} />
@@ -139,11 +155,28 @@ const styles = StyleSheet.create({
   loaderText: { color: Palette.textSecondary, fontSize: 14 },
 
   summaryCard: { gap: Spacing.two },
+  // Gradasi lilac tipis, sama dengan kartu sesi di Beranda dan Detail Sesi.
+  summaryGradien: {
+    experimental_backgroundImage:
+      'linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(244, 207, 239, 0.8) 100%)',
+  } as object,
+  summaryTop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginRight: -6,
+  },
   summaryTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: Palette.text,
   },
+  summarySub: {
+    fontSize: 12,
+    color: Palette.textSecondary,
+  },
+  emptyCard: { alignItems: 'center', gap: 8, paddingVertical: 24 },
+  emptyText: { color: Palette.textMuted, fontSize: 13, textAlign: 'center' },
   summaryGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',

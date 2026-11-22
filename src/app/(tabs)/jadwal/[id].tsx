@@ -6,15 +6,21 @@ import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { AttendanceAction } from '@/components/attendance-action';
 import { LocationCheckCard } from '@/components/location-check-card';
 import SessionControls from '@/components/session-controls';
+import {
+  IlustrasiDitutup,
+  IlustrasiHadir,
+  IlustrasiIzinDiterima,
+  IlustrasiKosong,
+  IlustrasiLab,
+  IlustrasiMenunggu,
+} from '@/components/ilustrasi';
 import { useToast } from '@/components/toast';
-import { StatusBadge } from '@/components/status-badge';
 import {
   Avatar,
   Chip,
   DeviceStatusCard,
   EmptyNote,
   GlassCard,
-  Illustration,
   RoundButton,
   Screen,
   SectionTitle,
@@ -26,9 +32,22 @@ import { useLeaveRequests } from '@/hooks/use-leave-requests';
 import { useLocationValidation } from '@/hooks/useLocationValidation';
 import { useSessions } from '@/hooks/use-sessions';
 import { usePraktikanList } from '@/hooks/use-users';
-import { formatRentangJam, formatTanggal } from '@/utils/format';
+import { formatRentangJam, formatTanggalSingkat } from '@/utils/format';
 import { Logger } from '@/utils/logger';
 import { sesiSudahBerakhir } from '@/utils/sesi';
+import type { Session } from '@/types';
+
+// Kotak status berteks putih, warnanya sama dengan kartu Sesi Terdekat di Beranda.
+const LABEL_STATUS: Record<Session['status'], string> = {
+  belum_dibuka: 'Belum dibuka',
+  dibuka: 'Sedang dibuka',
+  ditutup: 'Sudah ditutup',
+};
+const WARNA_STATUS: Record<Session['status'], string> = {
+  belum_dibuka: Palette.textMuted,
+  dibuka: Palette.primary,
+  ditutup: Palette.ink,
+};
 
 export default function SesiDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -91,11 +110,11 @@ export default function SesiDetailScreen() {
       setDeleting(true);
       await deleteSession(session.id);
       setShowDeleteModal(false);
-      tampilkanToast('Sesi praktikum dihapus.');
+      tampilkanToast('Sesi dan jadwalnya sudah dihapus dari daftar.', 'sukses', 'Sesi dihapus');
       router.replace('/jadwal' as Href);
     } catch (e) {
       Logger.error('FIRESTORE', 'DELETE_SESSION', e);
-      tampilkanToast('Gagal menghapus sesi. Periksa koneksi internet lalu coba lagi.', 'error');
+      tampilkanToast('Periksa koneksi internet lalu coba lagi.', 'error', 'Sesi gagal dihapus');
       setDeleting(false);
     }
   }
@@ -130,24 +149,36 @@ export default function SesiDetailScreen() {
         <Avatar nama={asistenName} size={64} />
       </View>
 
+      {/* Kartu sesi bergaya sama dengan kartu Sesi Terdekat di Beranda. */}
+      {/* Kiri: status, judul, lalu jam/tanggal/lab masing-masing satu baris.
+          Kanan: ilustrasi duduk di bawah, tidak terdorong oleh panjang chip. */}
       <View style={styles.hero}>
         <View style={styles.heroText}>
-          <View style={styles.timePill}>
-            <View style={styles.timeCheck}>
-              <Ionicons name="checkmark" size={14} color={Palette.primary} />
-            </View>
-            <Text style={styles.timeText}>
-              {formatRentangJam(session.jamMulai, session.jamSelesai)}
-            </Text>
+          <View style={[styles.statusBox, { backgroundColor: WARNA_STATUS[session.status] }]}>
+            <Text style={styles.statusText}>{LABEL_STATUS[session.status]}</Text>
           </View>
-          <Text style={styles.heroTitle}>{session.praktikum}</Text>
+          <Text style={styles.heroTitle} numberOfLines={2}>
+            {session.praktikum}
+          </Text>
           <View style={styles.heroChips}>
-            <Chip label={formatTanggal(session.tanggal)} />
-            <Chip label={session.kelasLab} />
+            <View style={styles.heroChip}>
+              <Text style={[styles.heroChipText, styles.heroChipTebal]}>
+                {formatRentangJam(session.jamMulai, session.jamSelesai)}
+              </Text>
+            </View>
+            <View style={styles.heroChip}>
+              <Text style={styles.heroChipText}>{formatTanggalSingkat(session.tanggal)}</Text>
+            </View>
+            <View style={styles.heroChip}>
+              <Text style={styles.heroChipText} numberOfLines={1}>
+                {session.kelasLab}
+              </Text>
+            </View>
           </View>
-          <StatusBadge status={session.status} />
         </View>
-        <Ionicons name="flask" size={64} color="rgba(226, 27, 208, 0.35)" />
+        <View style={styles.heroArt}>
+          <IlustrasiLab lebar={120} />
+        </View>
       </View>
 
       {/* Komponen Sesi (Asisten) atau Presensi (Praktikan) */}
@@ -162,10 +193,11 @@ export default function SesiDetailScreen() {
               message="Anda tidak terdaftar sebagai praktikan pada sesi praktikum ini."
               tone="warning"
               icon="person-remove-outline"
+              ilustrasi={<IlustrasiKosong lebar={110} />}
             />
           ) : myAttendance ? (
             <GlassCard style={styles.successCard}>
-              <Illustration icon="checkmark-circle" />
+              <IlustrasiHadir lebar={130} />
               <Text style={styles.successTitle}>Sudah Hadir</Text>
               <Text style={styles.successSubtitle}>
                 Tercatat pada{' '}
@@ -189,6 +221,7 @@ export default function SesiDetailScreen() {
               }
               tone="warning"
               icon="document-text-outline"
+              ilustrasi={myLeave.status === 'diterima' ? <IlustrasiIzinDiterima lebar={120} /> : <IlustrasiMenunggu lebar={120} />}
             />
           ) : isDitutup ? (
             <DeviceStatusCard
@@ -196,6 +229,7 @@ export default function SesiDetailScreen() {
               message="Presensi untuk sesi praktikum ini telah berakhir."
               tone="danger"
               icon="lock-closed-outline"
+              ilustrasi={<IlustrasiDitutup lebar={120} />}
             />
           ) : session.status === 'belum_dibuka' ? (
             <DeviceStatusCard
@@ -203,6 +237,7 @@ export default function SesiDetailScreen() {
               message="Asisten belum membuka sesi presensi. Silakan tunggu sampai sesi dibuka."
               tone="warning"
               icon="hourglass-outline"
+              ilustrasi={<IlustrasiMenunggu lebar={120} />}
             />
           ) : (
             <View style={{ gap: Spacing.two }}>
@@ -234,7 +269,10 @@ export default function SesiDetailScreen() {
             }
           />
           {hadir.length === 0 ? (
-            <Text style={styles.empty}>Belum ada praktikan yang presensi.</Text>
+            <View style={styles.emptyBox}>
+              <IlustrasiKosong lebar={84} />
+              <Text style={styles.empty}>Belum ada praktikan yang presensi.</Text>
+            </View>
           ) : (
             hadir.map(({ item, user }) => (
               <View key={item.id} style={styles.attendee}>
@@ -319,41 +357,50 @@ const styles = StyleSheet.create({
     lineHeight: 32,
   },
   hero: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(238, 205, 228, 0.75)',
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    alignItems: 'flex-end',
+    borderColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 28,
     borderWidth: 1,
+    experimental_backgroundImage:
+      'linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(244, 207, 239, 0.8) 100%)',
     flexDirection: 'row',
-    gap: 8,
+    gap: 4,
     padding: 18,
-  },
+  } as object,
   heroText: {
     alignItems: 'flex-start',
     flex: 1,
     gap: 10,
   },
-  timePill: {
-    alignItems: 'center',
+  heroArt: {
+    marginRight: -8,
+  },
+  statusBox: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  statusText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  // Chip ringkas di kartu sesi; jam diberi teks tebal.
+  heroChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderColor: Palette.border,
     borderRadius: 999,
-    flexDirection: 'row',
-    gap: 8,
-    padding: 5,
-    paddingRight: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  timeCheck: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(226, 27, 208, 0.14)',
-    borderRadius: 999,
-    height: 28,
-    justifyContent: 'center',
-    width: 28,
-  },
-  timeText: {
+  heroChipText: {
     color: Palette.text,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
+  },
+  heroChipTebal: {
+    fontWeight: '700',
   },
   heroTitle: {
     color: Palette.text,
@@ -361,8 +408,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   heroChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'flex-start',
     gap: 6,
   },
   listCard: {
@@ -372,10 +418,15 @@ const styles = StyleSheet.create({
     color: Palette.textMuted,
     fontSize: 13,
   },
+  emptyBox: {
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+  },
   empty: {
     color: Palette.textMuted,
     fontSize: 13,
-    paddingVertical: 8,
+    textAlign: 'center',
   },
   attendee: {
     alignItems: 'center',

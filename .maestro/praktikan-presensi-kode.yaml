@@ -1,0 +1,33 @@
+# Praktikan: presensi dengan kode manual 123456 di sesi "Pemrograman Mobile" (Dekanat FSM).
+# Syarat: seeder baru dijalankan, dan appConfig.enforceMockLocationBlock = false selama uji,
+# karena lokasi dari setLocation dianggap lokasi palsu oleh aplikasi.
+appId: com.oasxyz.HadirKu
+---
+- runFlow:
+    file: subflows/masuk.yaml
+    env:
+      EMAIL: ${PRAKTIKAN_EMAIL}
+      SANDI: ${PRAKTIKAN_SANDI}
+# Koordinat Dekanat FSM; sesuaikan bila titik lab diubah di Kelola Lokasi Lab.
+- setLocation:
+    latitude: -7.0490375
+    longitude: 110.441484375
+- tapOn: "Buka detail sesi"
+- extendedWaitUntil:
+    visible: "Presensi"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Perbarui Lokasi"
+- tapOn: "Perbarui Lokasi"
+- extendedWaitUntil:
+    visible: "Di dalam radius"
+    timeout: 20000
+- scrollUntilVisible:
+    element: "Kamera bermasalah? Ketik kode 6 digit"
+- tapOn: "Kamera bermasalah? Ketik kode 6 digit"
+- inputText: "123456"
+- hideKeyboard
+- tapOn: "Kirim Presensi"
+- extendedWaitUntil:
+    visible: "Sudah Hadir"
+    timeout: 20000

@@ -2,8 +2,9 @@ import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { IlustrasiSapaan } from '@/components/ilustrasi';
 import { TextField } from '@/components/text-field';
-import { Chip, GlassCard, PrimaryButton, Screen, TopBar } from '@/components/ui';
+import { Chip, GlassCard, Screen, TopBar } from '@/components/ui';
 import { useToast } from '@/components/toast';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
@@ -25,7 +26,7 @@ export default function RegisterScreen() {
   // Pesan error tampil sebagai toast melayang di atas layar.
   const setError = (pesan: string | null) => {
     setErrorState(pesan);
-    if (pesan) tampilkanToast(pesan, 'error');
+    if (pesan) tampilkanToast(pesan, 'error', 'Pendaftaran gagal');
   };
 
   async function handleRegister() {
@@ -70,6 +71,11 @@ export default function RegisterScreen() {
       <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1 }}>
+        {/* Banner berilustrasi, gaya sama dengan halaman Login. */}
+        <View style={styles.hero}>
+          <IlustrasiSapaan lebar={300} />
+        </View>
+
         <GlassCard style={styles.sheet}>
           <Text style={styles.heading}>Buat Akun Baru</Text>
           <Text style={styles.subtitle}>
@@ -141,11 +147,17 @@ export default function RegisterScreen() {
             </View>
           </View>
 
-          <PrimaryButton
-            label={loading ? 'Mendaftar…' : 'Daftar'}
+          <Pressable
             onPress={handleRegister}
             disabled={loading}
-          />
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.utamaBtn,
+              loading && { opacity: 0.6 },
+              pressed && { opacity: 0.8 },
+            ]}>
+            <Text style={styles.utamaBtnText}>{loading ? 'Mendaftar…' : 'Daftar'}</Text>
+          </Pressable>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Sudah punya akun? </Text>
@@ -160,10 +172,35 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
+  hero: {
+    alignItems: 'center',
+    borderRadius: 32,
+    experimental_backgroundImage:
+      'linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(244, 207, 239, 0.9) 100%)',
+    height: 140,
+    justifyContent: 'flex-end',
+    marginBottom: 14,
+    overflow: 'hidden',
+  } as object,
+  // Kartu solid, latar sama dengan kartu lain di aplikasi.
   sheet: {
-    borderRadius: 36,
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
+    borderRadius: 32,
     gap: 16,
     padding: 24,
+  },
+  utamaBtn: {
+    alignItems: 'center',
+    backgroundColor: Palette.ink,
+    borderRadius: 999,
+    height: 56,
+    justifyContent: 'center',
+  },
+  utamaBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   heading: {
     color: Palette.text,
@@ -175,19 +212,6 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     fontSize: 13,
     lineHeight: 18,
-    textAlign: 'center',
-  },
-  errorBox: {
-    backgroundColor: 'rgba(225, 29, 72, 0.08)',
-    borderColor: 'rgba(225, 29, 72, 0.3)',
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  errorText: {
-    color: Palette.danger,
-    fontSize: 13,
     textAlign: 'center',
   },
   form: {
@@ -223,8 +247,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   loginLink: {
-    color: Palette.primary,
+    color: Palette.text,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

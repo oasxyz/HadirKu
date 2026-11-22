@@ -269,11 +269,13 @@ export function DateTimeField({ label, value, mode = 'date', onChange, error }: 
 
 // Aturan warna seragam: kartu kondisi perangkat putih dengan judul dan tombol hitam, tanpa ikon
 // hiasan. `tone` dan `icon` tetap diterima supaya pemanggil lama tidak perlu diubah.
-export function DeviceStatusCard({ title, message, actionLabel, onAction }: { title: string; message: string; tone?: 'warning' | 'danger'; actionLabel?: string; onAction?: () => void; icon?: IconName }) {
+// `ilustrasi` opsional: bila diisi, gambar tampil di atas dan teks dirata tengah.
+export function DeviceStatusCard({ title, message, actionLabel, onAction, ilustrasi }: { title: string; message: string; tone?: 'warning' | 'danger'; actionLabel?: string; onAction?: () => void; icon?: IconName; ilustrasi?: React.ReactNode }) {
   return (
-    <View style={styles.statusCard}>
-      <Text style={styles.statusCardTitle}>{title}</Text>
-      <Text style={styles.statusCardMessage}>{message}</Text>
+    <View style={[styles.statusCard, ilustrasi ? styles.statusCardIlustrasi : null]}>
+      {ilustrasi}
+      <Text style={[styles.statusCardTitle, ilustrasi ? styles.teksTengah : null]}>{title}</Text>
+      <Text style={[styles.statusCardMessage, ilustrasi ? styles.teksTengah : null]}>{message}</Text>
       {onAction && actionLabel && (
         <Pressable onPress={onAction} style={({ pressed }) => [styles.statusCardButton, pressed && styles.pressed]}>
           <Text style={styles.statusCardButtonText}>{actionLabel}</Text>
@@ -341,7 +343,9 @@ const styles = StyleSheet.create({
   modalOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Palette.border },
   modalOptionText: { fontSize: 16, color: Palette.text },
   modalOptionSubtitle: { fontSize: 12, color: Palette.textMuted, marginTop: 4 },
-  statusCard: { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderColor: Palette.border, borderRadius: 18, borderWidth: 1, padding: 16, gap: 8 },
+  statusCard: { backgroundColor: '#F7F6FB', borderColor: Palette.border, borderRadius: 18, borderWidth: 1, padding: 16, gap: 8 },
+  statusCardIlustrasi: { alignItems: 'center', paddingVertical: 22 },
+  teksTengah: { textAlign: 'center' },
   statusCardTitle: { color: Palette.text, fontSize: 15, fontWeight: '700' },
   statusCardMessage: { fontSize: 13, color: Palette.textSecondary, lineHeight: 18 },
   statusCardButton: { alignSelf: 'flex-start', backgroundColor: Palette.ink, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 },

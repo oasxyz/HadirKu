@@ -17,7 +17,6 @@ import {
   DateTimeField,
   EmptyNote,
   GlassCard,
-  PrimaryButton,
   Screen,
   SelectField,
   TopBar,
@@ -29,6 +28,7 @@ import { usePraktikanList } from '@/hooks/use-users';
 import { kirimNotifikasi, pesanJadwalBerubah } from '@/services/notifications';
 import type { Session } from '@/types';
 import { getAuthErrorMessage } from '@/utils/auth-error';
+import { formatTanggalSingkat } from '@/utils/format';
 import { Logger } from '@/utils/logger';
 
 // Jumlah baris praktikan per halaman pada tabel peserta.
@@ -131,6 +131,8 @@ function JadwalFormContent({
   const [searchPraktikan, setSearchPraktikan] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Form bertahap: 1 Info, 2 Waktu & lab, 3 Peserta.
+  const [langkah, setLangkah] = useState<Langkah>(1);
 
   const isSubmittingRef = useRef<boolean>(false);
   const { tampilkanToast } = useToast();
@@ -189,33 +191,47 @@ function JadwalFormContent({
     setPesertaIds([]);
   }
 
-  function validate() {
-    if (!praktikum.trim()) return 'Nama praktikum wajib diisi';
-    if (!labId) return 'Laboratorium wajib dipilih';
-    if (!kelasLab.trim()) return 'Kelas praktikum wajib diisi';
-
-    const hmStart = timeToHm(jamMulaiDate);
-    const hmEnd = timeToHm(jamSelesaiDate);
-
-    if (hmStart >= hmEnd) {
-      return 'Jam selesai harus lebih lambat dari jam mulai';
+  // Validasi per langkah supaya kesalahan ketahuan sebelum pindah ke langkah berikutnya.
+  function validasiLangkah(l: Langkah): string | null {
+    if (l === 1) {
+      if (!praktikum.trim()) return 'Nama praktikum wajib diisi';
+      if (!kelasLab.trim()) return 'Kelas praktikum wajib diisi';
     }
-
-    if (pesertaIds.length === 0) {
+    if (l === 2) {
+      if (!labId) return 'Laboratorium wajib dipilih';
+      if (timeToHm(jamMulaiDate) >= timeToHm(jamSelesaiDate)) {
+        return 'Jam selesai harus lebih lambat dari jam mulai';
+      }
+    }
+    if (l === 3 && pesertaIds.length === 0) {
       return 'Pilih minimal satu praktikan sebagai peserta';
     }
-
     return null;
+  }
+
+  function handleLanjut() {
+    const err = validasiLangkah(langkah);
+    if (err) {
+      setError(err);
+      tampilkanToast(err, 'error', 'Periksa isian sesi');
+      return;
+    }
+    setError(null);
+    setLangkah((l) => Math.min(3, l + 1) as Langkah);
   }
 
   async function handleSave() {
     if (isSubmittingRef.current || loading) return;
 
-    const err = validate();
-    if (err) {
-      setError(err);
-      tampilkanToast(err, 'error');
-      return;
+    // Cek ulang semua langkah; bila ada yang salah, kembali ke langkah tersebut.
+    for (const l of [1, 2, 3] as Langkah[]) {
+      const err = validasiLangkah(l);
+      if (err) {
+        setError(err);
+        setLangkah(l);
+        tampilkanToast(err, 'error', 'Periksa isian sesi');
+        return;
+      }
     }
 
     isSubmittingRef.current = true;
@@ -267,12 +283,14 @@ function JadwalFormContent({
         }
         tampilkanToast(
           isChanged
-            ? 'Perubahan sesi disimpan. Peserta diberi tahu lewat notifikasi.'
-            : 'Perubahan sesi disimpan.'
+            ? 'Peserta diberi tahu lewat notifikasi karena jadwal berubah.'
+            : 'Data sesi praktikum sudah diperbarui.',
+          'sukses',
+          'Perubahan disimpan'
         );
       } else {
         await createSession(payload);
-        tampilkanToast('Sesi praktikum berhasil dibuat.');
+        tampilkanToast('Sesi siap dibuka sesuai jadwal.', 'sukses', 'Sesi praktikum dibuat');
       }
 
       router.back();
@@ -280,7 +298,7 @@ function JadwalFormContent({
       Logger.error('FIRESTORE', 'SAVE_SESSION', e);
       const pesan = getAuthErrorMessage(e);
       setError(pesan);
-      tampilkanToast(pesan, 'error');
+      tampilkanToast(pesan, 'error', 'Sesi gagal disimpan');
     } finally {
       setLoading(false);
       isSubmittingRef.current = false;
@@ -302,7 +320,10 @@ function JadwalFormContent({
         style={{ flex: 1 }}
       >
         <View style={styles.formContainer}>
-          {/* Card 1: Informasi Praktikum & Waktu */}
+          <ProgresLangkah langkah={langkah} />
+
+          {/* Langkah 1: Informasi Sesi */}
+          {langkah === 1 ? (
           <GlassCard style={styles.card}>
             <Text style={styles.cardSectionHeader}>Informasi Sesi</Text>
 
@@ -327,6 +348,13 @@ function JadwalFormContent({
               placeholder="Contoh: Kelas A / Sesi 1"
               error={error && !kelasLab.trim() ? 'Wajib diisi' : undefined}
             />
+          </GlassCard>
+          ) : null}
+
+          {/* Langkah 2: Waktu & Laboratorium */}
+          {langkah === 2 ? (
+          <GlassCard style={styles.card}>
+            <Text style={styles.cardSectionHeader}>Waktu &amp; Laboratorium</Text>
 
             {/* SelectField Laboratorium dari Koleksi labs */}
             <View>
@@ -394,8 +422,11 @@ function JadwalFormContent({
               </View>
             </View>
           </GlassCard>
+          ) : null}
 
-          {/* Card 2: Pemilihan Peserta */}
+          {/* Langkah 3: Pemilihan Peserta + ringkasan sebelum disimpan */}
+          {langkah === 3 ? (
+          <>
           <GlassCard style={styles.card}>
             <View style={styles.pesertaHeaderRow}>
               <View>
@@ -405,12 +436,17 @@ function JadwalFormContent({
                 </Text>
               </View>
               <View style={styles.pesertaActionButtons}>
-                <Pressable onPress={handleSelectAllPeserta}>
-                  <Text style={styles.pesertaActionText}>Pilih Semua</Text>
+                <Pressable
+                  onPress={handleSelectAllPeserta}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.tombolKecil, styles.tombolKecilIsi, pressed && { opacity: 0.7 }]}>
+                  <Text style={styles.tombolKecilTeks}>Pilih Semua</Text>
                 </Pressable>
-                <Text style={styles.pesertaActionDivider}>•</Text>
-                <Pressable onPress={handleResetPeserta}>
-                  <Text style={styles.pesertaActionText}>Reset</Text>
+                <Pressable
+                  onPress={handleResetPeserta}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.tombolKecil, pressed && { opacity: 0.7 }]}>
+                  <Text style={styles.tombolKecilTeks}>Reset</Text>
                 </Pressable>
               </View>
             </View>
@@ -496,18 +532,54 @@ function JadwalFormContent({
             )}
           </GlassCard>
 
-          {/* Tombol Simpan Sesi */}
-          <PrimaryButton
-            label={
-              loading
-                ? 'Menyimpan Sesi…'
-                : isEdit
-                  ? 'Simpan Perubahan Sesi'
-                  : 'Buat Sesi Praktikum'
-            }
-            onPress={handleSave}
-            style={styles.saveButton}
-          />
+          <View style={styles.ringkasan}>
+            <Text style={styles.ringkasanJudul}>Ringkasan</Text>
+            <Text style={styles.ringkasanTeks}>
+              <Text style={styles.ringkasanTebal}>{praktikum.trim() || '—'}</Text> ·{' '}
+              {kelasLab.trim() || '—'}
+            </Text>
+            <Text style={styles.ringkasanTeks}>
+              {formatTanggalSingkat(dateToYmd(tanggalDate))}, {timeToHm(jamMulaiDate)}–
+              {timeToHm(jamSelesaiDate)} · {currentLab?.namaLab ?? '—'}
+            </Text>
+            <Text style={styles.ringkasanTeks}>{pesertaIds.length} praktikan terpilih</Text>
+          </View>
+          </>
+          ) : null}
+
+          {/* Navigasi langkah: Kembali / Lanjut, lalu Simpan di langkah terakhir */}
+          <View style={styles.navLangkah}>
+            <Pressable
+              onPress={() => setLangkah((l) => Math.max(1, l - 1) as Langkah)}
+              disabled={langkah === 1 || loading}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.tombolKembali,
+                langkah === 1 && styles.tombolMati,
+                pressed && { opacity: 0.7 },
+              ]}>
+              <Text style={styles.tombolKembaliTeks}>Kembali</Text>
+            </Pressable>
+            <Pressable
+              onPress={langkah < 3 ? handleLanjut : handleSave}
+              disabled={loading}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.tombolLanjut,
+                loading && styles.tombolMati,
+                pressed && { opacity: 0.8 },
+              ]}>
+              <Text style={styles.tombolLanjutTeks}>
+                {langkah < 3
+                  ? 'Lanjut'
+                  : loading
+                    ? 'Menyimpan Sesi…'
+                    : isEdit
+                      ? 'Simpan Perubahan'
+                      : 'Buat Sesi'}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </Screen>
@@ -578,13 +650,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  pesertaActionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Palette.primary,
+  // Tombol kecil berlatar supaya jelas bisa diketuk.
+  tombolKecil: {
+    backgroundColor: '#FFFFFF',
+    borderColor: Palette.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
-  pesertaActionDivider: {
-    color: Palette.textMuted,
+  tombolKecilIsi: {
+    backgroundColor: Palette.lavender,
+    borderColor: Palette.lavender,
+  },
+  tombolKecilTeks: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Palette.text,
   },
   emptyPraktikanText: {
     color: Palette.textMuted,
@@ -681,7 +763,118 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontVariant: ['tabular-nums'],
   },
-  saveButton: {
-    marginTop: 8,
+  // Progres langkah (bulet-bulet), gaya sama dengan pelacak izin.
+  progres: { gap: 6, paddingHorizontal: 4 },
+  progresGaris: { flexDirection: 'row', alignItems: 'center' },
+  progresSegmen: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  progresPenghubung: { flex: 1, height: 3, borderRadius: 999, backgroundColor: Palette.lavender },
+  progresPenghubungAktif: { backgroundColor: Palette.primary },
+  progresPenghubungKosong: { backgroundColor: 'transparent' },
+  progresTitik: {
+    alignItems: 'center',
+    backgroundColor: Palette.lavender,
+    borderRadius: 999,
+    height: 24,
+    justifyContent: 'center',
+    width: 24,
   },
+  progresTitikSelesai: { backgroundColor: Palette.primary },
+  progresTitikAktif: { backgroundColor: '#FFFFFF', borderColor: Palette.primary, borderWidth: 2 },
+  progresAngka: { fontSize: 11, fontWeight: '700', color: Palette.textMuted },
+  progresAngkaAktif: { color: Palette.primary },
+  progresLabelBaris: { flexDirection: 'row' },
+  progresLabel: { flex: 1, fontSize: 11, fontWeight: '600', color: Palette.textMuted, textAlign: 'center' },
+  progresLabelAktif: { color: Palette.text },
+
+  ringkasan: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderRadius: 20,
+    gap: 3,
+    padding: 16,
+  },
+  ringkasanJudul: { fontSize: 13, fontWeight: '700', color: Palette.text, marginBottom: 2 },
+  ringkasanTeks: { fontSize: 12, color: Palette.textSecondary, lineHeight: 18 },
+  ringkasanTebal: { fontWeight: '700', color: Palette.text },
+
+  navLangkah: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  tombolKembali: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: Palette.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flex: 1,
+    height: 56,
+    justifyContent: 'center',
+  },
+  tombolKembaliTeks: { fontSize: 14, fontWeight: '700', color: Palette.text },
+  tombolLanjut: {
+    alignItems: 'center',
+    backgroundColor: Palette.ink,
+    borderRadius: 999,
+    flex: 1.4,
+    height: 56,
+    justifyContent: 'center',
+  },
+  tombolLanjutTeks: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  tombolMati: { opacity: 0.35 },
 });
+
+type Langkah = 1 | 2 | 3;
+const LABEL_LANGKAH = ['Info', 'Waktu & lab', 'Peserta'];
+
+/** Bulet progres form: langkah sebelumnya dicentang, langkah sekarang bertepi magenta. */
+function ProgresLangkah({ langkah }: { langkah: Langkah }) {
+  return (
+    <View
+      style={styles.progres}
+      accessibilityLabel={`Langkah ${langkah} dari 3: ${LABEL_LANGKAH[langkah - 1]}`}>
+      <View style={styles.progresGaris}>
+        {LABEL_LANGKAH.map((label, i) => {
+          const no = i + 1;
+          const selesai = no < langkah;
+          const aktif = no === langkah;
+          return (
+            <View key={label} style={styles.progresSegmen}>
+              <View
+                style={[
+                  styles.progresPenghubung,
+                  i === 0 && styles.progresPenghubungKosong,
+                  i > 0 && no <= langkah ? styles.progresPenghubungAktif : null,
+                ]}
+              />
+              <View
+                style={[
+                  styles.progresTitik,
+                  selesai && styles.progresTitikSelesai,
+                  aktif && styles.progresTitikAktif,
+                ]}>
+                {selesai ? (
+                  <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+                ) : (
+                  <Text style={[styles.progresAngka, aktif && styles.progresAngkaAktif]}>{no}</Text>
+                )}
+              </View>
+              <View
+                style={[
+                  styles.progresPenghubung,
+                  i === LABEL_LANGKAH.length - 1 && styles.progresPenghubungKosong,
+                  i < LABEL_LANGKAH.length - 1 && no + 1 <= langkah
+                    ? styles.progresPenghubungAktif
+                    : null,
+                ]}
+              />
+            </View>
+          );
+        })}
+      </View>
+      <View style={styles.progresLabelBaris}>
+        {LABEL_LANGKAH.map((label, i) => (
+          <Text key={label} style={[styles.progresLabel, i + 1 <= langkah && styles.progresLabelAktif]}>
+            {label}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+}

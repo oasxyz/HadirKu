@@ -4,23 +4,23 @@ import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { AttendanceAction } from '@/components/attendance-action';
 import { ErrorBoundary } from '@/components/error-boundary';
+import {
+  IlustrasiDitutup,
+  IlustrasiHadir,
+  IlustrasiIzinDiterima,
+  IlustrasiKosong,
+  IlustrasiLab,
+  IlustrasiMenunggu,
+} from '@/components/ilustrasi';
 import { LocationCheckCard } from '@/components/location-check-card';
 import { StatusBadge } from '@/components/status-badge';
-import {
-  Chip,
-  DeviceStatusCard,
-  EmptyNote,
-  GlassCard,
-  Illustration,
-  Screen,
-  TopBar,
-} from '@/components/ui';
+import { DeviceStatusCard, EmptyNote, GlassCard, Screen, TopBar } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useLeaveRequests } from '@/hooks/use-leave-requests';
 import { useLocationValidation } from '@/hooks/useLocationValidation';
 import { useSessions } from '@/hooks/use-sessions';
-import { formatRentangJam, formatTanggal } from '@/utils/format';
+import { formatRentangJam, formatTanggalSingkat } from '@/utils/format';
 import { sesiSudahBerakhir } from '@/utils/sesi';
 
 export default function PresensiScreen() {
@@ -90,27 +90,34 @@ export default function PresensiScreen() {
       header={<TopBar title="Presensi Praktikum" back fallback="/jadwal" />}>
       <ErrorBoundary fallbackTitle="Halaman Presensi Bermasalah">
         {/* ========== 1. KARTU INFORMASI SESI ========== */}
-        <GlassCard style={styles.sessionCard}>
-          <View style={styles.sessionHeader}>
-            <View style={{ flex: 1, gap: 6 }}>
-              <Text style={styles.sessionTitle}>{session.praktikum}</Text>
-              <Text style={styles.sessionMeta}>Asisten: {asistenName}</Text>
-            </View>
+        {/* Kartu sesi bergaya sama dengan Detail Sesi: status, judul, chip bertumpuk, ilustrasi. */}
+        <View style={styles.sessionCard}>
+          <View style={styles.sessionText}>
             <StatusBadge status={session.status} />
+            <Text style={styles.sessionTitle} numberOfLines={2}>
+              {session.praktikum}
+            </Text>
+            <Text style={styles.sessionMeta}>Asisten: {asistenName}</Text>
+            <View style={styles.sessionChips}>
+              <View style={styles.chip}>
+                <Text style={[styles.chipText, styles.chipTebal]}>
+                  {formatRentangJam(session.jamMulai, session.jamSelesai)}
+                </Text>
+              </View>
+              <View style={styles.chip}>
+                <Text style={styles.chipText}>{formatTanggalSingkat(session.tanggal)}</Text>
+              </View>
+              <View style={styles.chip}>
+                <Text style={styles.chipText} numberOfLines={1}>
+                  {locationState.labName ?? session.kelasLab}
+                </Text>
+              </View>
+            </View>
           </View>
-
-          <View style={styles.sessionChips}>
-            <Chip label={formatTanggal(session.tanggal)} icon="calendar-outline" />
-            <Chip
-              label={formatRentangJam(session.jamMulai, session.jamSelesai)}
-              icon="time-outline"
-            />
-            <Chip
-              label={locationState.labName ?? session.kelasLab}
-              icon="location-outline"
-            />
+          <View style={styles.sessionArt}>
+            <IlustrasiLab lebar={110} />
           </View>
-        </GlassCard>
+        </View>
 
         {/* ========== 2. KARTU GUARD SESI (status sesi / sudah hadir / sudah izin) ========== */}
         {!isPeserta && (
@@ -119,6 +126,7 @@ export default function PresensiScreen() {
             message="Anda tidak terdaftar sebagai peserta di sesi praktikum ini."
             tone="danger"
             icon="person-remove-outline"
+            ilustrasi={<IlustrasiKosong lebar={110} />}
           />
         )}
 
@@ -128,6 +136,7 @@ export default function PresensiScreen() {
             message="Presensi sesi ini sudah ditutup. Hubungi asisten jika Anda perlu mengajukan izin."
             tone="danger"
             icon="lock-closed-outline"
+            ilustrasi={<IlustrasiDitutup lebar={120} />}
           />
         )}
 
@@ -137,12 +146,13 @@ export default function PresensiScreen() {
             message="Asisten belum membuka sesi presensi. Silakan tunggu sampai sesi dibuka."
             tone="warning"
             icon="hourglass-outline"
+            ilustrasi={<IlustrasiMenunggu lebar={120} />}
           />
         )}
 
         {isPeserta && sudahHadir && (
           <GlassCard style={styles.successCard}>
-            <Illustration icon="checkmark-circle" />
+            <IlustrasiHadir lebar={130} />
             <Text style={styles.successTitle}>Sudah Hadir</Text>
             <Text style={styles.successSubtitle}>
               Tercatat pada{' '}
@@ -166,6 +176,7 @@ export default function PresensiScreen() {
             }
             tone="warning"
             icon="document-text-outline"
+            ilustrasi={izinAktif.status === 'diterima' ? <IlustrasiIzinDiterima lebar={120} /> : <IlustrasiMenunggu lebar={120} />}
           />
         )}
 
@@ -195,7 +206,7 @@ export default function PresensiScreen() {
         onRequestClose={() => setShowSuccess(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Illustration icon="checkmark" />
+            <IlustrasiHadir lebar={140} />
             <Text style={styles.modalTitle}>Presensi Berhasil!</Text>
             <Text style={styles.modalSubtitle}>
               Kehadiran Anda telah tercatat.
@@ -216,36 +227,66 @@ export default function PresensiScreen() {
 }
 
 const styles = StyleSheet.create({
-  sessionCard: { gap: Spacing.two },
-  sessionHeader: {
+  sessionCard: {
+    alignItems: 'flex-end',
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 28,
+    borderWidth: 1,
+    experimental_backgroundImage:
+      'linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(244, 207, 239, 0.8) 100%)',
     flexDirection: 'row',
+    gap: 4,
+    padding: 18,
+  } as object,
+  sessionText: {
     alignItems: 'flex-start',
-    gap: Spacing.two,
+    flex: 1,
+    gap: 8,
+  },
+  sessionArt: {
+    alignSelf: 'center',
   },
   sessionTitle: {
     color: Palette.text,
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   sessionMeta: {
     color: Palette.textSecondary,
     fontSize: 13,
   },
   sessionChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'flex-start',
     gap: 6,
+  },
+  chip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderColor: Palette.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipText: {
+    color: Palette.text,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  chipTebal: {
+    fontWeight: '700',
   },
 
   successCard: {
     alignItems: 'center',
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
     gap: 6,
     paddingVertical: Spacing.four,
   },
   successTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: Palette.primary,
+    color: Palette.text,
   },
   successSubtitle: {
     fontSize: 13,
@@ -261,8 +302,6 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    borderWidth: 1,
-    borderColor: Palette.primary,
     padding: Spacing.four,
     width: '80%',
     alignItems: 'center',
@@ -279,7 +318,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   modalButton: {
-    backgroundColor: Palette.primary,
+    backgroundColor: Palette.ink,
     paddingVertical: 10,
     paddingHorizontal: 32,
     borderRadius: 999,

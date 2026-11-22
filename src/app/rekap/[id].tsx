@@ -4,13 +4,14 @@ import { useLocalSearchParams, router, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { IlustrasiKosong, IlustrasiPapanKlip } from '@/components/ilustrasi';
 import { StatusBadge } from '@/components/status-badge';
 import {
   LABEL_STATUS_KEHADIRAN,
   StatusKehadiranBadge,
   WARNA_ANGKA_STATUS,
 } from '@/components/status-kehadiran-badge';
-import { Badge, Chip, EmptyNote, GlassCard, Screen, SectionTitle, TopBar } from '@/components/ui';
+import { Badge, EmptyNote, GlassCard, Screen, SectionTitle, TopBar } from '@/components/ui';
 import { BATAS_JARAK_METER } from '@/constants/lokasi';
 import { Palette } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
@@ -18,7 +19,7 @@ import { useLeaveRequests } from '@/hooks/use-leave-requests';
 import { useSessions } from '@/hooks/use-sessions';
 import { usePraktikanList } from '@/hooks/use-users';
 import type { Attendance, FinalAttendanceStatus } from '@/types';
-import { formatRentangJam, formatTanggal } from '@/utils/format';
+import { formatRentangJam, formatTanggalSingkat } from '@/utils/format';
 import { hitungStatusKehadiran, ringkasKehadiran, sesiSelesai } from '@/utils/status-kehadiran';
 
 // Status sesi bisa berubah hanya karena waktu (lewat jamSelesai + toleransi), jadi layar
@@ -162,20 +163,33 @@ export default function RekapDetailScreen() {
     <Screen
       withTabBar={false}
       header={<TopBar title="Rekap" back fallback="/rekap" />}>
-      <View style={styles.titleBlock}>
-        <Text style={styles.title}>{session.praktikum}</Text>
-        <View style={styles.chips}>
-          <Chip label={formatTanggal(session.tanggal)} />
-          <Chip label={formatRentangJam(session.jamMulai, session.jamSelesai)} />
+      {/* Kartu sesi bergaya sama dengan Detail Sesi: status, judul, chip bertumpuk, ilustrasi. */}
+      <View style={styles.hero}>
+        <View style={styles.heroText}>
           <StatusBadge status={session.status} />
+          <Text style={styles.title} numberOfLines={2}>
+            {session.praktikum}
+          </Text>
+          <View style={styles.chips}>
+            <View style={styles.chip}>
+              <Text style={[styles.chipText, styles.chipTebal]}>
+                {formatRentangJam(session.jamMulai, session.jamSelesai)}
+              </Text>
+            </View>
+            <View style={styles.chip}>
+              <Text style={styles.chipText}>{formatTanggalSingkat(session.tanggal)}</Text>
+            </View>
+          </View>
+          <Text style={styles.statLabel}>
+            Praktikan hadir{' '}
+            <Text style={styles.statValue}>
+              {ringkasan.hadir}/{total}
+            </Text>
+          </Text>
         </View>
-      </View>
-
-      <View>
-        <Text style={styles.statLabel}>Praktikan Hadir</Text>
-        <Text style={styles.statValue}>
-          {ringkasan.hadir} / {total}
-        </Text>
+        <View style={styles.heroArt}>
+          <IlustrasiPapanKlip lebar={104} />
+        </View>
       </View>
 
       <View style={styles.summaryRow}>
@@ -197,23 +211,30 @@ export default function RekapDetailScreen() {
         </Text>
       ) : null}
 
-      <GlassCard style={styles.listCard}>
+      <View style={styles.listCard}>
         <SectionTitle
           title={filterAktif ? `Peserta ${LABEL_STATUS_KEHADIRAN[filterAktif]}` : 'Daftar Peserta'}
           right={
             filterAktif ? (
-              <Pressable onPress={() => setFilter(null)} hitSlop={8} accessibilityRole="button">
+              <Pressable
+                onPress={() => setFilter(null)}
+                hitSlop={8}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.resetButton, pressed && styles.pressed]}>
                 <Text style={styles.resetText}>Tampilkan semua</Text>
               </Pressable>
             ) : undefined
           }
         />
-        {peserta.length === 0 ? (
-          <Text style={styles.empty}>Sesi ini belum memiliki peserta.</Text>
-        ) : pesertaTampil.length === 0 && filterAktif ? (
-          <Text style={styles.empty}>
-            Tidak ada peserta berstatus {LABEL_STATUS_KEHADIRAN[filterAktif]}.
-          </Text>
+        {peserta.length === 0 || (pesertaTampil.length === 0 && filterAktif) ? (
+          <View style={styles.emptyBox}>
+            <IlustrasiKosong lebar={96} />
+            <Text style={styles.empty}>
+              {peserta.length === 0
+                ? 'Sesi ini belum memiliki peserta.'
+                : `Tidak ada peserta berstatus ${LABEL_STATUS_KEHADIRAN[filterAktif!]}.`}
+            </Text>
+          </View>
         ) : (
           pesertaTampil.map(({ userId, user, attendance, status, keteranganIzin: izin }) => (
             <View key={userId} style={styles.row}>
@@ -233,7 +254,7 @@ export default function RekapDetailScreen() {
             </View>
           ))
         )}
-      </GlassCard>
+      </View>
     </Screen>
   );
 }
@@ -293,20 +314,50 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     fontSize: 14,
   },
-  titleBlock: {
+  hero: {
+    alignItems: 'flex-end',
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 28,
+    borderWidth: 1,
+    experimental_backgroundImage:
+      'linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(244, 207, 239, 0.8) 100%)',
+    flexDirection: 'row',
+    gap: 4,
+    padding: 18,
+  } as object,
+  heroText: {
+    alignItems: 'flex-start',
+    flex: 1,
     gap: 10,
+  },
+  // Ilustrasi di tengah kartu secara vertikal dan tidak terpotong di tepi kanan.
+  heroArt: {
+    alignSelf: 'center',
   },
   title: {
     color: Palette.text,
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '600',
-    lineHeight: 32,
   },
   chips: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'flex-start',
     gap: 6,
+  },
+  chip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderColor: Palette.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipText: {
+    color: Palette.text,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  chipTebal: {
+    fontWeight: '700',
   },
   statLabel: {
     color: Palette.textSecondary,
@@ -314,7 +365,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     color: Palette.text,
-    fontSize: 20,
+    fontSize: 15,
     fontWeight: '700',
   },
   summaryRow: {
@@ -323,8 +374,8 @@ const styles = StyleSheet.create({
   },
   summaryBox: {
     alignItems: 'center',
-    backgroundColor: Palette.card,
-    borderColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
     borderRadius: 18,
     borderWidth: 1,
     flex: 1,
@@ -342,10 +393,16 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.75,
   },
+  resetButton: {
+    backgroundColor: Palette.lavender,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
   resetText: {
-    color: Palette.primary,
+    color: Palette.text,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   summaryValue: {
     fontSize: 24,
@@ -362,20 +419,32 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   listCard: {
-    gap: 12,
+    gap: 10,
+  },
+  emptyBox: {
+    alignItems: 'center',
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 6,
+    paddingVertical: 20,
   },
   empty: {
     color: Palette.textMuted,
     fontSize: 13,
-    paddingVertical: 8,
+    textAlign: 'center',
   },
+  // Baris peserta solid, latar sama dengan kartu Timeline dan daftar Rekap.
   row: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
-    borderRadius: 24,
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
+    borderRadius: 18,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: 10,
-    paddingLeft: 20,
+    paddingLeft: 16,
     paddingRight: 12,
     paddingVertical: 12,
   },

@@ -1,0 +1,20 @@
+# Subflow: buka aplikasi dari keadaan bersih lalu masuk dengan email + kata sandi.
+# Dipanggil flow lain dengan env EMAIL dan SANDI (jangan tulis kata sandi di file).
+appId: com.oasxyz.HadirKu
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Masuk dengan Google"
+    timeout: 30000
+- tapOn: "nama@univ.ac.id"
+- inputText: ${EMAIL}
+- tapOn: "Masukkan kata sandi"
+- inputText: ${SANDI}
+- hideKeyboard
+- tapOn: "Masuk"
+- extendedWaitUntil:
+    visible: "Sesi Terdekat"
+    timeout: 30000

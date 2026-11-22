@@ -1,0 +1,14 @@
+# Praktikan: Beranda menampilkan sesi yang sedang dibuka (data dari scripts/seed-uji.mjs).
+appId: com.oasxyz.HadirKu
+---
+- runFlow:
+    file: subflows/masuk.yaml
+    env:
+      EMAIL: ${PRAKTIKAN_EMAIL}
+      SANDI: ${PRAKTIKAN_SANDI}
+- assertVisible: "Pemrograman Mobile"
+- assertVisible: "Sedang dibuka"
+- assertVisible: "Jadwal Praktikum"
+- scrollUntilVisible:
+    element: "Timeline"
+- assertVisible: "Dibuka"

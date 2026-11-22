@@ -26,6 +26,7 @@ import { usePraktikanList } from "@/hooks/use-users";
 import { useLeaveRequests } from "@/hooks/use-leave-requests";
 import { kirimNotifikasi, pesanIzinDiputuskan } from "@/services/notifications";
 import { KategoriIzinBadge } from "@/components/status-kehadiran-badge";
+import { IlustrasiKosong, IlustrasiSurat } from "@/components/ilustrasi";
 import { useToast } from "@/components/toast";
 import { normalizeLeaveCategory } from "@/types";
 import { formatTanggal } from "@/utils/format";
@@ -119,6 +120,8 @@ export function PemeriksaanIzin() {
     assistantSessionIds.has(req.sessionId),
   );
 
+  const jumlahMenunggu = assistantRequests.filter((req) => req.status === "menunggu").length;
+
   // 2. Filter by Time (menggunakan tanggal lokal perangkat, bukan UTC)
   const now = new Date();
   const todayLocalKey = toLocalDateKey(now);
@@ -166,9 +169,9 @@ export function PemeriksaanIzin() {
       setProcessing(true);
       await updateLeaveStatus(decision.id, decision.action, currentUser!.nama);
       tampilkanToast(
-        decision.action === 'diterima'
-          ? 'Izin diterima. Praktikan diberi tahu lewat notifikasi.'
-          : 'Izin ditolak. Praktikan diberi tahu lewat notifikasi.'
+        'Praktikan diberi tahu lewat notifikasi.',
+        'sukses',
+        decision.action === 'diterima' ? 'Izin diterima' : 'Izin ditolak'
       );
 
       // SRS3-04: beri tahu praktikan pemohon. Dijalankan di latar belakang supaya dialog
@@ -180,7 +183,7 @@ export function PemeriksaanIzin() {
       }
     } catch (err) {
       Logger.error("FIRESTORE", "putuskanIzin", err, { leaveRequestId: decision.id });
-      tampilkanToast("Keputusan izin gagal disimpan. Periksa koneksi internet lalu coba lagi.", "error");
+      tampilkanToast("Periksa koneksi internet lalu coba lagi.", "error", "Keputusan gagal disimpan");
     } finally {
       isSubmittingRef.current = false;
       setProcessing(false);
@@ -203,6 +206,23 @@ export function PemeriksaanIzin() {
   return (
     <Screen>
       <TopBar title="Pemeriksaan Izin" />
+
+      {/* Kartu ringkas berilustrasi: berapa izin yang masih menunggu keputusan. */}
+      <View style={styles.ringkas}>
+        <View style={styles.ringkasTeks}>
+          <Text style={styles.ringkasJudul}>
+            {jumlahMenunggu > 0
+              ? `${jumlahMenunggu} izin menunggu keputusan`
+              : "Semua izin sudah diputuskan"}
+          </Text>
+          <Text style={styles.ringkasSub}>
+            {jumlahMenunggu > 0
+              ? "Periksa alasan dan saran AI, lalu terima atau tolak."
+              : "Pengajuan baru dari praktikan akan muncul di sini."}
+          </Text>
+        </View>
+        <IlustrasiSurat lebar={88} />
+      </View>
 
       <ScrollView
         horizontal
@@ -227,7 +247,10 @@ export function PemeriksaanIzin() {
       </ScrollView>
 
       {groupEntries.length === 0 ? (
-        <EmptyNote message={getEmptyMessage()} />
+        <View style={styles.kosong}>
+          <IlustrasiKosong lebar={100} />
+          <Text style={styles.kosongTeks}>{getEmptyMessage()}</Text>
+        </View>
       ) : (
         <View style={styles.listContainer}>
           {groupEntries.map((group) => (
@@ -250,7 +273,7 @@ export function PemeriksaanIzin() {
                 const kategori = normalizeLeaveCategory(req.kategoriAi);
 
                 return (
-                  <GlassCard key={req.id} style={styles.reqCard}>
+                  <View key={req.id} style={styles.reqCard}>
                     <View style={styles.reqHeader}>
                       <Avatar nama={praktikan?.nama ?? "?"} size={40} />
                       <View style={styles.reqInfo}>
@@ -308,7 +331,7 @@ export function PemeriksaanIzin() {
                           : ""}
                       </Text>
                     )}
-                  </GlassCard>
+                  </View>
                 );
               })}
             </View>
@@ -399,8 +422,38 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     fontSize: 13,
   },
+  ringkas: {
+    alignItems: "center",
+    backgroundColor: Palette.infoMuted,
+    borderRadius: 24,
+    flexDirection: "row",
+    gap: 4,
+    marginBottom: Spacing.three,
+    paddingLeft: 18,
+    paddingRight: 8,
+    paddingVertical: 14,
+  },
+  ringkasTeks: { flex: 1, gap: 4 },
+  ringkasJudul: { color: Palette.text, fontSize: 16, fontWeight: "700" },
+  ringkasSub: { color: Palette.textSecondary, fontSize: 12, lineHeight: 17 },
+  kosong: {
+    alignItems: "center",
+    backgroundColor: "#F7F6FB",
+    borderColor: Palette.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 8,
+    paddingVertical: 24,
+  },
+  kosongTeks: { color: Palette.textMuted, fontSize: 13, textAlign: "center" },
+  // Kartu solid, latar sama dengan kartu Timeline/Rekap.
   reqCard: {
+    backgroundColor: "#F7F6FB",
+    borderColor: Palette.border,
+    borderRadius: 22,
+    borderWidth: 1,
     gap: Spacing.three,
+    padding: 16,
   },
   reqHeader: {
     flexDirection: "row",
@@ -423,7 +476,7 @@ const styles = StyleSheet.create({
     color: Palette.text,
     fontSize: 14,
     lineHeight: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    backgroundColor: "#FFFFFF",
     padding: Spacing.two,
     borderRadius: 12,
   },

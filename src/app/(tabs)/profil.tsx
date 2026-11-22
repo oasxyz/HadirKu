@@ -3,9 +3,10 @@ import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { IlustrasiSapaan } from '@/components/ilustrasi';
 import { KartuKondisi } from '@/components/peta/kartu-kondisi';
 import { useToast } from '@/components/toast';
-import { Avatar, Badge, GlassCard, ListRow, Screen, SectionTitle, TopBar } from '@/components/ui';
+import { Avatar, Badge, GlassCard, Screen, SectionTitle, TopBar } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import {
@@ -56,7 +57,7 @@ export default function ProfilScreen() {
     // tidak lagi terkirim ke perangkat yang nanti dipakai akun lain.
     if (currentUser) await hapusPushToken(currentUser.id);
     await signOut();
-    tampilkanToast('Kamu sudah keluar dari akun.', 'info');
+    tampilkanToast('Sampai jumpa lagi di sesi praktikum berikutnya.', 'info', 'Kamu sudah keluar');
     router.replace('/login' as Href);
   }
 
@@ -64,8 +65,14 @@ export default function ProfilScreen() {
     <Screen>
       <TopBar title="Profil" />
 
+      {/* Banner lilac berilustrasi; avatar menumpang di tepi bawahnya. */}
+      <View style={styles.banner}>
+        <IlustrasiSapaan lebar={340} />
+      </View>
       <View style={styles.header}>
-        <Avatar nama={displayName} size={104} />
+        <View style={styles.avatarRing}>
+          <Avatar nama={displayName} size={96} />
+        </View>
         <Text style={styles.name}>{displayName}</Text>
         <Badge
           label={roleLabel}
@@ -73,11 +80,21 @@ export default function ProfilScreen() {
         />
       </View>
 
-      <View style={styles.list}>
-        <ListRow title="NIM" subtitle={nimDisplay} />
-        <ListRow title="Email Institusi" subtitle={emailDisplay} />
-        <ListRow title="Notifikasi" subtitle={LABEL_STATUS_PUSH[push.status]} />
-        <ListRow title="Versi Aplikasi" subtitle="3.0.0 (Sprint 3)" />
+      {/* Data akun dalam satu kartu solid, dipisah garis tipis. */}
+      <View style={styles.infoCard}>
+        {[
+          ['NIM', nimDisplay],
+          ['Email Institusi', emailDisplay],
+          ['Notifikasi', LABEL_STATUS_PUSH[push.status]],
+          ['Versi Aplikasi', '3.0.0 (Sprint 3)'],
+        ].map(([judul, isi], i) => (
+          <View key={judul} style={[styles.infoRow, i > 0 && styles.infoRowGaris]}>
+            <Text style={styles.infoJudul}>{judul}</Text>
+            <Text style={styles.infoIsi} numberOfLines={1}>
+              {isi}
+            </Text>
+          </View>
+        ))}
       </View>
 
       {push.status === 'ditolak' ? (
@@ -103,7 +120,7 @@ export default function ProfilScreen() {
       ) : null}
 
       {/* SRS3-04: notifikasi in-app, cadangan bila push tidak sampai ke perangkat */}
-      <GlassCard style={styles.notifCard}>
+      <GlassCard style={[styles.notifCard, styles.kartuSolid]}>
         <SectionTitle
           title={
             notif.jumlahBelumDibaca > 0
@@ -112,7 +129,11 @@ export default function ProfilScreen() {
           }
           right={
             notif.jumlahBelumDibaca > 0 ? (
-              <Pressable onPress={notif.tandaiSemuaDibaca} hitSlop={8} accessibilityRole="button">
+              <Pressable
+                onPress={notif.tandaiSemuaDibaca}
+                hitSlop={8}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.notifActionBtn, pressed && { opacity: 0.7 }]}>
                 <Text style={styles.notifAction}>Tandai dibaca</Text>
               </Pressable>
             ) : undefined
@@ -185,27 +206,77 @@ export default function ProfilScreen() {
 }
 
 const styles = StyleSheet.create({
+  banner: {
+    alignItems: 'center',
+    backgroundColor: Palette.warningMuted,
+    borderRadius: 28,
+    height: 150,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
   header: {
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 8,
+    gap: 8,
+    marginTop: -64,
+  },
+  avatarRing: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    padding: 4,
   },
   name: {
     color: Palette.text,
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '600',
     textAlign: 'center',
   },
-  list: {
+  // Kartu solid, latar sama dengan kartu Timeline/Rekap.
+  kartuSolid: {
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
+  },
+  infoCard: {
+    backgroundColor: '#F7F6FB',
+    borderColor: Palette.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+  },
+  infoRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
     gap: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+  },
+  infoRowGaris: {
+    borderTopColor: Palette.border,
+    borderTopWidth: 1,
+  },
+  infoJudul: {
+    color: Palette.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  infoIsi: {
+    color: Palette.textSecondary,
+    flexShrink: 1,
+    fontSize: 13,
+    textAlign: 'right',
   },
   notifCard: {
     gap: 12,
   },
+  notifActionBtn: {
+    backgroundColor: Palette.lavender,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
   notifAction: {
-    color: Palette.primary,
+    color: Palette.text,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   notifEmpty: {
     color: Palette.textMuted,
@@ -214,7 +285,7 @@ const styles = StyleSheet.create({
   },
   notifRow: {
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     flexDirection: 'row',
     gap: 10,

@@ -1,0 +1,23 @@
+# Asisten: rekap sesi kemarin, filter kotak Alpha, lalu kembali ke semua peserta.
+appId: com.oasxyz.HadirKu
+---
+- runFlow:
+    file: subflows/masuk.yaml
+    env:
+      EMAIL: ${ASISTEN_EMAIL}
+      SANDI: ${ASISTEN_SANDI}
+- tapOn: "Rekap"
+- extendedWaitUntil:
+    visible: "Jaringan Komputer"
+    timeout: 15000
+- tapOn: "Jaringan Komputer"
+- extendedWaitUntil:
+    visible: "Daftar Peserta"
+    timeout: 15000
+- assertVisible: "Di luar radius"
+- tapOn:
+    text: 'Alpha \d+ orang.*'
+- assertVisible: "Peserta Alpha"
+- assertVisible: 'Joko Santoso \(uji\)'
+- tapOn: "Tampilkan semua"
+- assertVisible: "Daftar Peserta"

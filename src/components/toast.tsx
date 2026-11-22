@@ -3,29 +3,30 @@
 //
 // Pakai: const { tampilkanToast } = useToast(); tampilkanToast('Sesi ditutup');
 //        tampilkanToast('Gagal menyimpan', 'error');
+//        tampilkanToast('Peserta diberi tahu lewat notifikasi.', 'sukses', 'Sesi dibuka');
 // Provider dipasang sekali di src/app/_layout.tsx.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Palette } from '@/constants/theme';
 
 export type JenisToast = 'sukses' | 'info' | 'error';
 
-type IsiToast = { id: number; pesan: string; jenis: JenisToast };
+type IsiToast = { id: number; pesan: string; jenis: JenisToast; judul: string };
 
 type NilaiToast = {
-  tampilkanToast: (pesan: string, jenis?: JenisToast) => void;
+  /** `judul` opsional; bila kosong memakai judul bawaan sesuai jenis. */
+  tampilkanToast: (pesan: string, jenis?: JenisToast, judul?: string) => void;
 };
 
 const DURASI_MS = 3000;
 
-// Gaya ala X/Twitter: kartu abu-abu gelap dengan teks putih. Jenis toast ditandai titik kecil:
-// magenta untuk sukses, putih untuk info, merah untuk error.
-const WARNA_TITIK: Record<JenisToast, string> = {
-  sukses: Palette.primary,
-  info: '#FFFFFF',
-  error: '#FF6B8A',
+// Kartu abu-abu terang bergaris tepi, dengan judul tebal dan isi pesan di bawahnya.
+const JUDUL_BAWAAN: Record<JenisToast, string> = {
+  sukses: 'Berhasil',
+  info: 'Informasi',
+  error: 'Terjadi kesalahan',
 };
 
 const KonteksToast = createContext<NilaiToast>({
@@ -40,11 +41,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<IsiToast | null>(null);
   const urutanRef = useRef(0);
 
-  const tampilkanToast = useCallback((pesan: string, jenis: JenisToast = 'sukses') => {
-    urutanRef.current += 1;
-    // Toast baru menggantikan yang lama supaya tidak menumpuk.
-    setToast({ id: urutanRef.current, pesan, jenis });
-  }, []);
+  const tampilkanToast = useCallback(
+    (pesan: string, jenis: JenisToast = 'sukses', judul?: string) => {
+      urutanRef.current += 1;
+      // Toast baru menggantikan yang lama supaya tidak menumpuk.
+      setToast({ id: urutanRef.current, pesan, jenis, judul: judul ?? JUDUL_BAWAAN[jenis] });
+    },
+    [],
+  );
 
   const tutup = useCallback(() => setToast(null), []);
   const nilai = useMemo(() => ({ tampilkanToast }), [tampilkanToast]);
@@ -82,7 +86,7 @@ function KartuToast({ toast, onTutup }: { toast: IsiToast; onTutup: () => void }
         accessibilityLiveRegion="polite"
         accessibilityHint="Ketuk untuk menutup"
         style={styles.kartu}>
-        <View style={[styles.titik, { backgroundColor: WARNA_TITIK[toast.jenis] }]} />
+        <Text style={[styles.judul, toast.jenis === 'error' && styles.judulError]}>{toast.judul}</Text>
         <Text style={styles.teks}>{toast.pesan}</Text>
       </Pressable>
     </Animated.View>
@@ -98,25 +102,26 @@ const styles = StyleSheet.create({
     elevation: 1000,
   },
   kartu: {
-    alignItems: 'center',
-    backgroundColor: '#2A2830',
+    backgroundColor: '#ECEAF1',
+    borderColor: 'rgba(23, 21, 28, 0.45)',
     borderRadius: 14,
-    boxShadow: '0 10px 30px rgba(20, 15, 30, 0.35)',
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 16,
+    borderWidth: 1,
+    boxShadow: '0 10px 28px rgba(40, 30, 60, 0.16)',
+    gap: 4,
+    paddingHorizontal: 18,
     paddingVertical: 14,
   },
-  titik: {
-    borderRadius: 999,
-    height: 8,
-    width: 8,
+  judul: {
+    color: Palette.ink,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  judulError: {
+    color: Palette.danger,
   },
   teks: {
-    color: '#FFFFFF',
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    lineHeight: 20,
+    color: Palette.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
   },
 });
