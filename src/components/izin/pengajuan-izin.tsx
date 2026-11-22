@@ -269,7 +269,7 @@ export function PengajuanIzin() {
                 Ajukan Izin · {formatTanggal(selectedDate)}
               </Text>
 
-              <Text style={styles.label}>Sesi</Text>
+              <Text style={styles.label}>Pilih sesi</Text>
               <View style={{ gap: 6 }}>
                 {sesiBisaDiajukan.map((s) => {
                   const selected = s.id === selectedSessionId;
@@ -281,19 +281,16 @@ export function PengajuanIzin() {
                         styles.sessionOption,
                         selected && styles.sessionOptionSelected,
                       ]}>
+                      {/* Tombol pilihan bulat: kosong, atau hitam bercentang saat dipilih. */}
+                      <View style={[styles.radio, selected && styles.radioTerpilih]}>
+                        {selected ? <Ionicons name="checkmark" size={13} color="#FFFFFF" /> : null}
+                      </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.sessionOptionTitle}>{s.praktikum}</Text>
                         <Text style={styles.sessionOptionSub}>
-                          {s.kelasLab} · {s.jamMulai}-{s.jamSelesai}
+                          {s.jamMulai}–{s.jamSelesai} · {s.kelasLab}
                         </Text>
                       </View>
-                      {selected && (
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={22}
-                          color={Palette.primary}
-                        />
-                      )}
                     </Pressable>
                   );
                 })}
@@ -592,19 +589,34 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
     marginBottom: Spacing.one,
   },
+  // Pilihan sesi: kartu solid; yang dipilih bertepi hitam (bukan latar merah muda).
   sessionOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
     borderWidth: 1,
     borderColor: Palette.border,
     borderRadius: 14,
     padding: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: '#F7F6FB',
   },
   sessionOptionSelected: {
-    borderColor: Palette.primary,
-    backgroundColor: 'rgba(226, 27, 208, 0.08)',
+    borderColor: Palette.ink,
+    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+  },
+  radio: {
+    alignItems: 'center',
+    borderColor: Palette.textMuted,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    height: 22,
+    justifyContent: 'center',
+    width: 22,
+  },
+  radioTerpilih: {
+    backgroundColor: Palette.ink,
+    borderColor: Palette.ink,
   },
   sessionOptionTitle: {
     fontSize: 14, fontWeight: '600', color: Palette.text,
@@ -619,7 +631,7 @@ const styles = StyleSheet.create({
     padding: 12,
     minHeight: 100,
     color: Palette.text,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: '#F7F6FB',
   },
   errorText: { color: Palette.danger, fontSize: 13, marginTop: Spacing.two },
   modalActions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three },
@@ -635,7 +647,7 @@ const styles = StyleSheet.create({
   confirmBtn: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: Palette.primary,
+    backgroundColor: Palette.ink,
     borderRadius: 999,
     paddingVertical: 12,
   },

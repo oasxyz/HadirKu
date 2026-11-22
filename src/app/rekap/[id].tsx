@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { IlustrasiKosong, IlustrasiPapanKlip } from '@/components/ilustrasi';
+import { ChipInfo } from '@/components/chip-info';
 import { StatusBadge } from '@/components/status-badge';
 import {
   LABEL_STATUS_KEHADIRAN,
@@ -171,14 +172,12 @@ export default function RekapDetailScreen() {
             {session.praktikum}
           </Text>
           <View style={styles.chips}>
-            <View style={styles.chip}>
-              <Text style={[styles.chipText, styles.chipTebal]}>
-                {formatRentangJam(session.jamMulai, session.jamSelesai)}
-              </Text>
-            </View>
-            <View style={styles.chip}>
-              <Text style={styles.chipText}>{formatTanggalSingkat(session.tanggal)}</Text>
-            </View>
+            <ChipInfo
+              label="Waktu"
+              nilai={formatRentangJam(session.jamMulai, session.jamSelesai)}
+            />
+            <ChipInfo label="Tanggal" nilai={formatTanggalSingkat(session.tanggal)} />
+            <ChipInfo label="Kelas" nilai={session.kelasLab} />
           </View>
           <Text style={styles.statLabel}>
             Praktikan hadir{' '}
@@ -342,22 +341,6 @@ const styles = StyleSheet.create({
   chips: {
     alignItems: 'flex-start',
     gap: 6,
-  },
-  chip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderColor: Palette.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  chipText: {
-    color: Palette.text,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  chipTebal: {
-    fontWeight: '700',
   },
   statLabel: {
     color: Palette.textSecondary,

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AttendanceAction } from '@/components/attendance-action';
+import { ChipInfo } from '@/components/chip-info';
 import { LocationCheckCard } from '@/components/location-check-card';
 import SessionControls from '@/components/session-controls';
 import {
@@ -161,19 +162,15 @@ export default function SesiDetailScreen() {
             {session.praktikum}
           </Text>
           <View style={styles.heroChips}>
-            <View style={styles.heroChip}>
-              <Text style={[styles.heroChipText, styles.heroChipTebal]}>
-                {formatRentangJam(session.jamMulai, session.jamSelesai)}
-              </Text>
-            </View>
-            <View style={styles.heroChip}>
-              <Text style={styles.heroChipText}>{formatTanggalSingkat(session.tanggal)}</Text>
-            </View>
-            <View style={styles.heroChip}>
-              <Text style={styles.heroChipText} numberOfLines={1}>
-                {session.kelasLab}
-              </Text>
-            </View>
+            <ChipInfo
+              label="Waktu"
+              nilai={formatRentangJam(session.jamMulai, session.jamSelesai)}
+            />
+            <ChipInfo label="Tanggal" nilai={formatTanggalSingkat(session.tanggal)} />
+            <ChipInfo label="Kelas" nilai={session.kelasLab} />
+            {locationState.labName ? (
+              <ChipInfo label="Tempat" nilai={locationState.labName} />
+            ) : null}
           </View>
         </View>
         <View style={styles.heroArt}>
@@ -383,23 +380,6 @@ const styles = StyleSheet.create({
   statusText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '700',
-  },
-  // Chip ringkas di kartu sesi; jam diberi teks tebal.
-  heroChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderColor: Palette.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  heroChipText: {
-    color: Palette.text,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  heroChipTebal: {
     fontWeight: '700',
   },
   heroTitle: {

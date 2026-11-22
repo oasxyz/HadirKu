@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AttendanceAction } from '@/components/attendance-action';
+import { ChipInfo } from '@/components/chip-info';
 import { ErrorBoundary } from '@/components/error-boundary';
 import {
   IlustrasiDitutup,
@@ -99,19 +100,15 @@ export default function PresensiScreen() {
             </Text>
             <Text style={styles.sessionMeta}>Asisten: {asistenName}</Text>
             <View style={styles.sessionChips}>
-              <View style={styles.chip}>
-                <Text style={[styles.chipText, styles.chipTebal]}>
-                  {formatRentangJam(session.jamMulai, session.jamSelesai)}
-                </Text>
-              </View>
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>{formatTanggalSingkat(session.tanggal)}</Text>
-              </View>
-              <View style={styles.chip}>
-                <Text style={styles.chipText} numberOfLines={1}>
-                  {locationState.labName ?? session.kelasLab}
-                </Text>
-              </View>
+              <ChipInfo
+                label="Waktu"
+                nilai={formatRentangJam(session.jamMulai, session.jamSelesai)}
+              />
+              <ChipInfo label="Tanggal" nilai={formatTanggalSingkat(session.tanggal)} />
+              <ChipInfo label="Kelas" nilai={session.kelasLab} />
+              {locationState.labName ? (
+                <ChipInfo label="Tempat" nilai={locationState.labName} />
+              ) : null}
             </View>
           </View>
           <View style={styles.sessionArt}>
@@ -258,22 +255,6 @@ const styles = StyleSheet.create({
   sessionChips: {
     alignItems: 'flex-start',
     gap: 6,
-  },
-  chip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderColor: Palette.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  chipText: {
-    color: Palette.text,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  chipTebal: {
-    fontWeight: '700',
   },
 
   successCard: {
