@@ -8,7 +8,7 @@ import type { Coordinates, Lab } from '@/types';
 import { Logger } from '@/utils/logger';
 
 /** Fallback lab ID kalau sesi belum punya labId (sesi Sprint 2 lama atau PIC A belum update form). */
-const LAB_ID_FALLBACK = 'lab-b';
+const LAB_ID_FALLBACK = 'lab-informatika-b';
 
 export type LocationPermissionStatus =
   | 'unknown'
@@ -189,8 +189,8 @@ export function useLocationValidation(labId: string | null | undefined): Locatio
 
   // 3. Panggil refreshLocation pertama kali
   useEffect(() => {
+    void refreshLocation();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    refreshLocation();
   }, [refreshLocation]);
 
   // 4. Hitung jarak & derivasi state

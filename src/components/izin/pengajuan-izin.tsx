@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getFirestore, serverTimestamp, setDoc } from '@react-native-firebase/firestore';
+import { doc, getFirestore, setDoc } from '@react-native-firebase/firestore';
 import { router, type Href } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -35,10 +35,6 @@ import { formatTanggal } from '@/utils/format';
 import { Logger, toUserErrorMessage } from '@/utils/logger';
 import { sesiSudahBerakhir } from '@/utils/sesi';
 
-/**
- * Status visual sprint 3 — gunakan sebagai gantinya Badge `tone` di ui.tsx
- * (sementara menunggu PM update tone warning/info/danger di komponen Badge).
- */
 function LocalBadge({
   label,
   tone,
@@ -86,7 +82,6 @@ export function PengajuanIzin() {
     [leaveRequests, currentUser],
   );
 
-  // Tanggal yang punya sesi (untuk marker titik di kalender)
   const markedDates = useMemo(() => {
     if (!currentUser) return new Set<string>();
     const set = new Set<string>();
@@ -122,8 +117,6 @@ export function PengajuanIzin() {
     );
   }
 
-  // Filter sesi yang bisa diajukan: pada tanggal terpilih, belum ditutup / berakhir,
-  // belum hadir, belum ada pengajuan menunggu/diterima.
   const sesiBisaDiajukan = sessions.filter((s) => {
     if (s.tanggal !== selectedDate) return false;
     if (s.status === 'ditutup') return false;
@@ -139,8 +132,6 @@ export function PengajuanIzin() {
     return !sudahAdaAktif;
   });
 
-  const selectedSession = sessions.find((s) => s.id === selectedSessionId);
-
   const resetForm = () => {
     setSelectedSessionId(null);
     setAlasan('');
@@ -151,7 +142,6 @@ export function PengajuanIzin() {
   const doSubmit = async (trimmed: string, compositeId: string) => {
     setSubmitting(true);
     try {
-      // Klasifikasi AI dulu (hasil dipakai saat write)
       const kategoriAi = await classifyLeaveReason(trimmed, config.aiTimeoutMs);
 
       const firestore = getFirestore();
@@ -163,7 +153,7 @@ export function PengajuanIzin() {
         alasan: trimmed,
         kategoriAi,
         status: 'menunggu',
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         diputuskanOleh: null,
         diputuskanAt: null,
       });
@@ -267,7 +257,6 @@ export function PengajuanIzin() {
         </View>
       )}
 
-      {/* ====== MODAL FORM ====== */}
       <Modal
         visible={showForm}
         animationType="fade"

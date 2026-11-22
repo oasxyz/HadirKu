@@ -3,10 +3,9 @@ import {
   doc,
   getFirestore,
   runTransaction,
-  serverTimestamp,
 } from '@react-native-firebase/firestore';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -24,6 +23,10 @@ import { useCurrentUser } from '@/context/auth-context';
 import { COLLECTIONS, getCompositeId } from '@/services/firebase';
 import type { AttendanceMethod, Session } from '@/types';
 import { Logger, toUserErrorMessage } from '@/utils/logger';
+
+const CAMERA_INITIAL_DELAY_MS = 200;
+const CAMERA_REMOUNT_DELAY_MS = 500;
+const SCANNER_GRACE_MS = 1500;
 
 interface AttendanceActionProps {
   sessionId: string;
@@ -50,13 +53,74 @@ export function AttendanceAction({
   const [submitting, setSubmitting] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [scanned, setScanned] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+
+  const [cameraMounted, setCameraMounted] = useState(false);
   const [cameraKey, setCameraKey] = useState(0);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [scannerActive, setScannerActive] = useState(false);
 
   const [permission, requestPermission] = useCameraPermissions();
 
   const isSubmittingRef = useRef<boolean>(false);
+  const permissionRequestedRef = useRef<boolean>(false);
 
   const currentUserId = currentUser?.id ?? '';
+
+  useEffect(() => {
+    if (permissionRequestedRef.current) return;
+    if (!permission) return;
+    if (permission.granted) {
+      permissionRequestedRef.current = true;
+      return;
+    }
+    if (permission.canAskAgain) {
+      permissionRequestedRef.current = true;
+      requestPermission().then((result) => {
+        if (!result.granted) setPermissionDenied(true);
+      });
+    } else {
+      setPermissionDenied(true);
+    }
+  }, [permission, requestPermission]);
+
+  useEffect(() => {
+    if (!permission?.granted || showManual || locked || session.status !== 'dibuka') {
+      setCameraMounted(false);
+      setCameraReady(false);
+      setScannerActive(false);
+      return;
+    }
+
+    setCameraMounted(false);
+    setCameraReady(false);
+    setScannerActive(false);
+
+    const t1 = setTimeout(() => setCameraMounted(true), CAMERA_INITIAL_DELAY_MS);
+    const t2 = setTimeout(
+      () => setCameraMounted(false),
+      CAMERA_INITIAL_DELAY_MS + CAMERA_REMOUNT_DELAY_MS,
+    );
+    const t3 = setTimeout(() => {
+      setCameraKey((k) => k + 1);
+      setCameraMounted(true);
+    }, CAMERA_INITIAL_DELAY_MS + CAMERA_REMOUNT_DELAY_MS + 100);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [permission?.granted, showManual, locked, session.status]);
+
+  useEffect(() => {
+    if (!cameraReady) {
+      setScannerActive(false);
+      return;
+    }
+    const t = setTimeout(() => setScannerActive(true), SCANNER_GRACE_MS);
+    return () => clearTimeout(t);
+  }, [cameraReady]);
 
   const submitPresensi = useCallback(
     async (inputKode: string, metode: AttendanceMethod) => {
@@ -102,7 +166,7 @@ export function AttendanceAction({
           const payload: Record<string, unknown> = {
             sessionId,
             userId: currentUserId,
-            waktuPresensi: serverTimestamp(),
+            waktuPresensi: new Date().toISOString(),
             kode: trimmed,
             metode,
           };
@@ -120,7 +184,7 @@ export function AttendanceAction({
 
         setKode('');
         setShowManual(false);
-        setScanned(false);
+        setScannerActive(false);
         onSuccess?.();
       } catch (err: unknown) {
         const code = (err as { code?: string }).code ?? '';
@@ -142,30 +206,38 @@ export function AttendanceAction({
     [currentUser, currentUserId, sessionId, session.status, session.pesertaIds, jarakMeter, radiusMeter, locked, onSuccess],
   );
 
-  const openScanner = useCallback(async () => {
-    setScannerError(null);
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
-        setErrorMsg('Izin kamera diperlukan untuk scan QR');
-        return;
-      }
-    }
-    setScanned(false);
-  }, [permission?.granted, requestPermission]);
+  const retryPermission = useCallback(async () => {
+    setPermissionDenied(false);
+    const result = await requestPermission();
+    if (!result.granted) setPermissionDenied(true);
+  }, [requestPermission]);
 
   const handleBarCodeScanned = useCallback(
     ({ data }: { data: string }) => {
-      if (scanned || isSubmittingRef.current) return;
+      if (scanned || isSubmittingRef.current || !scannerActive) return;
       setScanned(true);
       submitPresensi(data, 'qr');
     },
-    [scanned, submitPresensi],
+    [scanned, scannerActive, submitPresensi],
   );
 
   const scanAgain = useCallback(() => {
     setScannerError(null);
     setScanned(false);
+  }, []);
+
+  const switchToManual = useCallback(() => {
+    setScanned(true);
+    setScannerActive(false);
+    setShowManual(true);
+  }, []);
+
+  const refreshCamera = useCallback(() => {
+    setCameraReady(false);
+    setScannerActive(false);
+    setScanned(false);
+    setScannerError(null);
+    setCameraKey((k) => k + 1);
   }, []);
 
   if (session.status === 'belum_dibuka') {
@@ -201,6 +273,8 @@ export function AttendanceAction({
     );
   }
 
+  const showLoadingOverlay = !scannerActive && !submitting;
+
   return (
     <ErrorBoundary fallbackTitle="Komponen Presensi Bermasalah">
       <View style={styles.container}>
@@ -208,28 +282,40 @@ export function AttendanceAction({
           <>
             {permission?.granted ? (
               <View style={styles.scannerFrame}>
-                <CameraView
-                  key={`camera-${cameraKey}-${permission.granted ? 'active' : 'idle'}`}
-                  facing="back"
-                  style={StyleSheet.absoluteFill}
-                  barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                  onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-                />
+                {cameraMounted && (
+                  <CameraView
+                    key={`camera-${cameraKey}`}
+                    facing="back"
+                    style={StyleSheet.absoluteFill}
+                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                    onCameraReady={() => setCameraReady(true)}
+                    onBarcodeScanned={
+                      !scannerActive || scanned ? undefined : handleBarCodeScanned
+                    }
+                  />
+                )}
                 <View style={styles.scannerCornerTL} />
                 <View style={styles.scannerCornerTR} />
                 <View style={styles.scannerCornerBL} />
                 <View style={styles.scannerCornerBR} />
 
-                <TouchableOpacity
-                  style={styles.refreshCameraBtn}
-                  onPress={() => {
-                    setCameraKey((k) => k + 1);
-                    setScanned(false);
-                    setScannerError(null);
-                  }}>
-                  <Ionicons name="refresh" size={14} color="#FFFFFF" />
-                  <Text style={styles.refreshCameraText}>Muat Ulang Kamera</Text>
-                </TouchableOpacity>
+                {showLoadingOverlay && (
+                  <View style={styles.scannerLoading}>
+                    <ActivityIndicator size="large" color="#FFFFFF" />
+                    <Text style={styles.scannerLoadingText}>
+                      {cameraReady ? 'Menyiapkan scanner...' : 'Menyiapkan kamera...'}
+                    </Text>
+                  </View>
+                )}
+
+                {!submitting && (
+                  <TouchableOpacity
+                    style={styles.refreshCameraBtn}
+                    onPress={refreshCamera}>
+                    <Ionicons name="refresh" size={14} color="#FFFFFF" />
+                    <Text style={styles.refreshCameraText}>Muat Ulang Kamera</Text>
+                  </TouchableOpacity>
+                )}
 
                 {submitting && (
                   <View style={styles.scannerLoading}>
@@ -247,22 +333,25 @@ export function AttendanceAction({
                   </View>
                 )}
               </View>
+            ) : permissionDenied ? (
+              <View style={styles.scannerPermFrame}>
+                <Illustration icon="camera-outline" />
+                <Text style={styles.scannerPermTitle}>Izin Kamera Diperlukan</Text>
+                <Text style={styles.scannerPermSubtitle}>
+                  Berikan izin kamera untuk scan QR, atau gunakan kode manual.
+                </Text>
+                <TouchableOpacity style={styles.permButton} onPress={retryPermission}>
+                  <Text style={styles.permButtonText}>Coba Lagi</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               <View style={styles.scannerPermFrame}>
-                <Illustration icon="qr-code-outline" />
-                <Text style={styles.scannerPermTitle}>Pindai QR Code Asisten</Text>
-                <Text style={styles.scannerPermSubtitle}>
-                  Berikan izin kamera untuk memulai
-                </Text>
-                <TouchableOpacity style={styles.permButton} onPress={openScanner}>
-                  <Text style={styles.permButtonText}>Buka Kamera</Text>
-                </TouchableOpacity>
+                <ActivityIndicator size="large" color={Palette.primary} />
+                <Text style={styles.scannerPermSubtitle}>Menyiapkan kamera...</Text>
               </View>
             )}
 
-            <Pressable
-              onPress={() => setShowManual(true)}
-              style={styles.fallbackButton}>
+            <Pressable onPress={switchToManual} style={styles.fallbackButton}>
               <Text style={styles.fallbackButtonText}>
                 Kamera bermasalah? Ketik kode 6 digit
               </Text>
@@ -308,6 +397,7 @@ export function AttendanceAction({
                 setShowManual(false);
                 setKode('');
                 setErrorMsg(null);
+                setScanned(false);
               }}
               style={styles.fallbackButton}>
               <Text style={styles.fallbackButtonText}>Kembali ke Pindai QR</Text>
