@@ -24,8 +24,7 @@ import { COLLECTIONS, getCompositeId } from '@/services/firebase';
 import type { AttendanceMethod, Session } from '@/types';
 import { Logger, toUserErrorMessage } from '@/utils/logger';
 
-const CAMERA_INITIAL_DELAY_MS = 200;
-const CAMERA_REMOUNT_DELAY_MS = 500;
+/** Grace period sebelum scan QR diproses setelah kamera siap (ms). */
 const SCANNER_GRACE_MS = 1500;
 
 interface AttendanceActionProps {
@@ -52,75 +51,35 @@ export function AttendanceAction({
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showManual, setShowManual] = useState(false);
-  const [scanned, setScanned] = useState(false);
-  const [permissionDenied, setPermissionDenied] = useState(false);
-
-  const [cameraMounted, setCameraMounted] = useState(false);
-  const [cameraKey, setCameraKey] = useState(0);
   const [cameraReady, setCameraReady] = useState(false);
-  const [scannerActive, setScannerActive] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const [permission, requestPermission] = useCameraPermissions();
 
+  // Lock sinkron (ref) untuk cegah double-submit dan auto-scan sebelum grace period.
+  // Dipakai di dalam handler scan, bukan di state, supaya tidak memicu re-render
+  // yang bisa bikin onBarcodeScanned sempat undefined.
   const isSubmittingRef = useRef<boolean>(false);
+  const scanLockRef = useRef<boolean>(false);
+  const scanReadyAtRef = useRef<number>(Number.POSITIVE_INFINITY);
   const permissionRequestedRef = useRef<boolean>(false);
 
   const currentUserId = currentUser?.id ?? '';
 
+  // Auto-minta izin kamera sekali saat komponen mount.
   useEffect(() => {
     if (permissionRequestedRef.current) return;
     if (!permission) return;
-    if (permission.granted) {
-      permissionRequestedRef.current = true;
-      return;
-    }
+    permissionRequestedRef.current = true;
+    if (permission.granted) return;
     if (permission.canAskAgain) {
-      permissionRequestedRef.current = true;
       requestPermission().then((result) => {
         if (!result.granted) setPermissionDenied(true);
       });
     } else {
-      setPermissionDenied(true);
+      Promise.resolve().then(() => setPermissionDenied(true));
     }
   }, [permission, requestPermission]);
-
-  useEffect(() => {
-    if (!permission?.granted || showManual || locked || session.status !== 'dibuka') {
-      setCameraMounted(false);
-      setCameraReady(false);
-      setScannerActive(false);
-      return;
-    }
-
-    setCameraMounted(false);
-    setCameraReady(false);
-    setScannerActive(false);
-
-    const t1 = setTimeout(() => setCameraMounted(true), CAMERA_INITIAL_DELAY_MS);
-    const t2 = setTimeout(
-      () => setCameraMounted(false),
-      CAMERA_INITIAL_DELAY_MS + CAMERA_REMOUNT_DELAY_MS,
-    );
-    const t3 = setTimeout(() => {
-      setCameraKey((k) => k + 1);
-      setCameraMounted(true);
-    }, CAMERA_INITIAL_DELAY_MS + CAMERA_REMOUNT_DELAY_MS + 100);
-
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-    };
-  }, [permission?.granted, showManual, locked, session.status]);
-
-  useEffect(() => {
-    if (!cameraReady) {
-      setScannerActive(false);
-      return;
-    }
-    const t = setTimeout(() => setScannerActive(true), SCANNER_GRACE_MS);
-    return () => clearTimeout(t);
-  }, [cameraReady]);
 
   const submitPresensi = useCallback(
     async (inputKode: string, metode: AttendanceMethod) => {
@@ -130,22 +89,22 @@ export function AttendanceAction({
       const trimmed = inputKode.trim();
       if (!currentUser) {
         setError('Pengguna belum masuk');
-        return;
-      }
-      if (session.status !== 'dibuka') {
-        setError('Sesi presensi belum dibuka oleh asisten');
+        scanLockRef.current = false;
         return;
       }
       if (trimmed.length !== 6 || !/^\d{6}$/.test(trimmed)) {
         setError('Kode sesi harus 6 digit angka');
+        scanLockRef.current = false;
         return;
       }
       if (!session.pesertaIds.includes(currentUserId)) {
         setError('Anda bukan peserta sesi ini');
+        scanLockRef.current = false;
         return;
       }
       if (locked) {
         setError('Presensi terkunci. Pastikan Anda di dalam radius lab.');
+        scanLockRef.current = false;
         return;
       }
 
@@ -184,7 +143,6 @@ export function AttendanceAction({
 
         setKode('');
         setShowManual(false);
-        setScannerActive(false);
         onSuccess?.();
       } catch (err: unknown) {
         const code = (err as { code?: string }).code ?? '';
@@ -198,12 +156,14 @@ export function AttendanceAction({
           setError(toUserErrorMessage(err));
         }
         Logger.error('FIRESTORE', 'AttendanceWrite', err, { sessionId });
+        // Reset lock supaya user bisa coba lagi via tombol "Coba Lagi" / scan ulang.
+        scanLockRef.current = false;
       } finally {
         isSubmittingRef.current = false;
         setSubmitting(false);
       }
     },
-    [currentUser, currentUserId, sessionId, session.status, session.pesertaIds, jarakMeter, radiusMeter, locked, onSuccess],
+    [currentUser, currentUserId, sessionId, session.pesertaIds, jarakMeter, radiusMeter, locked, onSuccess],
   );
 
   const retryPermission = useCallback(async () => {
@@ -212,55 +172,44 @@ export function AttendanceAction({
     if (!result.granted) setPermissionDenied(true);
   }, [requestPermission]);
 
+  const handleCameraReady = useCallback(() => {
+    scanReadyAtRef.current = Date.now() + SCANNER_GRACE_MS;
+    scanLockRef.current = false;
+    setCameraReady(true);
+  }, []);
+
+  // Handler selalu terpasang (onBarcodeScanned tidak pernah undefined), supaya
+  // expo-camera 57 benar-benar mengaktifkan barcode scanner native di mount pertama.
+  // Semua gate (grace period, dedupe) dicek di dalam handler lewat ref.
   const handleBarCodeScanned = useCallback(
     ({ data }: { data: string }) => {
-      if (scanned || isSubmittingRef.current || !scannerActive) return;
-      setScanned(true);
+      if (scanLockRef.current || isSubmittingRef.current) return;
+      if (Date.now() < scanReadyAtRef.current) return;
+      scanLockRef.current = true;
       submitPresensi(data, 'qr');
     },
-    [scanned, scannerActive, submitPresensi],
+    [submitPresensi],
   );
 
   const scanAgain = useCallback(() => {
     setScannerError(null);
-    setScanned(false);
+    scanLockRef.current = false;
   }, []);
 
   const switchToManual = useCallback(() => {
-    setScanned(true);
-    setScannerActive(false);
+    scanLockRef.current = true;
     setShowManual(true);
   }, []);
 
-  const refreshCamera = useCallback(() => {
+  const backToScanner = useCallback(() => {
+    setShowManual(false);
+    setKode('');
+    setErrorMsg(null);
+    // Kamera akan remount saat kembali ke tampilan scanner; reset gate scan.
+    scanReadyAtRef.current = Number.POSITIVE_INFINITY;
+    scanLockRef.current = false;
     setCameraReady(false);
-    setScannerActive(false);
-    setScanned(false);
-    setScannerError(null);
-    setCameraKey((k) => k + 1);
   }, []);
-
-  if (session.status === 'belum_dibuka') {
-    return (
-      <View style={[styles.banner, styles.lockedBorder]}>
-        <Ionicons name="hourglass-outline" size={24} color={Palette.warning} />
-        <Text style={[styles.bannerText, { color: Palette.warning }]}>
-          Sesi presensi belum dibuka oleh asisten. Fitur scanner kamera dan ketik kode terkunci.
-        </Text>
-      </View>
-    );
-  }
-
-  if (session.status === 'ditutup') {
-    return (
-      <View style={[styles.banner, styles.lockedBorder]}>
-        <Ionicons name="lock-closed" size={24} color={Palette.danger} />
-        <Text style={[styles.bannerText, { color: Palette.danger }]}>
-          Sesi presensi telah ditutup.
-        </Text>
-      </View>
-    );
-  }
 
   if (locked) {
     return (
@@ -273,8 +222,6 @@ export function AttendanceAction({
     );
   }
 
-  const showLoadingOverlay = !scannerActive && !submitting;
-
   return (
     <ErrorBoundary fallbackTitle="Komponen Presensi Bermasalah">
       <View style={styles.container}>
@@ -282,39 +229,22 @@ export function AttendanceAction({
           <>
             {permission?.granted ? (
               <View style={styles.scannerFrame}>
-                {cameraMounted && (
-                  <CameraView
-                    key={`camera-${cameraKey}`}
-                    facing="back"
-                    style={StyleSheet.absoluteFill}
-                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                    onCameraReady={() => setCameraReady(true)}
-                    onBarcodeScanned={
-                      !scannerActive || scanned ? undefined : handleBarCodeScanned
-                    }
-                  />
-                )}
+                <CameraView
+                  style={StyleSheet.absoluteFill}
+                  barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                  onCameraReady={handleCameraReady}
+                  onBarcodeScanned={handleBarCodeScanned}
+                />
                 <View style={styles.scannerCornerTL} />
                 <View style={styles.scannerCornerTR} />
                 <View style={styles.scannerCornerBL} />
                 <View style={styles.scannerCornerBR} />
 
-                {showLoadingOverlay && (
+                {!cameraReady && !submitting && (
                   <View style={styles.scannerLoading}>
                     <ActivityIndicator size="large" color="#FFFFFF" />
-                    <Text style={styles.scannerLoadingText}>
-                      {cameraReady ? 'Menyiapkan scanner...' : 'Menyiapkan kamera...'}
-                    </Text>
+                    <Text style={styles.scannerLoadingText}>Menyiapkan kamera...</Text>
                   </View>
-                )}
-
-                {!submitting && (
-                  <TouchableOpacity
-                    style={styles.refreshCameraBtn}
-                    onPress={refreshCamera}>
-                    <Ionicons name="refresh" size={14} color="#FFFFFF" />
-                    <Text style={styles.refreshCameraText}>Muat Ulang Kamera</Text>
-                  </TouchableOpacity>
                 )}
 
                 {submitting && (
@@ -392,14 +322,7 @@ export function AttendanceAction({
               )}
             </TouchableOpacity>
 
-            <Pressable
-              onPress={() => {
-                setShowManual(false);
-                setKode('');
-                setErrorMsg(null);
-                setScanned(false);
-              }}
-              style={styles.fallbackButton}>
+            <Pressable onPress={backToScanner} style={styles.fallbackButton}>
               <Text style={styles.fallbackButtonText}>Kembali ke Pindai QR</Text>
             </Pressable>
           </View>
@@ -428,24 +351,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#000',
     position: 'relative',
-  },
-  refreshCameraBtn: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    zIndex: 10,
-  },
-  refreshCameraText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '600',
   },
   scannerCornerTL: {
     position: 'absolute', top: 12, left: 12, width: 28, height: 28,
