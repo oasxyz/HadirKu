@@ -4,7 +4,16 @@
 // Praktikan melihat sesi yang diikutinya; asisten melihat semua sesi di tiap lab (keputusan tim).
 import { router, type Href } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -21,12 +30,26 @@ import PetaLeaflet, { type PinPeta, type RadiusPeta } from '@/components/peta/pe
 import { useLabsPeta } from '@/components/peta/use-labs-peta';
 import { useLokasiPengguna } from '@/components/peta/use-lokasi-pengguna';
 import { useSesiSemuaAsisten } from '@/components/peta/use-sesi-semua-asisten';
-import { Chip, GlassCard, RoundButton, TAB_BAR_SPACE } from '@/components/ui';
+import { GlassCard, RoundButton, TAB_BAR_SPACE } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useSessions } from '@/hooks/use-sessions';
 
 const INTERVAL_JAM_MS = 30_000;
+
+// Chip lab di header. Chip bawaan (ui.tsx) berlatar putih transparan sehingga hilang di atas
+// header yang sudah putih; di sini latarnya lavender agar tetap terlihat.
+function ChipLab({ label, terpilih, onPress }: { label: string; terpilih: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: terpilih }}
+      style={({ pressed }) => [styles.chipLab, terpilih && styles.chipLabTerpilih, pressed && styles.ditekan]}>
+      <Text style={[styles.chipLabTeks, terpilih && styles.chipLabTeksTerpilih]}>{label}</Text>
+    </Pressable>
+  );
+}
 
 function useSekarang(): Date {
   const [sekarang, setSekarang] = useState(() => new Date());
@@ -211,10 +234,10 @@ export default function PetaScreen() {
         {labs.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
             {labs.map((lab) => (
-              <Chip
+              <ChipLab
                 key={lab.id}
                 label={namaLabSingkat(lab.namaLab)}
-                selected={lab.id === labTerpilih}
+                terpilih={lab.id === labTerpilih}
                 onPress={() => setLabTerpilih(lab.id)}
               />
             ))}
@@ -272,6 +295,26 @@ const styles = StyleSheet.create({
   },
   chips: {
     gap: 6,
+  },
+  chipLab: {
+    backgroundColor: Palette.lavender,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  chipLabTerpilih: {
+    backgroundColor: Palette.ink,
+  },
+  chipLabTeks: {
+    color: Palette.text,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  chipLabTeksTerpilih: {
+    color: '#FFFFFF',
+  },
+  ditekan: {
+    opacity: 0.7,
   },
   bottom: {
     left: 14,
