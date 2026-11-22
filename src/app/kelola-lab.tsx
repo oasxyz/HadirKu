@@ -16,12 +16,12 @@ import {
 import {
   Badge,
   GlassCard,
-  IconCircle,
   PrimaryButton,
   Screen,
   SectionTitle,
   TopBar,
 } from '@/components/ui';
+import { useToast } from '@/components/toast';
 import { Palette } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useLabs } from '@/hooks/use-labs';
@@ -44,9 +44,13 @@ export default function KelolaLabScreen() {
   const [radiusInput, setRadiusInput] = useState<string>('50');
   const [fetchingGps, setFetchingGps] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(
-    null
-  );
+  // Umpan balik (sukses/error) kini tampil sebagai toast melayang, bukan kotak di halaman.
+  const { tampilkanToast } = useToast();
+  const setFeedback = (
+    feedback: { type: 'success' | 'error'; message: string } | null,
+  ) => {
+    if (feedback) tampilkanToast(feedback.message, feedback.type === 'error' ? 'error' : 'sukses');
+  };
 
   const isSubmittingRef = useRef<boolean>(false);
 
@@ -239,7 +243,6 @@ export default function KelolaLabScreen() {
                 {/* 2. Kartu Koordinat Lokasi */}
                 <GlassCard style={styles.card}>
                   <View style={styles.cardHeader}>
-                    <IconCircle icon="location" tint={0} size={42} />
                     <View style={styles.cardHeaderText}>
                       <Text style={styles.cardTitle}>{selectedLab.namaLab}</Text>
                       <Text style={styles.cardSubtitle}>
@@ -287,7 +290,7 @@ export default function KelolaLabScreen() {
                         <ActivityIndicator size="small" color={Palette.primary} />
                       ) : (
                         <Text style={styles.gpsButtonText}>
-                          📍 Gunakan Lokasi Saya
+                          Gunakan Lokasi Saya
                         </Text>
                       )}
                     </Pressable>
@@ -299,7 +302,7 @@ export default function KelolaLabScreen() {
                       ]}
                       onPress={handleUseUndipPreset}
                     >
-                      <Text style={styles.presetButtonText}>🏫 Titik FSM Undip</Text>
+                      <Text style={styles.presetButtonText}>Titik FSM Undip</Text>
                     </Pressable>
                   </View>
                 </GlassCard>
@@ -371,28 +374,6 @@ export default function KelolaLabScreen() {
                 </GlassCard>
 
                 {/* Feedback status */}
-                {feedback && (
-                  <View
-                    style={[
-                      styles.feedbackBox,
-                      feedback.type === 'error'
-                        ? styles.feedbackError
-                        : styles.feedbackSuccess,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.feedbackText,
-                        feedback.type === 'error'
-                          ? styles.feedbackTextError
-                          : styles.feedbackTextSuccess,
-                      ]}
-                    >
-                      {feedback.message}
-                    </Text>
-                  </View>
-                )}
-
                 {/* Tombol Simpan */}
                 <PrimaryButton
                   label={saving ? 'Menyimpan Pengaturan…' : 'Simpan Lokasi Lab'}
@@ -597,32 +578,6 @@ const styles = StyleSheet.create({
   radiusChipTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
-  },
-  feedbackBox: {
-    padding: 14,
-    borderRadius: 16,
-  },
-  feedbackSuccess: {
-    backgroundColor: 'rgba(34, 197, 94, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.4)',
-  },
-  feedbackError: {
-    backgroundColor: Palette.dangerMuted,
-    borderWidth: 1,
-    borderColor: Palette.danger,
-  },
-  feedbackText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  feedbackTextSuccess: {
-    color: '#15803d',
-    fontWeight: '600',
-  },
-  feedbackTextError: {
-    color: Palette.danger,
-    fontWeight: '600',
   },
   saveButton: {
     marginTop: 8,

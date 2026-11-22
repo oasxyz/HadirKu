@@ -6,6 +6,7 @@ import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { AttendanceAction } from '@/components/attendance-action';
 import { LocationCheckCard } from '@/components/location-check-card';
 import SessionControls from '@/components/session-controls';
+import { useToast } from '@/components/toast';
 import { StatusBadge } from '@/components/status-badge';
 import {
   Avatar,
@@ -26,6 +27,7 @@ import { useLocationValidation } from '@/hooks/useLocationValidation';
 import { useSessions } from '@/hooks/use-sessions';
 import { usePraktikanList } from '@/hooks/use-users';
 import { formatRentangJam, formatTanggal } from '@/utils/format';
+import { Logger } from '@/utils/logger';
 import { sesiSudahBerakhir } from '@/utils/sesi';
 
 export default function SesiDetailScreen() {
@@ -37,6 +39,7 @@ export default function SesiDetailScreen() {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { tampilkanToast } = useToast();
 
   const session = sessions.find((item) => item.id === id);
   const isAsisten = currentUser?.role === 'asisten';
@@ -88,9 +91,11 @@ export default function SesiDetailScreen() {
       setDeleting(true);
       await deleteSession(session.id);
       setShowDeleteModal(false);
+      tampilkanToast('Sesi praktikum dihapus.');
       router.replace('/jadwal' as Href);
     } catch (e) {
-      console.error('Gagal menghapus sesi:', e);
+      Logger.error('FIRESTORE', 'DELETE_SESSION', e);
+      tampilkanToast('Gagal menghapus sesi. Periksa koneksi internet lalu coba lagi.', 'error');
       setDeleting(false);
     }
   }

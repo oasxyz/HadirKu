@@ -66,7 +66,7 @@ export function LocationCheckCard({ state, onOpenSettings }: LocationCheckCardPr
   if (state.loading && state.currentCoords === null) {
     return (
       <GlassCard style={styles.locationCard}>
-        <Text style={styles.locationStatusText}>Memeriksa lokasi...</Text>
+        <Text style={styles.locationStatusText}>Memeriksa lokasi…</Text>
       </GlassCard>
     );
   }
@@ -83,7 +83,7 @@ export function LocationCheckCard({ state, onOpenSettings }: LocationCheckCardPr
         <Ionicons
           name={state.isWithinRadius ? 'checkmark-circle' : 'alert-circle'}
           size={28}
-          color={state.isWithinRadius ? Palette.primary : Palette.danger}
+          color={state.isWithinRadius ? Palette.primary : Palette.ink}
         />
         <View style={{ flex: 1 }}>
           <Text style={styles.locationTitle}>
@@ -111,7 +111,7 @@ export function LocationCheckCard({ state, onOpenSettings }: LocationCheckCardPr
           disabled={state.loading}>
           <Ionicons name="refresh" size={16} color={Palette.text} />
           <Text style={styles.refreshButtonText}>
-            {state.loading ? 'Memuat...' : 'Perbarui Lokasi'}
+            {state.loading ? 'Memperbarui lokasi…' : 'Perbarui Lokasi'}
           </Text>
         </Pressable>
 
@@ -160,8 +160,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   locationWarning: {
+    // Aturan warna seragam: merah hanya untuk error; kondisi di luar radius memakai hitam.
     fontSize: 12,
-    color: Palette.danger,
+    fontWeight: '600',
+    color: Palette.ink,
     lineHeight: 18,
   },
   actionsRow: {

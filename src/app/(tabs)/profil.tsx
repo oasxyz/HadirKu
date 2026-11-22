@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { KartuKondisi } from '@/components/peta/kartu-kondisi';
+import { useToast } from '@/components/toast';
 import { Avatar, Badge, GlassCard, ListRow, Screen, SectionTitle, TopBar } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
@@ -40,6 +41,7 @@ export default function ProfilScreen() {
   const { firebaseUser, currentUser, signOut } = useAuth();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const push = usePushNotifikasi();
+  const { tampilkanToast } = useToast();
   const notif = useNotifikasiSaya();
 
   const displayName = currentUser?.nama || firebaseUser?.displayName || 'Pengguna';
@@ -54,6 +56,7 @@ export default function ProfilScreen() {
     // tidak lagi terkirim ke perangkat yang nanti dipakai akun lain.
     if (currentUser) await hapusPushToken(currentUser.id);
     await signOut();
+    tampilkanToast('Kamu sudah keluar dari akun.', 'info');
     router.replace('/login' as Href);
   }
 

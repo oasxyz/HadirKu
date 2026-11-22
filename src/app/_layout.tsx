@@ -8,6 +8,7 @@ import { View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ScreenBackground } from '@/components/screen-background';
+import { ToastProvider } from '@/components/toast';
 import { AuthProvider } from '@/context/auth-context';
 import { seedInitialLabsIfNeeded } from '@/services/firebase';
 import { FONT_INTER, pasangFontInter } from '@/constants/font-inter';
@@ -39,6 +40,8 @@ export default function RootLayout() {
     <AuthProvider>
       <StatusBar style="dark" />
       <AnimatedSplashOverlay />
+      {/* Toast melayang di atas semua layar (lihat src/components/toast.tsx). */}
+      <ToastProvider>
       <View style={{ flex: 1 }}>
         <ScreenBackground />
         <ThemeProvider value={transparentTheme}>
@@ -57,7 +60,6 @@ export default function RootLayout() {
             <Stack.Screen name="register" />
             <Stack.Screen name="lengkapi-profil" />
             <Stack.Screen name="jadwal/form" />
-            <Stack.Screen name="jadwal-form" />
             <Stack.Screen name="kelola-lab" />
 
             {/* ===== PIC B (Annis) — Detail rekap kehadiran ===== */}
@@ -68,6 +70,7 @@ export default function RootLayout() {
           </Stack>
         </ThemeProvider>
       </View>
+      </ToastProvider>
     </AuthProvider>
   );
 }

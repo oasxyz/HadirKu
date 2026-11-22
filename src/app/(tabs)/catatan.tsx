@@ -1,6 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
+import {
+  LABEL_STATUS_KEHADIRAN,
+  StatusKehadiranBadge,
+  WARNA_ANGKA_STATUS,
+} from '@/components/status-kehadiran-badge';
 import {
   EmptyNote,
   GlassCard,
@@ -16,17 +20,14 @@ import type { FinalAttendanceStatus } from '@/types';
 import { formatTanggal } from '@/utils/format';
 import { hitungStatusKehadiran, ringkasKehadiran } from '@/utils/status-kehadiran';
 
-// Peta label + warna untuk 4 status + belum hadir
-const STATUS_META: Record<
-  FinalAttendanceStatus,
-  { label: string; color: string; bg: string; icon: 'checkmark-circle' | 'medkit' | 'document-text' | 'close-circle' | 'time' }
-> = {
-  hadir: { label: 'Hadir', color: Palette.primary, bg: 'rgba(226,27,208,0.1)', icon: 'checkmark-circle' },
-  sakit: { label: 'Sakit', color: '#D97706', bg: 'rgba(217,119,6,0.14)', icon: 'medkit' },
-  izin: { label: 'Izin', color: '#6D28D9', bg: 'rgba(109,40,217,0.12)', icon: 'document-text' },
-  alpha: { label: 'Alpha', color: '#E11D48', bg: 'rgba(225,29,72,0.12)', icon: 'close-circle' },
-  belum_hadir: { label: 'Belum Hadir', color: Palette.textSecondary, bg: 'rgba(110,90,150,0.08)', icon: 'time' },
-};
+// Tanggal sesi harus valid (YYYY-MM-DD dan benar-benar ada di kalender), supaya data yang
+// salah ketik tidak tampil sebagai "40 Nov 2026".
+function tanggalValid(tanggal: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) return false;
+  const [y, m, d] = tanggal.split('-').map(Number);
+  const tgl = new Date(y, m - 1, d);
+  return tgl.getFullYear() === y && tgl.getMonth() === m - 1 && tgl.getDate() === d;
+}
 
 export default function CatatanScreen() {
   const currentUser = useCurrentUser();
@@ -42,21 +43,25 @@ export default function CatatanScreen() {
         <TopBar title="Catatan Kehadiran" />
         <GlassCard style={styles.loaderCard}>
           <ActivityIndicator size="large" color={Palette.primary} />
+          <Text style={styles.loaderText}>Memuat catatan kehadiran…</Text>
         </GlassCard>
       </Screen>
     );
   }
 
-  // Ambil semua sesi di mana praktikan adalah peserta, urut terbaru dulu.
-  // Status akhir dihitung memakai helper dari PIC Rekap biar konsisten
-  // antara halaman Rekap (asisten) dan Catatan (praktikan).
+  // Ambil semua sesi di mana praktikan adalah peserta, terbaru di atas (tanggal lalu jam mulai).
+  // Status akhir dihitung memakai helper yang sama dengan Rekap supaya hasilnya konsisten.
   const myRows = sessions
-    .filter((s) => s.pesertaIds.includes(currentUserId))
+    .filter((s) => s.pesertaIds.includes(currentUserId) && tanggalValid(s.tanggal))
     .map((s) => ({
       session: s,
       status: hitungStatusKehadiran(s, currentUserId, attendances, leaveRequests),
     }))
-    .sort((a, b) => (a.session.tanggal < b.session.tanggal ? 1 : -1));
+    .sort(
+      (a, b) =>
+        b.session.tanggal.localeCompare(a.session.tanggal) ||
+        b.session.jamMulai.localeCompare(a.session.jamMulai),
+    );
 
   const summary = ringkasKehadiran(myRows.map((row) => row.status));
 
@@ -73,7 +78,7 @@ export default function CatatanScreen() {
     <Screen>
       <TopBar title="Catatan Kehadiran" />
 
-      {/* === RINGKASAN 4 STATUS === */}
+      {/* Ringkasan 4 status, warna sama dengan kotak ringkasan di Rekap */}
       <GlassCard style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>Ringkasan Kehadiran</Text>
         <View style={styles.summaryGrid}>
@@ -100,21 +105,11 @@ export default function CatatanScreen() {
   );
 }
 
-function SummaryCell({
-  status,
-  count,
-}: {
-  status: FinalAttendanceStatus;
-  count: number;
-}) {
-  const meta = STATUS_META[status];
+function SummaryCell({ status, count }: { status: FinalAttendanceStatus; count: number }) {
   return (
     <View style={styles.summaryCell}>
-      <View style={[styles.summaryIconCircle, { backgroundColor: meta.bg }]}>
-        <Ionicons name={meta.icon} size={22} color={meta.color} />
-      </View>
-      <Text style={[styles.summaryCount, { color: meta.color }]}>{count}</Text>
-      <Text style={styles.summaryLabel}>{meta.label}</Text>
+      <Text style={[styles.summaryCount, { color: WARNA_ANGKA_STATUS[status] }]}>{count}</Text>
+      <Text style={styles.summaryLabel}>{LABEL_STATUS_KEHADIRAN[status]}</Text>
     </View>
   );
 }
@@ -126,7 +121,6 @@ function SessionRow({
   session: { praktikum: string; kelasLab: string; tanggal: string };
   status: FinalAttendanceStatus;
 }) {
-  const meta = STATUS_META[status];
   return (
     <GlassCard style={styles.rowCard}>
       <View style={{ flex: 1 }}>
@@ -135,16 +129,14 @@ function SessionRow({
           {formatTanggal(session.tanggal)} · {session.kelasLab}
         </Text>
       </View>
-      <View style={[styles.statusChip, { backgroundColor: meta.bg }]}>
-        <Ionicons name={meta.icon} size={14} color={meta.color} />
-        <Text style={[styles.statusText, { color: meta.color }]}>{meta.label}</Text>
-      </View>
+      <StatusKehadiranBadge status={status} />
     </GlassCard>
   );
 }
 
 const styles = StyleSheet.create({
-  loaderCard: { padding: 24, alignItems: 'center' },
+  loaderCard: { padding: 24, alignItems: 'center', gap: 12 },
+  loaderText: { color: Palette.textSecondary, fontSize: 14 },
 
   summaryCard: { gap: Spacing.two },
   summaryTitle: {
@@ -160,21 +152,16 @@ const styles = StyleSheet.create({
   summaryCell: {
     flex: 1,
     alignItems: 'center',
-    gap: 4,
-  },
-  summaryIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 2,
+    paddingVertical: 8,
   },
   summaryCount: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '700',
   },
   summaryLabel: {
     fontSize: 11,
+    fontWeight: '600',
     color: Palette.textSecondary,
   },
   belumHint: {
@@ -198,17 +185,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Palette.textMuted,
     marginTop: 2,
-  },
-  statusChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '700',
   },
 });

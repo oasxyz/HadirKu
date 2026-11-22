@@ -26,6 +26,7 @@ import { usePraktikanList } from "@/hooks/use-users";
 import { useLeaveRequests } from "@/hooks/use-leave-requests";
 import { kirimNotifikasi, pesanIzinDiputuskan } from "@/services/notifications";
 import { KategoriIzinBadge } from "@/components/status-kehadiran-badge";
+import { useToast } from "@/components/toast";
 import { normalizeLeaveCategory } from "@/types";
 import { formatTanggal } from "@/utils/format";
 import { Logger } from "@/utils/logger";
@@ -70,6 +71,7 @@ export function PemeriksaanIzin() {
   const [decision, setDecision] = useState<Decision>(null);
   const [processing, setProcessing] = useState(false);
   const isSubmittingRef = useRef(false);
+  const { tampilkanToast } = useToast();
 
   useEffect(() => {
     if (!currentUser) {
@@ -85,7 +87,7 @@ export function PemeriksaanIzin() {
         <TopBar title="Pemeriksaan Izin" />
         <GlassCard style={styles.centerCard}>
           <ActivityIndicator size="large" color={Palette.primary} />
-          <Text style={styles.loadingText}>Memuat...</Text>
+          <Text style={styles.loadingText}>Memuat pengajuan izin…</Text>
         </GlassCard>
       </Screen>
     );
@@ -163,6 +165,11 @@ export function PemeriksaanIzin() {
     try {
       setProcessing(true);
       await updateLeaveStatus(decision.id, decision.action, currentUser!.nama);
+      tampilkanToast(
+        decision.action === 'diterima'
+          ? 'Izin diterima. Praktikan diberi tahu lewat notifikasi.'
+          : 'Izin ditolak. Praktikan diberi tahu lewat notifikasi.'
+      );
 
       // SRS3-04: beri tahu praktikan pemohon. Dijalankan di latar belakang supaya dialog
       // langsung tertutup; kegagalan notifikasi tidak membatalkan keputusan izin.
@@ -173,6 +180,7 @@ export function PemeriksaanIzin() {
       }
     } catch (err) {
       Logger.error("FIRESTORE", "putuskanIzin", err, { leaveRequestId: decision.id });
+      tampilkanToast("Keputusan izin gagal disimpan. Periksa koneksi internet lalu coba lagi.", "error");
     } finally {
       isSubmittingRef.current = false;
       setProcessing(false);

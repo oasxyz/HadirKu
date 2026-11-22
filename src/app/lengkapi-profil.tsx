@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } fro
 
 import { TextField } from '@/components/text-field';
 import { Chip, GlassCard, PrimaryButton, Screen, TopBar } from '@/components/ui';
+import { useToast } from '@/components/toast';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import type { Role } from '@/types';
@@ -18,7 +19,13 @@ export default function LengkapiProfilScreen() {
   const [role, setRole] = useState<Role>('praktikan');
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorState] = useState<string | null>(null);
+  const { tampilkanToast } = useToast();
+  // Pesan error tampil sebagai toast melayang di atas layar.
+  const setError = (pesan: string | null) => {
+    setErrorState(pesan);
+    if (pesan) tampilkanToast(pesan, 'error');
+  };
 
   // Layar ini hanya untuk akun yang belum punya dokumen profil. Kalau profil sudah
   // ada (mis. dibuka lewat back stack), jangan biarkan nama/NIM tertimpa.
@@ -91,12 +98,6 @@ export default function LengkapiProfilScreen() {
           <Text style={styles.subtitle}>
             Lengkapi data NIM dan peran untuk mendaftarkan akun praktikummu.
           </Text>
-
-          {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
 
           <View style={styles.form}>
             <TextField

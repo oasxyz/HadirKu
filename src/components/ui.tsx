@@ -126,7 +126,7 @@ const BADGE_BACKGROUND: Record<BadgeTone, string> = {
   dark: Palette.ink,
   info: Palette.infoMuted,
   warning: Palette.warningMuted,
-  danger: Palette.dangerMuted,
+  danger: Palette.ink,
   muted: '#B9B5C6',
   outline: '#FFFFFF',
 };
@@ -134,9 +134,10 @@ const BADGE_BACKGROUND: Record<BadgeTone, string> = {
 const BADGE_TEXT_COLOR: Record<BadgeTone, string> = {
   primary: '#FFFFFF',
   dark: '#FFFFFF',
-  info: Palette.info,
+  info: Palette.ink,
   warning: Palette.warning,
-  danger: Palette.danger,
+  // Aturan warna seragam: status "bahaya" (Alpha, Ditolak, Di Luar Radius) tampil hitam.
+  danger: '#FFFFFF',
   muted: '#FFFFFF',
   outline: Palette.ink,
 };
@@ -266,20 +267,15 @@ export function DateTimeField({ label, value, mode = 'date', onChange, error }: 
   );
 }
 
-export function DeviceStatusCard({ title, message, tone = 'warning', actionLabel, onAction, icon }: { title: string; message: string; tone?: 'warning' | 'danger'; actionLabel?: string; onAction?: () => void; icon?: IconName }) {
-  const isDanger = tone === 'danger';
-  const bgColor = isDanger ? Palette.dangerMuted : Palette.warningMuted;
-  const fgColor = isDanger ? Palette.danger : Palette.warning;
-
+// Aturan warna seragam: kartu kondisi perangkat putih dengan judul dan tombol hitam, tanpa ikon
+// hiasan. `tone` dan `icon` tetap diterima supaya pemanggil lama tidak perlu diubah.
+export function DeviceStatusCard({ title, message, actionLabel, onAction }: { title: string; message: string; tone?: 'warning' | 'danger'; actionLabel?: string; onAction?: () => void; icon?: IconName }) {
   return (
-    <View style={[styles.statusCard, { backgroundColor: bgColor, borderColor: fgColor }]}>
-      <View style={styles.statusCardHeader}>
-        <Ionicons name={icon || (isDanger ? 'alert-circle' : 'warning')} size={24} color={fgColor} />
-        <Text style={[styles.statusCardTitle, { color: fgColor }]}>{title}</Text>
-      </View>
+    <View style={styles.statusCard}>
+      <Text style={styles.statusCardTitle}>{title}</Text>
       <Text style={styles.statusCardMessage}>{message}</Text>
       {onAction && actionLabel && (
-        <Pressable onPress={onAction} style={[styles.statusCardButton, { backgroundColor: fgColor }]}>
+        <Pressable onPress={onAction} style={({ pressed }) => [styles.statusCardButton, pressed && styles.pressed]}>
           <Text style={styles.statusCardButtonText}>{actionLabel}</Text>
         </Pressable>
       )}
@@ -306,7 +302,8 @@ const styles = StyleSheet.create({
   glassCard: { backgroundColor: 'rgba(255, 255, 255, 0.66)', borderColor: 'rgba(255, 255, 255, 0.95)', borderRadius: 28, borderWidth: 1, boxShadow: shadow, padding: 18 },
   sectionRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   sectionTitle: { color: Palette.text, fontSize: 17, fontWeight: '600' },
-  chip: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.85)', borderRadius: 999, flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
+  // Garis tepi tipis supaya chip tetap terlihat di atas kartu putih maupun latar gradien.
+  chip: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.85)', borderColor: Palette.border, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
   chipSelected: { backgroundColor: Palette.ink },
   chipLabel: { color: Palette.text, fontSize: 13, fontWeight: '500' },
   chipLabelSelected: { color: '#FFFFFF' },
@@ -344,10 +341,9 @@ const styles = StyleSheet.create({
   modalOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Palette.border },
   modalOptionText: { fontSize: 16, color: Palette.text },
   modalOptionSubtitle: { fontSize: 12, color: Palette.textMuted, marginTop: 4 },
-  statusCard: { borderRadius: 18, borderWidth: 1, padding: 16, gap: 10 },
-  statusCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusCardTitle: { fontSize: 15, fontWeight: '700' },
-  statusCardMessage: { fontSize: 13, color: Palette.text, lineHeight: 18 },
-  statusCardButton: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 },
+  statusCard: { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderColor: Palette.border, borderRadius: 18, borderWidth: 1, padding: 16, gap: 8 },
+  statusCardTitle: { color: Palette.text, fontSize: 15, fontWeight: '700' },
+  statusCardMessage: { fontSize: 13, color: Palette.textSecondary, lineHeight: 18 },
+  statusCardButton: { alignSelf: 'flex-start', backgroundColor: Palette.ink, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 },
   statusCardButtonText: { color: '#FFF', fontSize: 13, fontWeight: '600' }
 });

@@ -1,6 +1,5 @@
 // SRS3-04 (PIC B — Annis): detail rekap per sesi dengan 4 status (Hadir, Sakit, Izin, Alpha).
 // Data realtime dari Firestore: sesi, presensi, dan pengajuan izin.
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -73,7 +72,7 @@ export default function RekapDetailScreen() {
         header={<TopBar title="Rekap" back fallback="/rekap" />}>
         <GlassCard style={styles.loadingCard}>
           <ActivityIndicator size="large" color={Palette.primary} />
-          <Text style={styles.loadingText}>Memuat...</Text>
+          <Text style={styles.loadingText}>Memuat rekap sesi…</Text>
         </GlassCard>
       </Screen>
     );
@@ -86,7 +85,7 @@ export default function RekapDetailScreen() {
         header={<TopBar title="Rekap" back fallback="/rekap" />}>
         <EmptyNote
           icon="cloud-offline-outline"
-          message="Tidak ada koneksi internet. Terjadi kesalahan, coba lagi."
+          message="Rekap belum bisa dimuat. Periksa koneksi internet lalu coba lagi."
         />
       </Screen>
     );
@@ -99,7 +98,7 @@ export default function RekapDetailScreen() {
       <Screen
         withTabBar={false}
         header={<TopBar title="Rekap" back fallback="/rekap" />}>
-        <EmptyNote message="Sesi tidak ditemukan." />
+        <EmptyNote message="Sesi praktikum tidak ditemukan atau telah dihapus." />
       </Screen>
     );
   }
@@ -172,16 +171,11 @@ export default function RekapDetailScreen() {
         </View>
       </View>
 
-      <View style={styles.stat}>
-        <View style={styles.statIcon}>
-          <Ionicons name="flash" size={20} color={Palette.text} />
-        </View>
-        <View>
-          <Text style={styles.statLabel}>Praktikan Hadir</Text>
-          <Text style={styles.statValue}>
-            {ringkasan.hadir} / {total}
-          </Text>
-        </View>
+      <View>
+        <Text style={styles.statLabel}>Praktikan Hadir</Text>
+        <Text style={styles.statValue}>
+          {ringkasan.hadir} / {total}
+        </Text>
       </View>
 
       <View style={styles.summaryRow}>
@@ -313,19 +307,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-  },
-  stat: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-  },
-  statIcon: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 999,
-    height: 46,
-    justifyContent: 'center',
-    width: 46,
   },
   statLabel: {
     color: Palette.textSecondary,

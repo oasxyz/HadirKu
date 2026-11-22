@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } fro
 
 import { TextField } from '@/components/text-field';
 import { GlassCard, PrimaryButton, Screen } from '@/components/ui';
+import { useToast } from '@/components/toast';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import { getAuthErrorMessage } from '@/utils/auth-error';
@@ -15,7 +16,13 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorState] = useState<string | null>(null);
+  const { tampilkanToast } = useToast();
+  // Pesan error tampil sebagai toast melayang di atas layar.
+  const setError = (pesan: string | null) => {
+    setErrorState(pesan);
+    if (pesan) tampilkanToast(pesan, 'error');
+  };
 
   async function handleLogin() {
     if (!email.trim() || !password) {
@@ -86,12 +93,6 @@ export default function LoginScreen() {
             Masuk dengan email dan kata sandi praktikummu.
           </Text>
 
-          {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
-
           <View style={styles.form}>
             <TextField
               label="Email Institusi"
@@ -128,6 +129,7 @@ export default function LoginScreen() {
             onPress={handleGoogleLogin}
             disabled={loading}
             style={({ pressed }) => [styles.googleBtn, pressed && { opacity: 0.7 }]}>
+            {/* Logo resmi Google (identitas produk), boleh tetap berwarna asli. */}
             <Ionicons name="logo-google" size={18} color="#EA4335" />
             <Text style={styles.googleBtnText}>
               {loading ? 'Menghubungkan…' : 'Masuk dengan Google'}

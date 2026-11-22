@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 
 import { TextField } from '@/components/text-field';
+import { useToast } from '@/components/toast';
 import {
-  Chip,
   DateTimeField,
   EmptyNote,
   GlassCard,
@@ -30,6 +30,9 @@ import { kirimNotifikasi, pesanJadwalBerubah } from '@/services/notifications';
 import type { Session } from '@/types';
 import { getAuthErrorMessage } from '@/utils/auth-error';
 import { Logger } from '@/utils/logger';
+
+// Jumlah baris praktikan per halaman pada tabel peserta.
+const PESERTA_PER_HALAMAN = 5;
 
 function dateToYmd(d: Date): string {
   const y = d.getFullYear();
@@ -130,6 +133,9 @@ function JadwalFormContent({
   const [error, setError] = useState<string | null>(null);
 
   const isSubmittingRef = useRef<boolean>(false);
+  const { tampilkanToast } = useToast();
+  // Daftar peserta ditampilkan per halaman supaya kartu tidak memanjang.
+  const [halamanPeserta, setHalamanPeserta] = useState(0);
 
   // Lab yang aktif: prioritaskan yang dipilih, atau fallback ke lab pertama
   const labId = labIdState || (labs.length > 0 ? labs[0].id : '');
@@ -149,11 +155,20 @@ function JadwalFormContent({
   // Peserta yang terfilter pencarian
   const filteredPraktikan = useMemo(() => {
     const q = searchPraktikan.trim().toLowerCase();
-    if (!q) return praktikanList;
-    return praktikanList.filter(
-      (p) => p.nama.toLowerCase().includes(q) || p.nim.toLowerCase().includes(q)
-    );
+    const hasil = !q
+      ? praktikanList
+      : praktikanList.filter(
+          (p) => p.nama.toLowerCase().includes(q) || p.nim.toLowerCase().includes(q)
+        );
+    return [...hasil].sort((a, b) => a.nama.localeCompare(b.nama));
   }, [praktikanList, searchPraktikan]);
+
+  const jumlahHalaman = Math.max(1, Math.ceil(filteredPraktikan.length / PESERTA_PER_HALAMAN));
+  const halamanAktif = Math.min(halamanPeserta, jumlahHalaman - 1);
+  const pesertaHalamanIni = filteredPraktikan.slice(
+    halamanAktif * PESERTA_PER_HALAMAN,
+    (halamanAktif + 1) * PESERTA_PER_HALAMAN
+  );
 
   function togglePeserta(userId: string) {
     if (pesertaIds.includes(userId)) {
@@ -199,6 +214,7 @@ function JadwalFormContent({
     const err = validate();
     if (err) {
       setError(err);
+      tampilkanToast(err, 'error');
       return;
     }
 
@@ -249,14 +265,22 @@ function JadwalFormContent({
             Logger.error('FCM', 'NOTIF_JADWAL_BERUBAH', err)
           );
         }
+        tampilkanToast(
+          isChanged
+            ? 'Perubahan sesi disimpan. Peserta diberi tahu lewat notifikasi.'
+            : 'Perubahan sesi disimpan.'
+        );
       } else {
         await createSession(payload);
+        tampilkanToast('Sesi praktikum berhasil dibuat.');
       }
 
       router.back();
     } catch (e: unknown) {
       Logger.error('FIRESTORE', 'SAVE_SESSION', e);
-      setError(getAuthErrorMessage(e));
+      const pesan = getAuthErrorMessage(e);
+      setError(pesan);
+      tampilkanToast(pesan, 'error');
     } finally {
       setLoading(false);
       isSubmittingRef.current = false;
@@ -394,41 +418,83 @@ function JadwalFormContent({
             <TextField
               label="Cari Praktikan"
               value={searchPraktikan}
-              onChangeText={setSearchPraktikan}
+              onChangeText={(teks) => {
+                setSearchPraktikan(teks);
+                setHalamanPeserta(0);
+              }}
               placeholder="Cari nama atau NIM praktikan…"
             />
 
-            <View style={styles.chipsContainer}>
-              {filteredPraktikan.length === 0 ? (
-                <Text style={styles.emptyPraktikanText}>
-                  {praktikanList.length === 0
-                    ? 'Belum ada data praktikan di sistem.'
-                    : 'Tidak ada praktikan yang cocok dengan pencarian.'}
-                </Text>
-              ) : (
-                filteredPraktikan.map((p) => {
+            {filteredPraktikan.length === 0 ? (
+              <Text style={styles.emptyPraktikanText}>
+                {praktikanList.length === 0
+                  ? 'Belum ada data praktikan di sistem.'
+                  : 'Tidak ada praktikan yang cocok dengan pencarian.'}
+              </Text>
+            ) : (
+              <View style={styles.tabel}>
+                <View style={styles.tabelHeader}>
+                  <View style={styles.tabelKolomCek} />
+                  <Text style={[styles.tabelJudul, styles.tabelKolomNama]}>Nama</Text>
+                  <Text style={[styles.tabelJudul, styles.tabelKolomNim]}>NIM</Text>
+                </View>
+                {pesertaHalamanIni.map((p) => {
                   const selected = pesertaIds.includes(p.id);
                   return (
-                    <Chip
+                    <Pressable
                       key={p.id}
-                      label={`${p.nama} (${p.nim})`}
-                      selected={selected}
-                      icon={selected ? 'checkmark' : undefined}
                       onPress={() => togglePeserta(p.id)}
-                    />
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                      accessibilityLabel={`${p.nama}, NIM ${p.nim}`}
+                      style={({ pressed }) => [
+                        styles.tabelBaris,
+                        selected && styles.tabelBarisTerpilih,
+                        pressed && { opacity: 0.7 },
+                      ]}>
+                      <View style={styles.tabelKolomCek}>
+                        <View style={[styles.kotakCek, selected && styles.kotakCekAktif]}>
+                          {selected ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
+                        </View>
+                      </View>
+                      <Text style={[styles.tabelTeks, styles.tabelKolomNama]} numberOfLines={1}>
+                        {p.nama}
+                      </Text>
+                      <Text style={[styles.tabelTeksNim, styles.tabelKolomNim]} numberOfLines={1}>
+                        {p.nim}
+                      </Text>
+                    </Pressable>
                   );
-                })
-              )}
-            </View>
+                })}
+                {jumlahHalaman > 1 ? (
+                  <View style={styles.paginasi}>
+                    <Pressable
+                      onPress={() => setHalamanPeserta(Math.max(0, halamanAktif - 1))}
+                      disabled={halamanAktif === 0}
+                      accessibilityRole="button"
+                      style={[styles.tombolHalaman, halamanAktif === 0 && styles.tombolHalamanMati]}>
+                      <Ionicons name="chevron-back" size={16} color={Palette.text} />
+                    </Pressable>
+                    <Text style={styles.teksHalaman}>
+                      {halamanAktif * PESERTA_PER_HALAMAN + 1}–
+                      {Math.min((halamanAktif + 1) * PESERTA_PER_HALAMAN, filteredPraktikan.length)} dari{' '}
+                      {filteredPraktikan.length}
+                    </Text>
+                    <Pressable
+                      onPress={() => setHalamanPeserta(Math.min(jumlahHalaman - 1, halamanAktif + 1))}
+                      disabled={halamanAktif >= jumlahHalaman - 1}
+                      accessibilityRole="button"
+                      style={[
+                        styles.tombolHalaman,
+                        halamanAktif >= jumlahHalaman - 1 && styles.tombolHalamanMati,
+                      ]}>
+                      <Ionicons name="chevron-forward" size={16} color={Palette.text} />
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            )}
           </GlassCard>
-
-          {/* Pesan Error Validasi */}
-          {error && (
-            <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle" size={18} color={Palette.danger} />
-              <Text style={styles.errorBannerText}>{error}</Text>
-            </View>
-          )}
 
           {/* Tombol Simpan Sesi */}
           <PrimaryButton
@@ -520,33 +586,100 @@ const styles = StyleSheet.create({
   pesertaActionDivider: {
     color: Palette.textMuted,
   },
-  chipsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 4,
-  },
   emptyPraktikanText: {
-    fontSize: 13,
     color: Palette.textMuted,
-    fontStyle: 'italic',
+    fontSize: 13,
     paddingVertical: 8,
   },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    backgroundColor: Palette.dangerMuted,
-    borderRadius: 14,
+  tabel: {
+    borderColor: Palette.border,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: Palette.danger,
+    overflow: 'hidden',
   },
-  errorBannerText: {
+  tabelHeader: {
+    alignItems: 'center',
+    backgroundColor: Palette.lavender,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  tabelJudul: {
+    color: Palette.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  tabelBaris: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderTopColor: Palette.border,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  tabelBarisTerpilih: {
+    backgroundColor: Palette.primaryMuted,
+  },
+  tabelKolomCek: {
+    width: 32,
+  },
+  tabelKolomNama: {
     flex: 1,
+    paddingRight: 8,
+  },
+  tabelKolomNim: {
+    textAlign: 'right',
+    width: 128,
+  },
+  tabelTeks: {
+    color: Palette.text,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  tabelTeksNim: {
+    color: Palette.textSecondary,
     fontSize: 13,
-    color: Palette.danger,
-    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  kotakCek: {
+    alignItems: 'center',
+    borderColor: 'rgba(110, 90, 150, 0.45)',
+    borderRadius: 6,
+    borderWidth: 1.5,
+    height: 20,
+    justifyContent: 'center',
+    width: 20,
+  },
+  kotakCekAktif: {
+    backgroundColor: Palette.primary,
+    borderColor: Palette.primary,
+  },
+  paginasi: {
+    alignItems: 'center',
+    borderTopColor: Palette.border,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  tombolHalaman: {
+    alignItems: 'center',
+    backgroundColor: Palette.lavender,
+    borderRadius: 999,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  tombolHalamanMati: {
+    opacity: 0.35,
+  },
+  teksHalaman: {
+    color: Palette.textSecondary,
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
   },
   saveButton: {
     marginTop: 8,

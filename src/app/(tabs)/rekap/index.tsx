@@ -46,7 +46,7 @@ export default function RekapScreen() {
         <GlassCard style={{ alignItems: "center", padding: 24, gap: 12 }}>
           <ActivityIndicator size="large" color={Palette.primary} />
           <Text style={{ color: Palette.textSecondary, fontSize: 14 }}>
-            Memuat...
+            Memuat rekap kehadiran…
           </Text>
         </GlassCard>
       </Screen>
@@ -59,7 +59,7 @@ export default function RekapScreen() {
         <TopBar title="Rekap Kehadiran" />
         <EmptyNote
           icon="cloud-offline-outline"
-          message="Tidak ada koneksi internet. Terjadi kesalahan, coba lagi."
+          message="Rekap belum bisa dimuat. Periksa koneksi internet lalu coba lagi."
         />
       </Screen>
     );

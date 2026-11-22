@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
+import { useToast } from '@/components/toast';
 import { DigitBoxes } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
@@ -25,6 +26,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
   const [processing, setProcessing] = useState(false);
   const isSubmittingRef = useRef<boolean>(false);
+  const { tampilkanToast } = useToast();
 
   const session = sessions.find((item) => item.id === sessionId);
 
@@ -39,22 +41,26 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
     if (!session || session.status !== 'dibuka') return;
 
     if (sesiSudahBerakhir(session)) {
-      tutupSesi().catch((error) => {
-        Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI', error);
-      });
+      tutupSesi()
+        .then(() => tampilkanToast('Sesi ditutup otomatis karena jam praktikum sudah lewat.', 'info'))
+        .catch((error) => {
+          Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI', error);
+        });
       return;
     }
 
     const batasTutup = getBatasTutupSesi(session);
     const sisaWaktu = Math.max(0, batasTutup.getTime() - Date.now());
     const timer = setTimeout(() => {
-      tutupSesi().catch((error) => {
-        Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI_TIMER', error);
-      });
+      tutupSesi()
+        .then(() => tampilkanToast('Sesi ditutup otomatis karena jam praktikum sudah lewat.', 'info'))
+        .catch((error) => {
+          Logger.error('FIRESTORE', 'AUTO_TUTUP_SESI_TIMER', error);
+        });
     }, sisaWaktu);
 
     return () => clearTimeout(timer);
-  }, [session, tutupSesi]);
+  }, [session, tutupSesi, tampilkanToast]);
 
   if (!session) return null;
 
@@ -124,11 +130,14 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
             Logger.error('FCM', 'NOTIF_SESI_DIBUKA', err)
           );
         }
+        tampilkanToast('Sesi dibuka. Praktikan sudah bisa presensi.');
       } else if (confirmation === 'close') {
         await tutupSesi();
+        tampilkanToast('Sesi ditutup.');
       }
     } catch (error) {
       Logger.error('FIRESTORE', 'CONFIRM_SESSION_ACTION', error);
+      tampilkanToast('Gagal memperbarui sesi. Periksa koneksi internet lalu coba lagi.', 'error');
     } finally {
       setProcessing(false);
       isSubmittingRef.current = false;

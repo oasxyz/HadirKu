@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 
 import { ErrorBoundary } from '@/components/error-boundary';
+import { useToast } from '@/components/toast';
 import { DigitBoxes, Illustration } from '@/components/ui';
 import { Palette, Spacing } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
@@ -60,6 +61,7 @@ export function AttendanceAction({
   // Dipakai di dalam handler scan, bukan di state, supaya tidak memicu re-render
   // yang bisa bikin onBarcodeScanned sempat undefined.
   const isSubmittingRef = useRef<boolean>(false);
+  const { tampilkanToast } = useToast();
   const scanLockRef = useRef<boolean>(false);
   const scanReadyAtRef = useRef<number>(Number.POSITIVE_INFINITY);
   const permissionRequestedRef = useRef<boolean>(false);
@@ -143,18 +145,20 @@ export function AttendanceAction({
 
         setKode('');
         setShowManual(false);
+        tampilkanToast('Presensi berhasil dicatat.');
         onSuccess?.();
       } catch (err: unknown) {
         const code = (err as { code?: string }).code ?? '';
         const msg = (err as Error).message ?? '';
 
-        if (msg === 'ALREADY_ATTENDED') {
-          setError('Anda sudah presensi di sesi ini');
-        } else if (code === 'firestore/permission-denied') {
-          setError('Kode sesi tidak sesuai atau sesi sudah ditutup');
-        } else {
-          setError(toUserErrorMessage(err));
-        }
+        const pesan =
+          msg === 'ALREADY_ATTENDED'
+            ? 'Anda sudah presensi di sesi ini'
+            : code === 'firestore/permission-denied'
+              ? 'Kode sesi tidak sesuai atau sesi sudah ditutup'
+              : toUserErrorMessage(err);
+        setError(pesan);
+        tampilkanToast(pesan, 'error');
         Logger.error('FIRESTORE', 'AttendanceWrite', err, { sessionId });
         // Reset lock supaya user bisa coba lagi via tombol "Coba Lagi" / scan ulang.
         scanLockRef.current = false;
@@ -163,7 +167,7 @@ export function AttendanceAction({
         setSubmitting(false);
       }
     },
-    [currentUser, currentUserId, sessionId, session.pesertaIds, jarakMeter, radiusMeter, locked, onSuccess],
+    [currentUser, currentUserId, sessionId, session.pesertaIds, jarakMeter, radiusMeter, locked, onSuccess, tampilkanToast],
   );
 
   const retryPermission = useCallback(async () => {
