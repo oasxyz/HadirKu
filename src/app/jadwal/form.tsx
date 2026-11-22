@@ -24,12 +24,14 @@ import {
 import { kodeKelasDari, OPSI_KELAS } from '@/constants/kelas';
 import { opsiPraktikum } from '@/constants/praktikum';
 import { Palette } from '@/constants/theme';
+import { useSesiSemuaAsisten } from '@/components/peta/use-sesi-semua-asisten';
 import { useLabs } from '@/hooks/use-labs';
 import { useSessions } from '@/hooks/use-sessions';
 import { usePraktikanList } from '@/hooks/use-users';
 import { kirimNotifikasi, pesanJadwalBerubah } from '@/services/notifications';
 import type { Session } from '@/types';
 import { getAuthErrorMessage } from '@/utils/auth-error';
+import { cariBentrokLab } from '@/utils/bentrok-lab';
 import { formatTanggalSingkat } from '@/utils/format';
 import { Logger } from '@/utils/logger';
 
@@ -110,6 +112,8 @@ function JadwalFormContent({
   const { createSession, updateSession } = useSessions();
   const { labs } = useLabs();
   const { praktikanList } = usePraktikanList();
+  // Semua sesi (termasuk milik asisten lain) untuk mengecek bentrok pemakaian lab.
+  const { sessions: semuaSesi } = useSesiSemuaAsisten();
 
   const isEdit = Boolean(initial);
 
@@ -229,6 +233,21 @@ function JadwalFormContent({
       if (!labId) return 'Laboratorium wajib dipilih';
       if (timeToHm(jamMulaiDate) >= timeToHm(jamSelesaiDate)) {
         return 'Jam selesai harus lebih lambat dari jam mulai';
+      }
+      // Lab tidak boleh dipakai dua sesi di jam yang tumpang tindih (termasuk sesi asisten lain).
+      const bentrok = cariBentrokLab(
+        semuaSesi,
+        {
+          labId,
+          tanggal: dateToYmd(tanggalDate),
+          jamMulai: timeToHm(jamMulaiDate),
+          jamSelesai: timeToHm(jamSelesaiDate),
+        },
+        sessionId,
+      );
+      if (bentrok) {
+        const pemilik = bentrok.asistenNama ? ` (${bentrok.asistenNama})` : '';
+        return `${currentLab?.namaLab ?? 'Lab'} sudah dipakai ${bentrok.praktikum} ${bentrok.kelasLab} pukul ${bentrok.jamMulai}–${bentrok.jamSelesai}${pemilik}. Pilih jam atau lab lain.`;
       }
     }
     if (l === 3 && pesertaIds.length === 0) {
