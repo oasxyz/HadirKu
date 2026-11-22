@@ -65,10 +65,13 @@ export default function RekapScreen() {
     );
   }
 
-  // Filter only sessions handled by the logged-in assistant and sort
+  // Sesi milik asisten yang login, terbaru di atas (tanggal lalu jam mulai, menurun)
   const assistantSessions = sessions
     .filter((session) => session.asistenId === currentUser.id)
-    .sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+    .sort(
+      (a, b) =>
+        b.tanggal.localeCompare(a.tanggal) || b.jamMulai.localeCompare(a.jamMulai),
+    );
 
   return (
     <Screen>
