@@ -1,11 +1,10 @@
 // SRS3-03 (PIC B — Annis): Peta Laboratorium Interaktif.
-// Marker lab + lingkaran radius, posisi pengguna realtime, dan panel aktivitas lab.
+// Peta digambar Leaflet (src/components/peta/peta-leaflet.tsx, tanpa kunci Google).
+// Layar ini mengatur data: marker lab + radius, posisi pengguna realtime, dan panel aktivitas lab.
 // Praktikan melihat sesi yang diikutinya; asisten melihat semua sesi di tiap lab (keputusan tim).
-import Constants from 'expo-constants';
 import { router, type Href } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import MapView, { Circle, Marker, UrlTile, type Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -15,30 +14,18 @@ import {
   sedangBerlangsung,
   type GrupLab,
 } from '@/components/peta/aktivitas-lab';
-import { GAYA_PETA_PASTEL } from '@/components/peta/gaya-peta';
 import { KartuKondisi } from '@/components/peta/kartu-kondisi';
 import { PanelLab } from '@/components/peta/panel-lab';
+import PetaLeaflet, { type PinPeta, type RadiusPeta } from '@/components/peta/peta-leaflet';
 import { useLabsPeta } from '@/components/peta/use-labs-peta';
 import { useLokasiPengguna } from '@/components/peta/use-lokasi-pengguna';
 import { useSesiSemuaAsisten } from '@/components/peta/use-sesi-semua-asisten';
 import { Chip, GlassCard, RoundButton, TAB_BAR_SPACE } from '@/components/ui';
-import { useAppConfig } from '@/constants/config';
 import { Palette } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useSessions } from '@/hooks/use-sessions';
 
-// Titik tengah FSM UNDIP, dipakai sebelum data lab termuat.
-const PUSAT_AWAL = { latitude: -7.0486, longitude: 110.4411 };
-const ZOOM_AREA = { latitudeDelta: 0.004, longitudeDelta: 0.004 };
-const ZOOM_DEKAT = { latitudeDelta: 0.0018, longitudeDelta: 0.0018 };
 const INTERVAL_JAM_MS = 30_000;
-const OSM_TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-
-// Tanpa kunci Google Maps yang valid, tile Google kosong: pakai OpenStreetMap.
-function kunciGoogleMapsValid(): boolean {
-  const kunci = Constants.expoConfig?.android?.config?.googleMaps?.apiKey;
-  return typeof kunci === 'string' && kunci.startsWith('AIza');
-}
 
 function useSekarang(): Date {
   const [sekarang, setSekarang] = useState(() => new Date());
@@ -53,9 +40,7 @@ export default function PetaScreen() {
   const currentUser = useCurrentUser();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
-  const mapRef = useRef<MapView>(null);
   const sekarang = useSekarang();
-  const config = useAppConfig();
   const { labs, loading: labsLoading, error: labsError, cobaLagi: muatUlangLab } = useLabsPeta();
   const { sessions: sesiSaya, attendances, error: sesiSayaError } = useSessions();
   const semuaAsisten = useSesiSemuaAsisten();
@@ -65,6 +50,7 @@ export default function PetaScreen() {
   const sessionsError = isAsisten ? semuaAsisten.error : sesiSayaError;
   const lokasi = useLokasiPengguna();
   const [labTerpilih, setLabTerpilih] = useState<string | null>(null);
+  const [pusatkan, setPusatkan] = useState(0);
 
   useEffect(() => {
     if (!currentUser) router.replace('/login' as Href);
@@ -74,39 +60,35 @@ export default function PetaScreen() {
   const grupTerpilih: GrupLab | undefined = grupLab.find((grup) =>
     grup.labs.some((lab) => lab.id === labTerpilih),
   );
-  const pakaiOsm = config.useOsmFallbackTiles || !kunciGoogleMapsValid();
 
   if (!currentUser) return null;
 
-  // Marker magenta bila ada praktikum yang sedang berlangsung di salah satu lab pada titik itu.
-  function grupAktif(grup: GrupLab): boolean {
-    return grup.labs.some((lab) =>
-      sessions.some((session) => session.labId === lab.id && sedangBerlangsung(session, sekarang)),
-    );
+  // Ada praktikum berlangsung di lab ini (dari sesi yang boleh dilihat pengguna).
+  function labAktif(labId: string): boolean {
+    return sessions.some((session) => session.labId === labId && sedangBerlangsung(session, sekarang));
   }
 
-  function arahkanKe(latitude: number, longitude: number, zoom = ZOOM_DEKAT) {
-    mapRef.current?.animateToRegion({ latitude, longitude, ...zoom }, 500);
-  }
-
-  function pilihLab(labId: string) {
-    setLabTerpilih(labId);
-    const lab = labs.find((item) => item.id === labId);
-    if (lab) arahkanKe(lab.latitude, lab.longitude);
-  }
+  // Satu pin per titik koordinat: Lab B/C/D di Gedung E jadi satu pin.
+  const pins: PinPeta[] = grupLab.map((grup) => ({
+    key: grup.key,
+    latitude: grup.latitude,
+    longitude: grup.longitude,
+    judul: namaGrup(grup),
+    aktif: grup.labs.some((lab) => labAktif(lab.id)),
+    labId: grup.labs[0].id,
+  }));
+  const radius: RadiusPeta[] = labs.map((lab) => ({
+    id: lab.id,
+    latitude: lab.latitude,
+    longitude: lab.longitude,
+    radiusMeter: lab.radiusMeter,
+    aktif: labAktif(lab.id),
+  }));
 
   function keLokasiSaya() {
-    if (lokasi.titik) {
-      arahkanKe(lokasi.titik.latitude, lokasi.titik.longitude);
-    } else {
-      lokasi.cobaLagi();
-    }
+    if (lokasi.titik) setPusatkan((n) => n + 1);
+    else lokasi.cobaLagi();
   }
-
-  const regionAwal: Region = {
-    ...(labs[0] ? { latitude: labs[0].latitude, longitude: labs[0].longitude } : PUSAT_AWAL),
-    ...ZOOM_AREA,
-  };
 
   const keteranganLokasi =
     lokasi.status === 'ditolak'
@@ -186,74 +168,18 @@ export default function PetaScreen() {
   return (
     <View style={styles.screen}>
       <ErrorBoundary fallbackTitle="Peta tidak dapat ditampilkan">
-        <MapView
-          ref={mapRef}
-          style={StyleSheet.absoluteFill}
-          initialRegion={regionAwal}
-          mapType={pakaiOsm ? 'none' : 'standard'}
-          customMapStyle={pakaiOsm ? undefined : GAYA_PETA_PASTEL}
-          toolbarEnabled={false}
-          showsCompass={false}
-          onPress={() => setLabTerpilih(null)}>
-          {pakaiOsm ? (
-            <UrlTile urlTemplate={OSM_TILE} maximumZ={19} tileSize={256} shouldReplaceMapContent />
-          ) : null}
-
-          {labs.map((lab) => {
-            const aktif = sessions.some(
-              (session) => session.labId === lab.id && sedangBerlangsung(session, sekarang),
-            );
-            return (
-              <Circle
-                key={`radius-${lab.id}-${aktif ? 1 : 0}`}
-                center={{ latitude: lab.latitude, longitude: lab.longitude }}
-                radius={lab.radiusMeter}
-                strokeWidth={2}
-                strokeColor={aktif ? Palette.primary : 'rgba(23, 21, 28, 0.55)'}
-                fillColor={aktif ? 'rgba(226, 27, 208, 0.12)' : 'rgba(23, 21, 28, 0.06)'}
-              />
-            );
-          })}
-
-          {grupLab.map((grup) => {
-            const aktif = grupAktif(grup);
-            const judul = namaGrup(grup);
-            return (
-              <Marker
-                // Isi marker kustom di Android baru berubah kalau marker dibuat ulang.
-                key={`lab-${grup.key}-${aktif ? 1 : 0}-${judul}`}
-                coordinate={{ latitude: grup.latitude, longitude: grup.longitude }}
-                // Titik lancip pin (di atas label) yang menempel ke koordinat.
-                anchor={{ x: 0.5, y: 0.7 }}
-                tracksViewChanges={false}
-                accessibilityLabel={`Laboratorium ${judul}`}
-                onPress={() => pilihLab(grup.labs[0].id)}>
-                <View style={styles.pinWrap}>
-                  <View style={[styles.pin, { backgroundColor: aktif ? Palette.primary : Palette.ink }]}>
-                    <View style={styles.pinDot} />
-                  </View>
-                  <View style={[styles.pinTail, { borderTopColor: aktif ? Palette.primary : Palette.ink }]} />
-                  <Text style={styles.pinLabel} numberOfLines={1}>
-                    {judul}
-                  </Text>
-                </View>
-              </Marker>
-            );
-          })}
-
-          {lokasi.titik ? (
-            <Marker
-              key="pengguna"
-              coordinate={lokasi.titik}
-              anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
-              accessibilityLabel="Posisi Anda">
-              <View style={styles.userHalo}>
-                <View style={styles.userDot} />
-              </View>
-            </Marker>
-          ) : null}
-        </MapView>
+        <PetaLeaflet
+          dom={{ scrollEnabled: false, style: StyleSheet.absoluteFill }}
+          pins={pins}
+          radius={radius}
+          pinTerpilih={grupTerpilih?.key ?? null}
+          posisiPengguna={lokasi.titik}
+          pusatkanKePengguna={pusatkan}
+          // Fungsi yang dikirim ke komponen DOM berjalan asinkron (lewat jembatan WebView).
+          onPilihLab={async (labId) => setLabTerpilih(labId)}
+          // Ketuk area kosong peta: tutup panel.
+          onKetukPeta={async () => setLabTerpilih(null)}
+        />
       </ErrorBoundary>
 
       <GlassCard style={[styles.header, { top: insets.top + 10 }]}>
@@ -261,7 +187,7 @@ export default function PetaScreen() {
           <Text style={styles.title}>Peta Laboratorium Informatika</Text>
           {labsLoading ? <ActivityIndicator color={Palette.primary} /> : null}
           <RoundButton icon="locate-outline" size={40} onPress={keLokasiSaya} />
-          {currentUser.role === 'asisten' ? (
+          {isAsisten ? (
             <RoundButton
               icon="settings-outline"
               size={40}
@@ -276,12 +202,11 @@ export default function PetaScreen() {
                 key={lab.id}
                 label={lab.namaLab}
                 selected={lab.id === labTerpilih}
-                onPress={() => pilihLab(lab.id)}
+                onPress={() => setLabTerpilih(lab.id)}
               />
             ))}
           </ScrollView>
         ) : null}
-        {pakaiOsm ? <Text style={styles.attribution}>Peta © kontributor OpenStreetMap</Text> : null}
       </GlassCard>
 
       {grupTerpilih && labTerpilih ? (
@@ -289,7 +214,7 @@ export default function PetaScreen() {
           <PanelLab
             grup={grupTerpilih}
             labId={labTerpilih}
-            onPilihLab={pilihLab}
+            onPilihLab={setLabTerpilih}
             sessions={sessions}
             attendances={attendances}
             role={currentUser.role}
@@ -322,6 +247,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
+    minHeight: 40,
   },
   title: {
     color: Palette.text,
@@ -332,65 +258,9 @@ const styles = StyleSheet.create({
   chips: {
     gap: 6,
   },
-  attribution: {
-    color: Palette.textMuted,
-    fontSize: 10,
-  },
   bottom: {
     left: 14,
     position: 'absolute',
     right: 14,
-  },
-  pinWrap: {
-    alignItems: 'center',
-    width: 140,
-  },
-  pinLabel: {
-    color: Palette.ink,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 2,
-    textShadowColor: 'rgba(255, 255, 255, 0.95)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 4,
-  },
-  pin: {
-    alignItems: 'center',
-    borderColor: '#FFFFFF',
-    borderRadius: 999,
-    borderWidth: 3,
-    height: 34,
-    justifyContent: 'center',
-    width: 34,
-  },
-  pinDot: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    height: 10,
-    width: 10,
-  },
-  pinTail: {
-    borderLeftColor: 'transparent',
-    borderLeftWidth: 7,
-    borderRightColor: 'transparent',
-    borderRightWidth: 7,
-    borderTopWidth: 10,
-    marginTop: -2,
-  },
-  userHalo: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(107, 79, 160, 0.18)',
-    borderRadius: 999,
-    height: 34,
-    justifyContent: 'center',
-    width: 34,
-  },
-  userDot: {
-    backgroundColor: '#6B4FA0',
-    borderColor: '#FFFFFF',
-    borderRadius: 999,
-    borderWidth: 3,
-    height: 16,
-    width: 16,
   },
 });
