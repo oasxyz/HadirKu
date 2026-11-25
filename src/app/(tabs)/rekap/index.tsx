@@ -9,7 +9,7 @@ import { Palette } from "@/constants/theme";
 import { useCurrentUser } from "@/context/auth-context";
 import { useLeaveRequests } from "@/hooks/use-leave-requests";
 import { useSessions } from "@/hooks/use-sessions";
-import { formatTanggalSingkat } from "@/utils/format";
+import { formatTanggalSingkat, tanggalValid } from "@/utils/format";
 import {
   hitungStatusKehadiran,
   ringkasKehadiran,
@@ -62,7 +62,8 @@ export default function RekapScreen() {
 
   // Sesi milik asisten yang login, terbaru di atas (tanggal lalu jam mulai, menurun)
   const assistantSessions = sessions
-    .filter((session) => session.asistenId === currentUser.id)
+    // Sesi bertanggal tidak valid (data salah ketik) disembunyikan supaya urutan terbaru benar.
+    .filter((session) => session.asistenId === currentUser.id && tanggalValid(session.tanggal))
     .sort(
       (a, b) =>
         b.tanggal.localeCompare(a.tanggal) || b.jamMulai.localeCompare(a.jamMulai),

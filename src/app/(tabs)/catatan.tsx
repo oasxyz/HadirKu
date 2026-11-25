@@ -17,17 +17,8 @@ import { useCurrentUser } from '@/context/auth-context';
 import { useLeaveRequests } from '@/hooks/use-leave-requests';
 import { useSessions } from '@/hooks/use-sessions';
 import type { FinalAttendanceStatus } from '@/types';
-import { formatTanggal } from '@/utils/format';
+import { formatTanggal, tanggalValid } from '@/utils/format';
 import { hitungStatusKehadiran, ringkasKehadiran } from '@/utils/status-kehadiran';
-
-// Tanggal sesi harus valid (YYYY-MM-DD dan benar-benar ada di kalender), supaya data yang
-// salah ketik tidak tampil sebagai "40 Nov 2026".
-function tanggalValid(tanggal: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) return false;
-  const [y, m, d] = tanggal.split('-').map(Number);
-  const tgl = new Date(y, m - 1, d);
-  return tgl.getFullYear() === y && tgl.getMonth() === m - 1 && tgl.getDate() === d;
-}
 
 /** Satu kalimat di bawah judul ringkasan, mis. "9 dari 10 sesi selesai kamu hadiri". */
 function keteranganRingkasan(s: ReturnType<typeof ringkasKehadiran>): string {

@@ -1,5 +1,5 @@
 // Uji format tanggal dan jam yang tampil di kartu dan chip.
-import { formatRentangJam, formatTanggal, formatTanggalSingkat } from '@/utils/format';
+import { formatRentangJam, formatTanggal, formatTanggalSingkat, tanggalValid } from '@/utils/format';
 
 describe('formatTanggal', () => {
   it('menampilkan hari, tanggal, bulan singkat, dan tahun', () => {
@@ -22,5 +22,19 @@ describe('formatTanggalSingkat', () => {
 describe('formatRentangJam', () => {
   it('menggabungkan jam mulai dan selesai', () => {
     expect(formatRentangJam('08:00', '10:00')).toBe('08:00 - 10:00');
+  });
+});
+
+describe('tanggalValid', () => {
+  it('tanggal kalender yang benar → valid', () => {
+    expect(tanggalValid('2026-11-30')).toBe(true);
+    expect(tanggalValid('2028-02-29')).toBe(true);
+  });
+
+  it('salah ketik atau format lain → tidak valid', () => {
+    expect(tanggalValid('2026-11-40')).toBe(false);
+    expect(tanggalValid('2026-11-35')).toBe(false);
+    expect(tanggalValid('2026-02-29')).toBe(false);
+    expect(tanggalValid('22/11/2026')).toBe(false);
   });
 });
