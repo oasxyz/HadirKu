@@ -277,11 +277,22 @@ async function ambilToken(userIds: string[]): Promise<string[]> {
   return [...new Set(hasil.flat())];
 }
 
+type BalasanExpo = {
+  data?: { status: string; message?: string }[];
+  errors?: { code?: string; message?: string; details?: Record<string, string[]> }[];
+};
+
 async function kirimKeExpo(tokens: string[], pesan: PesanNotifikasi) {
   let terkirim = 0;
   let gagal = 0;
+  const antrian: string[][] = [];
   for (let i = 0; i < tokens.length; i += MAKS_PER_KIRIM) {
-    const bagian = tokens.slice(i, i + MAKS_PER_KIRIM).map((to) => ({
+    antrian.push(tokens.slice(i, i + MAKS_PER_KIRIM));
+  }
+
+  let kelompok = antrian.shift();
+  while (kelompok) {
+    const bagian = kelompok.map((to) => ({
       to,
       title: pesan.title,
       body: pesan.body,
@@ -295,19 +306,33 @@ async function kirimKeExpo(tokens: string[], pesan: PesanNotifikasi) {
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify(bagian),
       });
-      const json = (await res.json()) as { data?: { status: string; message?: string }[] };
-      (json.data ?? []).forEach((tiket) => {
-        if (tiket.status === 'ok') terkirim += 1;
-        else {
-          gagal += 1;
-          Logger.warn('FCM', 'kirimKeExpo', tiket.message ?? 'Tiket push gagal');
+      const json = (await res.json()) as BalasanExpo;
+
+      // Expo menolak SELURUH permintaan bila tokennya berasal dari lebih dari satu project Expo
+      // (mis. development build tim dan APK build pribadi). Kirim ulang per project.
+      const campuran = json.errors?.find((e) => e.code === 'PUSH_TOO_MANY_EXPERIENCE_IDS');
+      if (campuran?.details && kelompok.length > 1) {
+        Object.values(campuran.details).forEach((daftar) => {
+          if (daftar.length > 0) antrian.push(daftar);
+        });
+      } else {
+        (json.data ?? []).forEach((tiket) => {
+          if (tiket.status === 'ok') terkirim += 1;
+          else {
+            gagal += 1;
+            Logger.warn('FCM', 'kirimKeExpo', tiket.message ?? 'Tiket push gagal');
+          }
+        });
+        if (!res.ok) {
+          if (!json.data) gagal += kelompok.length;
+          Logger.warn('FCM', 'kirimKeExpo', `HTTP ${res.status} ${json.errors?.[0]?.message ?? ''}`);
         }
-      });
-      if (!res.ok) Logger.warn('FCM', 'kirimKeExpo', `HTTP ${res.status}`);
+      }
     } catch (error) {
       gagal += bagian.length;
       Logger.error('FCM', 'kirimKeExpo', error);
     }
+    kelompok = antrian.shift();
   }
   return { terkirim, gagal };
 }
