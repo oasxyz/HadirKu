@@ -35,3 +35,14 @@ export function formatTanggalSingkat(isoDate: string): string {
 export function formatRentangJam(jamMulai: string, jamSelesai: string): string {
   return `${jamMulai} - ${jamSelesai}`;
 }
+
+/**
+ * Tanggal sesi valid bila berformat YYYY-MM-DD dan benar-benar ada di kalender, supaya data
+ * salah ketik (mis. "2026-11-40") tidak tampil sebagai tanggal aneh atau merusak urutan.
+ */
+export function tanggalValid(tanggal: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) return false;
+  const [y, m, d] = tanggal.split('-').map(Number);
+  const tgl = new Date(y, m - 1, d);
+  return tgl.getFullYear() === y && tgl.getMonth() === m - 1 && tgl.getDate() === d;
+}
