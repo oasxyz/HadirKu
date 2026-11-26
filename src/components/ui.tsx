@@ -1,7 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, Modal, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  Modal,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePickerModal from 'react-native-modal-datetime-picker'; // Tambahkan ini di package.json jika belum ada
 
@@ -289,6 +300,180 @@ export function DeviceStatusCard({ title, message, actionLabel, onAction, ilustr
   );
 }
 
+/* =========================================================
+   SPRINT 4: KOMPONEN BARU (FormScreen, SentimentBadge, MoneyText,
+   StatTile, BulkRowCard) - dipakai Annis & Yustinus
+========================================================= */
+
+// FormScreen: wrapper Screen yang membungkus isi dengan KeyboardAvoidingView
+// supaya form dengan banyak field (bulk import, tagihan, kelola lab) tidak tertutup
+// keyboard di Android. Lihat SRS4-02 (perbaikan form Sprint 3).
+export function FormScreen({
+  children,
+  header,
+  withTabBar = false,
+}: {
+  children: React.ReactNode;
+  header?: React.ReactNode;
+  withTabBar?: boolean;
+}) {
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+      <Screen header={header} withTabBar={withTabBar}>
+        {children}
+      </Screen>
+    </KeyboardAvoidingView>
+  );
+}
+
+// SentimentBadge: badge kecil untuk hasil AI sentimen alasan izin (SRS4-05).
+// Informasi pendukung saja, bukan keputusan - asprak tetap yang memutuskan.
+export type Sentiment = 'positif' | 'netral' | 'negatif';
+
+const SENTIMENT_LABEL: Record<Sentiment, string> = {
+  positif: 'Positif',
+  netral: 'Netral',
+  negatif: 'Negatif',
+};
+
+export function SentimentBadge({ value }: { value: Sentiment | null | undefined }) {
+  if (!value) {
+    return <Badge label="Belum dianalisis" tone="muted" />;
+  }
+  const tone: BadgeTone = value === 'negatif' ? 'danger' : value === 'netral' ? 'info' : 'primary';
+  return <Badge label={`AI: ${SENTIMENT_LABEL[value]}`} tone={tone} />;
+}
+
+// MoneyText: format rupiah seragam untuk tagihan, riwayat pembayaran, dan grafik keuangan
+// aslab (SRS4-03, SRS4-06..08).
+export function formatRupiah(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return 'Rp0';
+  const bulat = Math.round(n);
+  return 'Rp' + bulat.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+export function MoneyText({
+  value,
+  style,
+  strikethrough = false,
+}: {
+  value: number | null | undefined;
+  style?: StyleProp<ViewStyle>;
+  strikethrough?: boolean;
+}) {
+  return (
+    <View style={[styles.moneyText, style]}>
+      <Text style={[styles.moneyTextLabel, strikethrough && styles.moneyTextStrike]}>
+        {formatRupiah(value)}
+      </Text>
+    </View>
+  );
+}
+
+// StatTile: kartu statistik untuk dashboard aslab (SRS4-03). Satu angka besar
+// plus label kecil di bawahnya; opsional ikon di pojok dan delta pertumbuhan.
+export function StatTile({
+  label,
+  value,
+  icon,
+  delta,
+}: {
+  label: string;
+  value: string | number;
+  icon?: IconName;
+  delta?: string;
+}) {
+  return (
+    <GlassCard style={styles.statTile}>
+      <View style={styles.statTileHeader}>
+        <Text style={styles.statTileLabel} numberOfLines={1}>
+          {label}
+        </Text>
+        {icon ? <Ionicons name={icon} size={18} color={Palette.textSecondary} /> : null}
+      </View>
+      <Text style={styles.statTileValue} numberOfLines={1}>
+        {value}
+      </Text>
+      {delta ? <Text style={styles.statTileDelta}>{delta}</Text> : null}
+    </GlassCard>
+  );
+}
+
+// BulkRowCard: satu baris hasil parsing CSV di halaman Bulk Insert (SRS4-01).
+// Aslab bisa Terima / Tolak / Edit baris sebelum commit batch.
+export function BulkRowCard({
+  index,
+  title,
+  subtitle,
+  status,
+  message,
+  onAccept,
+  onReject,
+  onEdit,
+}: {
+  index: number;
+  title: string;
+  subtitle?: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'edited';
+  message?: string;
+  onAccept?: () => void;
+  onReject?: () => void;
+  onEdit?: () => void;
+}) {
+  const toneMap: Record<typeof status, BadgeTone> = {
+    pending: 'muted',
+    accepted: 'primary',
+    rejected: 'danger',
+    edited: 'info',
+  };
+  const labelMap: Record<typeof status, string> = {
+    pending: 'Menunggu',
+    accepted: 'Diterima',
+    rejected: 'Ditolak',
+    edited: 'Diedit',
+  };
+  return (
+    <GlassCard style={styles.bulkRowCard}>
+      <View style={styles.bulkRowHeader}>
+        <Text style={styles.bulkRowIndex}>#{index + 1}</Text>
+        <Badge label={labelMap[status]} tone={toneMap[status]} />
+      </View>
+      <Text style={styles.bulkRowTitle} numberOfLines={1}>
+        {title}
+      </Text>
+      {subtitle ? (
+        <Text style={styles.bulkRowSubtitle} numberOfLines={2}>
+          {subtitle}
+        </Text>
+      ) : null}
+      {message ? <Text style={styles.bulkRowMessage}>{message}</Text> : null}
+      <View style={styles.bulkRowActions}>
+        {onAccept ? (
+          <Pressable onPress={onAccept} style={({ pressed }) => [styles.bulkRowButton, styles.bulkRowButtonAccept, pressed && styles.pressed]}>
+            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+            <Text style={styles.bulkRowButtonTextAccept}>Terima</Text>
+          </Pressable>
+        ) : null}
+        {onEdit ? (
+          <Pressable onPress={onEdit} style={({ pressed }) => [styles.bulkRowButton, styles.bulkRowButtonEdit, pressed && styles.pressed]}>
+            <Ionicons name="create-outline" size={16} color={Palette.text} />
+            <Text style={styles.bulkRowButtonTextEdit}>Edit</Text>
+          </Pressable>
+        ) : null}
+        {onReject ? (
+          <Pressable onPress={onReject} style={({ pressed }) => [styles.bulkRowButton, styles.bulkRowButtonReject, pressed && styles.pressed]}>
+            <Ionicons name="close" size={16} color="#FFFFFF" />
+            <Text style={styles.bulkRowButtonTextAccept}>Tolak</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </GlassCard>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   fixedHeader: {
@@ -355,5 +540,30 @@ const styles = StyleSheet.create({
   statusCardTitle: { color: Palette.text, fontSize: 15, fontWeight: '700' },
   statusCardMessage: { fontSize: 13, color: Palette.textSecondary, lineHeight: 18 },
   statusCardButton: { alignSelf: 'flex-start', backgroundColor: Palette.ink, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 },
-  statusCardButtonText: { color: '#FFF', fontSize: 13, fontWeight: '600' }
+  statusCardButtonText: { color: '#FFF', fontSize: 13, fontWeight: '600' },
+
+  // Sprint 4
+  moneyText: { alignSelf: 'flex-start' },
+  moneyTextLabel: { color: Palette.text, fontSize: 18, fontWeight: '700' },
+  moneyTextStrike: { color: Palette.textMuted, textDecorationLine: 'line-through' },
+
+  statTile: { gap: 8, padding: 16 },
+  statTileHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  statTileLabel: { color: Palette.textSecondary, flex: 1, fontSize: 12, fontWeight: '500' },
+  statTileValue: { color: Palette.text, fontSize: 24, fontWeight: '700' },
+  statTileDelta: { color: Palette.textMuted, fontSize: 11 },
+
+  bulkRowCard: { gap: 6, padding: 14 },
+  bulkRowHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  bulkRowIndex: { color: Palette.textMuted, fontSize: 11, fontWeight: '600' },
+  bulkRowTitle: { color: Palette.text, fontSize: 14, fontWeight: '600' },
+  bulkRowSubtitle: { color: Palette.textSecondary, fontSize: 12 },
+  bulkRowMessage: { color: Palette.warning, fontSize: 11, marginTop: 2 },
+  bulkRowActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  bulkRowButton: { alignItems: 'center', borderRadius: 999, flexDirection: 'row', gap: 4, paddingHorizontal: 12, paddingVertical: 6 },
+  bulkRowButtonAccept: { backgroundColor: Palette.primary },
+  bulkRowButtonReject: { backgroundColor: Palette.ink },
+  bulkRowButtonEdit: { backgroundColor: 'rgba(255,255,255,0.8)', borderColor: Palette.border, borderWidth: 1 },
+  bulkRowButtonTextAccept: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
+  bulkRowButtonTextEdit: { color: Palette.text, fontSize: 12, fontWeight: '600' },
 });

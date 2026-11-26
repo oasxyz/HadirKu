@@ -13,6 +13,8 @@ const TAB_META: Record<string, { label: string; icon: IconName }> = {
   catatan: { label: 'Catatan', icon: 'document-text-outline' },
   izin: { label: 'Izin', icon: 'chatbubbles-outline' },
   profil: { label: 'Profil', icon: 'person-outline' },
+  // Sprint 4 (SRS4-03): tab Dashboard khusus Aslab.
+  dashboard: { label: 'Dashboard', icon: 'grid-outline' },
 };
 
 type TabBarProps = {
@@ -21,11 +23,19 @@ type TabBarProps = {
 };
 
 // Tab aktif berupa pill magenta berlabel; tab lain hanya ikon bulat.
+// Sprint 4 (SRS4-03): peran yang boleh melihat tab tertentu. 'asisten' = alias lama 'asprak'.
+const TAB_YANG_DISEMBUNYIKAN: Record<string, string[]> = {
+  praktikan: ['catatan', 'dashboard'],
+  asisten: ['rekap', 'dashboard'],
+  asprak: ['rekap', 'dashboard'],
+  aslab: ['rekap', 'izin', 'catatan', 'peta'],
+};
+
 export function FloatingTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const currentUser = useCurrentUser();
-  const role = currentUser?.role;
-  const hidden = role === 'asisten' ? 'catatan' : 'rekap';
+  const role = currentUser?.role ?? 'praktikan';
+  const hidden = TAB_YANG_DISEMBUNYIKAN[role] ?? TAB_YANG_DISEMBUNYIKAN.praktikan;
   // Folder tanpa _layout (mis. rekap/index) bernama "rekap/index"; samakan ke nama tab-nya.
   const tabKey = (name: string) => name.replace(/\/index$/, '');
   const activeName = tabKey(state.routes[state.index]?.name ?? '');
@@ -34,7 +44,7 @@ export function FloatingTabBar({ state, navigation }: TabBarProps) {
     <View pointerEvents="box-none" style={[styles.wrapper, { bottom: insets.bottom + 18 }]}>
       <View style={styles.bar}>
         {state.routes
-          .filter((route) => TAB_META[tabKey(route.name)] && tabKey(route.name) !== hidden)
+          .filter((route) => TAB_META[tabKey(route.name)] && !hidden.includes(tabKey(route.name)))
           .map((route) => {
             const meta = TAB_META[tabKey(route.name)];
             const active = tabKey(route.name) === activeName;
@@ -51,6 +61,25 @@ export function FloatingTabBar({ state, navigation }: TabBarProps) {
             );
           })}
       </View>
+    </View>
+  );
+}
+
+// Sprint 4 (SRS4-03): tombol magenta melayang di atas tab bar praktikan yang
+// langsung membuka kamera presensi. Integrasi final (penempatan di tengah tab bar
+// dan logika "sesi aktif mana yang dibuka") dilakukan Annis di SRS4-03.
+export function FloatingAbsenButton({ onPress, label = 'Absen' }: { onPress: () => void; label?: string }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View pointerEvents="box-none" style={[styles.absenWrapper, { bottom: insets.bottom + 56 }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Buka kamera presensi"
+        onPress={onPress}
+        style={({ pressed }) => [styles.absenButton, pressed && styles.absenButtonPressed]}>
+        <Ionicons name="qr-code" size={24} color="#FFFFFF" />
+        <Text style={styles.absenLabel}>{label}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -92,5 +121,29 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
+  },
+  absenWrapper: {
+    alignItems: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
+  absenButton: {
+    alignItems: 'center',
+    backgroundColor: Palette.primary,
+    borderRadius: 999,
+    boxShadow: '0 16px 32px rgba(226, 27, 208, 0.38)',
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+  },
+  absenButtonPressed: {
+    opacity: 0.85,
+  },
+  absenLabel: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

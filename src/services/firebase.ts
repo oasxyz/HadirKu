@@ -37,6 +37,11 @@ export const COLLECTIONS = {
   pengajuanKelas: 'pengajuanKelas',
   notifications: 'notifications',
   appConfig: 'appConfig',
+  // Sprint 4 (SRS4-06..08): denda keterlambatan dan pembayaran Midtrans.
+  fines: 'fines',
+  payments: 'payments',
+  // Sprint 4 (SRS4-01): log bulk import CSV oleh aslab.
+  bulkImports: 'bulkImports',
 } as const;
 
 // ID dokumen deterministik: satu praktikan hanya bisa punya satu dokumen per sesi.
@@ -46,6 +51,11 @@ export function attendanceDocId(sessionId: string, userId: string): string {
 
 // Alias Sprint 3 untuk dipakai pada attendances maupun leaveRequests.
 export function getCompositeId(sessionId: string, userId: string): string {
+  return `${sessionId}_${userId}`;
+}
+
+// Sprint 4 (SRS4-06): ID deterministik satu denda per sesi per praktikan.
+export function fineDocId(sessionId: string, userId: string): string {
   return `${sessionId}_${userId}`;
 }
 

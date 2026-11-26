@@ -41,4 +41,23 @@ example
 # generated native folders
 /ios
 /android
-google-services.json
+# google-services.json sengaja tidak di-ignore supaya EAS Build dapat membacanya.
+# File ini aman di-commit (hanya berisi public API key + project info, bukan secret).
+# Keamanan Firebase dijaga oleh firestore.rules, bukan file konfigurasi ini.
+
+# Sprint 4: kunci service account Firebase Admin SDK (untuk seeder & deploy).
+# WAJIB di-ignore - kebocoran = akses admin penuh ke project Firebase.
+service-account.json
+hadirku-*-firebase-adminsdk-*.json
+*-firebase-adminsdk-*.json
+
+# Sprint 4: backend Vercel (pengganti Cloud Functions)
+backend-vercel/node_modules/
+backend-vercel/dist/
+backend-vercel/.vercel/
+backend-vercel/.env
+backend-vercel/.env.local
+
+# Firebase debug logs
+firebase-debug.log
+firebase-debug.*.log

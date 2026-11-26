@@ -24,8 +24,20 @@ service cloud.firestore {
       return userDoc(request.auth.uid).role;
     }
 
+    // Sprint 4: 'asisten' adalah alias lama Sprint 1-3 untuk 'asprak'.
+    // aslab mewarisi semua izin asprak + izin tambahan untuk kelola lab/users/kelas.
+    function isAsprak() {
+      return signedIn() && (
+        currentUserRole() == 'asprak' || currentUserRole() == 'asisten'
+      );
+    }
+
+    function isAslab() {
+      return signedIn() && currentUserRole() == 'aslab';
+    }
+
     function isAsisten() {
-      return signedIn() && currentUserRole() == 'asisten';
+      return isAsprak() || isAslab();
     }
 
     function isPeserta(data) {
@@ -37,9 +49,12 @@ service cloud.firestore {
       // User bisa membaca profilnya sendiri; Asisten bisa membaca daftar user untuk rekap/peserta
       allow read: if signedIn() && (request.auth.uid == uid || isAsisten());
 
-      // Buat akun baru hanya untuk UID milik sendiri dengan role yang diizinkan
+      // Buat akun baru hanya untuk UID milik sendiri dengan role yang diizinkan.
+      // Sprint 4: tambah 'asprak' dan 'aslab' ke daftar role yang boleh didaftarkan praktikan.
+      // Peran 'aslab' hanya untuk akun yang ditambahkan aslab lewat Bulk Insert (SRS4-01);
+      // self-register ke role aslab tetap diblok di langkah aplikasi.
       allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.role in ['asisten', 'praktikan']
+        && request.resource.data.role in ['asisten', 'asprak', 'aslab', 'praktikan']
         && request.resource.data.nama is string
         && request.resource.data.nim is string;
 
@@ -216,6 +231,59 @@ service cloud.firestore {
     match /appConfig/{configId} {
       allow read: if signedIn();
       allow write: if isAsisten();
+    }
+
+    // Koleksi Fines (SRS4-06..08 PIC C — Yustinus)
+    // ID dokumen deterministik: sessionId_userId agar satu denda per sesi per praktikan.
+    // Denda dibuat dari client dalam satu transaksi atomik dengan attendances;
+    // pembaruan status (processing/paid/cancelled) dilakukan server-side via Cloud Functions.
+    match /fines/{fineId} {
+      allow read: if signedIn() && (
+        isAsisten() ||
+        (resource != null && resource.data.userId == request.auth.uid)
+      );
+
+      // Praktikan bisa membuat denda hanya untuk dirinya sendiri, status pending saja,
+      // ID harus cocok dengan sessionId_uid, dan menitTerlambat harus > 0.
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && fineId == request.resource.data.sessionId + '_' + request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.nominal is number
+        && request.resource.data.nominal > 0
+        && request.resource.data.jumlahMenitTerlambat is number
+        && request.resource.data.jumlahMenitTerlambat > 0;
+
+      // Update dari client hanya untuk menyimpan orderId/snapToken saat tombol Bayar ditekan.
+      // Perubahan status pembayaran (paid/failed/cancelled) HANYA via Cloud Function (admin SDK).
+      allow update: if signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['midtransOrderId', 'snapToken', 'snapRedirectUrl', 'status', 'updatedAt'])
+        && request.resource.data.status in ['pending', 'processing'];
+
+      allow delete: if false;
+    }
+
+    // Koleksi Payments (SRS4-07..08)
+    // Dibuat dan diupdate HANYA oleh Cloud Function midtransWebhook (admin SDK bypasses rules).
+    // Client hanya boleh membaca pembayaran miliknya sendiri.
+    match /payments/{paymentId} {
+      allow read: if signedIn() && (
+        isAsisten() ||
+        (resource != null && resource.data.userId == request.auth.uid)
+      );
+      allow create, update, delete: if false;
+    }
+
+    // Koleksi BulkImports (SRS4-01)
+    // Catatan audit dari bulk insert CSV oleh aslab. Hanya aslab yang baca dan buat.
+    match /bulkImports/{importId} {
+      allow read: if isAslab();
+      allow create: if isAslab()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.kind in ['lab', 'praktikan', 'asprak'];
+      allow update, delete: if false;
     }
   }
 }

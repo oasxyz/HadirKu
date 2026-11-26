@@ -69,6 +69,16 @@ export default function RootLayout() {
 
             {/* ===== PIC C (Varissa) — Halaman khusus presensi berbasis lokasi ===== */}
             <Stack.Screen name="presensi/[sessionId]" />
+
+            {/* ===== Sprint 4 (PM — stub placeholder) ===== */}
+            {/* PIC A Yoas (SRS4-01): bulk import CSV & distribusi praktikan oleh aslab */}
+            <Stack.Screen name="bulk-import" />
+            <Stack.Screen name="distribusi-praktikan" />
+            {/* PIC B Annis (SRS4-04): daftar notifikasi penuh dengan swipe delete */}
+            <Stack.Screen name="notifikasi" />
+            {/* PIC C Yustinus (SRS4-08): detail tagihan + bayar Midtrans & riwayat pembayaran */}
+            <Stack.Screen name="tagihan/[fineId]" />
+            <Stack.Screen name="pembayaran" />
           </Stack>
         </ThemeProvider>
       </View>

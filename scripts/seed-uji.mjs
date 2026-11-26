@@ -36,7 +36,14 @@ const KOLEKSI = [
   'notifications',
   'pengajuanKelas',
   'users',
+  // Sprint 4
+  'fines',
+  'payments',
+  'bulkImports',
 ];
+
+// Sprint 4 (SRS4-06): nominal denda default per keterlambatan.
+const DENDA_DEFAULT = 10000;
 
 function ambilArg(nama) {
   const i = process.argv.indexOf(`--${nama}`);
@@ -68,6 +75,11 @@ function waktuIso(hari, jamKe = 9, menitKe = 0) {
   d.setDate(d.getDate() + hari);
   d.setHours(jamKe, menitKe, 0, 0);
   return d.toISOString();
+}
+
+/** Format rupiah seragam untuk teks notifikasi. */
+function formatRp(n) {
+  return 'Rp' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
 initializeApp({ credential: applicationDefault() });
@@ -128,10 +140,16 @@ async function cariAkun(email, peranDiharapkan) {
     );
   }
   const data = profil.data();
-  if (data.role !== peranDiharapkan) {
-    throw new Error(`Akun ${email} berperan "${data.role}", bukan "${peranDiharapkan}".`);
+  // Sprint 4: 'asisten' adalah alias lama 'asprak'. Peran 'aslab' juga lolos saat yang dicari asprak.
+  const peranAktual = data.role;
+  const cocok =
+    peranAktual === peranDiharapkan ||
+    (peranDiharapkan === 'asisten' && (peranAktual === 'asprak' || peranAktual === 'aslab')) ||
+    (peranDiharapkan === 'asprak' && (peranAktual === 'asisten' || peranAktual === 'aslab'));
+  if (!cocok) {
+    throw new Error(`Akun ${email} berperan "${peranAktual}", bukan "${peranDiharapkan}".`);
   }
-  return { uid: akun.uid, nama: data.nama ?? email, kelas: data.kelas };
+  return { uid: akun.uid, nama: data.nama ?? email, kelas: data.kelas, role: peranAktual };
 }
 
 async function isiData(emailAsisten, emailPraktikan) {
@@ -253,7 +271,86 @@ async function isiData(emailAsisten, emailPraktikan) {
     { id: 'uji-notif-3', type: 'izin_ditolak', sessionId: 'uji-lalu-alpha',
       title: 'Izin ditolak', body: `Izin untuk Sistem Operasi ditolak oleh ${asisten.nama}.`,
       createdAt: waktuIso(-7, 7, 30), readBy: [] },
+    // Sprint 4 (SRS4-04 & SRS4-06..08)
+    { id: 'uji-notif-4', type: 'tagihan_baru', sessionId: 'uji-kemarin-telat',
+      title: 'Tagihan denda baru', body: `Terlambat 25 menit di Jaringan Komputer. Denda ${formatRp(25 * DENDA_DEFAULT / 10)}.`,
+      createdAt: waktuIso(-1, 10, 0), readBy: [],
+      fineId: `uji-kemarin-telat_${praktikan.uid}` },
   ].map((n) => ({ ...n, targetUserIds: [praktikan.uid] }));
+
+  // Sprint 4 (SRS4-06..08): 1 sesi tambahan dengan keterlambatan + denda + 1 pembayaran settled.
+  const sesiTelat = {
+    id: 'uji-kemarin-telat',
+    praktikum: 'Jaringan Komputer',
+    kelasLab: 'D1',
+    labId: 'lab-informatika-c',
+    tanggal: tanggal(-1),
+    jamMulai: '13:00',
+    jamSelesai: '15:00',
+    status: 'ditutup',
+    ...sesiDasar,
+  };
+  sesi.push(sesiTelat);
+
+  const fines = [
+    {
+      id: `uji-kemarin-telat_${praktikan.uid}`,
+      sessionId: 'uji-kemarin-telat',
+      userId: praktikan.uid,
+      labId: 'lab-informatika-c',
+      praktikum: 'Jaringan Komputer',
+      kelasLab: 'D1',
+      jumlahMenitTerlambat: 25,
+      nominal: DENDA_DEFAULT,
+      status: 'pending',
+      createdAt: waktuIso(-1, 13, 25),
+      midtransOrderId: null,
+      snapToken: null,
+      snapRedirectUrl: null,
+    },
+    {
+      id: `uji-dibuka-sekarang_${teman[0]}`,
+      sessionId: 'uji-dibuka-sekarang',
+      userId: teman[0],
+      labId: 'dekanat-fsm',
+      praktikum: 'Pemrograman Mobile',
+      kelasLab: 'D1',
+      jumlahMenitTerlambat: 12,
+      nominal: DENDA_DEFAULT,
+      status: 'paid',
+      createdAt: new Date(Date.now() - 15 * 60000).toISOString(),
+      midtransOrderId: 'uji-order-1',
+    },
+    {
+      id: `uji-lalu-izin_${praktikan.uid}`,
+      sessionId: 'uji-lalu-izin',
+      userId: praktikan.uid,
+      labId: 'dekanat-fsm',
+      praktikum: 'Pemrograman Web',
+      kelasLab: 'D1',
+      jumlahMenitTerlambat: 18,
+      nominal: DENDA_DEFAULT,
+      status: 'cancelled',
+      createdAt: waktuIso(-5, 10, 20),
+      cancelledReason: 'Izin diterima otomatis membatalkan denda.',
+      cancelledBy: asisten.uid,
+    },
+  ];
+
+  const payments = [
+    {
+      id: 'uji-order-1',
+      fineId: `uji-dibuka-sekarang_${teman[0]}`,
+      userId: teman[0],
+      nominal: DENDA_DEFAULT,
+      midtransOrderId: 'uji-order-1',
+      midtransTransactionId: 'uji-trx-1',
+      paymentType: 'qris',
+      status: 'settlement',
+      createdAt: new Date(Date.now() - 20 * 60000).toISOString(),
+      settledAt: new Date(Date.now() - 12 * 60000).toISOString(),
+    },
+  ];
 
   // Pengajuan pindah kelas menunggu: Bagus (D2) ingin ke D1, dipegang asisten uji.
   const pengajuanKelas = [{
@@ -285,12 +382,14 @@ async function isiData(emailAsisten, emailPraktikan) {
   leaveRequests.forEach(({ id, ...data }) => batch.set(db.collection('leaveRequests').doc(id), data));
   notifications.forEach(({ id, ...data }) => batch.set(db.collection('notifications').doc(id), data));
   pengajuanKelas.forEach(({ id, ...data }) => batch.set(db.collection('pengajuanKelas').doc(id), data));
+  fines.forEach(({ id, ...data }) => batch.set(db.collection('fines').doc(id), data));
+  payments.forEach(({ id, ...data }) => batch.set(db.collection('payments').doc(id), data));
   await batch.commit();
 
   console.log('');
   console.log(`Data uji ditulis: ${sesi.length} sesi, ${attendances.length} presensi, ` +
     `${leaveRequests.length} izin, ${notifications.length} pemberitahuan, ${temanUji.length} praktikan tambahan, ` +
-    `${pengajuanKelas.length} pengajuan pindah kelas.`);
+    `${pengajuanKelas.length} pengajuan pindah kelas, ${fines.length} denda, ${payments.length} pembayaran.`);
   console.log(`Kode sesi yang sedang dibuka: ${KODE_SESI_UJI}`);
   console.log('Hapus lagi dengan: node scripts/seed-uji.mjs --hapus');
 }

@@ -33,6 +33,9 @@ export default function TabsLayout() {
       <Tabs.Screen name="catatan" />
       <Tabs.Screen name="izin" />
       <Tabs.Screen name="profil" />
+      {/* Sprint 4 (SRS4-03): tab Dashboard khusus Aslab. FloatingTabBar
+          menyembunyikannya untuk role lain. */}
+      <Tabs.Screen name="dashboard" />
     </Tabs>
   );
 }

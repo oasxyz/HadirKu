@@ -1,4 +1,15 @@
-export type Role = 'asisten' | 'praktikan';
+// Sprint 4: hirarki role baru - aslab (manajemen lab) > asprak (asisten praktikum) > praktikan.
+// 'asisten' dipertahankan sebagai alias lama Sprint 1-3 agar dokumen users lama tetap terbaca.
+export type Role = 'aslab' | 'asprak' | 'praktikan' | 'asisten';
+
+// Sprint 4: helper agar kode baru maupun lama kompak - menerima 'asprak' maupun 'asisten'.
+export function isAsprakLike(role: Role | null | undefined): boolean {
+  return role === 'asprak' || role === 'asisten';
+}
+
+export function isAslabLike(role: Role | null | undefined): boolean {
+  return role === 'aslab';
+}
 
 export interface User {
   id: string; // uid Firebase Auth
@@ -10,6 +21,8 @@ export interface User {
   kelasKuliah?: string; // Batas kelas mata kuliah praktikan, mis. "A".."E"
   kelasPraktikum?: Record<string, string>; // Peta nama praktikum -> sub-kelas, mis. { "Basis Data": "D1", "Sistem Operasi": "D2" }
   pushTokens?: string[]; // Sprint 3: Token FCM untuk push notification
+  // Sprint 4 (SRS4-01): lab yang dipegang aslab/asprak. Aslab mengurus semua lab; asprak terbatas.
+  labIds?: string[];
 }
 
 // Titik lokasi dalam derajat desimal (WGS84).
@@ -28,6 +41,10 @@ export interface Lab {
   radiusMeter: number;
   updatedBy?: string;
   updatedAt?: string;
+  // Sprint 4 (SRS4-06): toleransi keterlambatan (menit) dan nominal denda default lab ini.
+  // Bila kosong, pakai appConfig/runtime.gracePeriodDefault / dendaDefault.
+  gracePeriodMenit?: number;
+  dendaPerKelambatan?: number;
 }
 
 export interface Kelas {
@@ -79,6 +96,11 @@ export interface Attendance {
   jarakMeter?: number | null;
   radiusSaatPresensi?: number;
   metode?: AttendanceMethod;
+  // Sprint 4 (SRS4-06): selisih menit dari jamMulai sesi ke waktuPresensi.
+  // > 0 berarti terlambat; 0/null berarti tepat waktu.
+  menitTerlambat?: number | null;
+  // Sprint 4 (SRS4-06): rujukan ke dokumen fines yang dibuat atas keterlambatan ini (bila ada).
+  fineId?: string | null;
 }
 
 export type LeaveStatus = 'menunggu' | 'diterima' | 'ditolak';
@@ -101,6 +123,9 @@ export interface LeaveRequest {
   userId: string;
   alasan: string;
   kategoriAi: LeaveCategory | null;
+  // Sprint 4 (SRS4-05): sentimen hasil analisis AI, informasi pendukung untuk asprak di
+  // halaman Pemeriksaan Izin. Boleh null jika model AI belum tersedia.
+  sentimenAi?: 'positif' | 'netral' | 'negatif' | null;
   status: LeaveStatus;
   createdAt: string;
   diputuskanOleh: string | null;
@@ -116,7 +141,15 @@ export type NotificationType =
   | 'izin_diterima'
   | 'izin_ditolak'
   | 'kelas_diterima'
-  | 'kelas_ditolak';
+  | 'kelas_ditolak'
+  // Sprint 4 (SRS4-01): aslab memindah praktikan antar kelas top-down.
+  | 'kelas_dipindah_aslab'
+  // Sprint 4 (SRS4-04 & SRS4-06..08): siklus hidup tagihan denda keterlambatan.
+  | 'tagihan_baru'
+  | 'tagihan_jatuh_tempo'
+  | 'tagihan_dibatalkan'
+  | 'pembayaran_sukses'
+  | 'pembayaran_gagal';
 
 // Pengajuan pindah kelas praktikum. ID dokumen = uid praktikan (satu pengajuan aktif per orang).
 // `asistenIds` = asisten yang sedang memegang praktikan (pembuat sesi yang memuatnya);
@@ -143,8 +176,90 @@ export interface Notification {
   body: string;
   type: NotificationType;
   sessionId?: string;
+  // Sprint 4 (SRS4-04): deep link ke halaman spesifik. Isi fineId untuk notifikasi tagihan,
+  // pengajuanKelasUid untuk notifikasi pindah kelas.
+  fineId?: string;
+  pengajuanKelasUid?: string;
   createdAt: string;
   readBy: string[];
+}
+
+// Sprint 4 (SRS4-06..08): tagihan denda keterlambatan praktikum.
+// ID dokumen deterministik: sessionId_userId agar denda per sesi per praktikan unik.
+export type FineStatus =
+  | 'pending'
+  | 'processing'
+  | 'paid'
+  | 'cancelled'
+  | 'failed'
+  | 'expired';
+
+export interface Fine {
+  id: string;
+  sessionId: string;
+  userId: string;
+  labId?: string;
+  praktikum: string;
+  kelasLab: string;
+  jumlahMenitTerlambat: number;
+  nominal: number; // rupiah
+  status: FineStatus;
+  createdAt: string;
+  updatedAt?: string;
+  // Diisi Cloud Function createMidtransTransaction saat praktikan menekan Bayar.
+  midtransOrderId?: string | null;
+  snapToken?: string | null;
+  snapRedirectUrl?: string | null;
+  // Diisi saat denda dibatalkan otomatis (mis. izin diterima).
+  cancelledReason?: string | null;
+  cancelledBy?: string | null;
+}
+
+// Rekam satu dokumen per percobaan/penyelesaian pembayaran Midtrans.
+// ID dokumen = midtransOrderId agar webhook berulang tidak menciptakan duplikat.
+export type PaymentStatus =
+  | 'pending'
+  | 'settlement'
+  | 'expire'
+  | 'cancel'
+  | 'deny'
+  | 'failure';
+
+export interface Payment {
+  id: string; // = midtransOrderId
+  fineId: string;
+  userId: string;
+  nominal: number;
+  midtransOrderId: string;
+  midtransTransactionId?: string;
+  paymentType?: string;
+  status: PaymentStatus;
+  rawPayload?: Record<string, unknown>;
+  createdAt: string;
+  settledAt?: string | null;
+}
+
+// Sprint 4 (SRS4-01): log aslab bulk import dari CSV. Simpan ringkasan per baris
+// supaya aslab bisa menelusuri siapa diterima/ditolak kapan.
+export type BulkImportKind = 'lab' | 'praktikan' | 'asprak';
+export type BulkImportRowStatus = 'accepted' | 'rejected' | 'edited';
+
+export interface BulkImportRow {
+  rowIndex: number;
+  status: BulkImportRowStatus;
+  payload: Record<string, unknown>;
+  message?: string;
+}
+
+export interface BulkImport {
+  id: string;
+  kind: BulkImportKind;
+  createdBy: string;
+  createdAt: string;
+  totalRow: number;
+  diterima: number;
+  ditolak: number;
+  rows: BulkImportRow[];
 }
 
 export interface AppConfig {
@@ -152,6 +267,14 @@ export interface AppConfig {
   gpsAccuracyBufferMeter: number;
   useOsmFallbackTiles: boolean;
   aiTimeoutMs: number;
+  // Sprint 4 (SRS4-06): nilai bawaan denda per keterlambatan dan toleransi menit,
+  // dipakai bila lab yang bersangkutan belum mengatur field spesifiknya.
+  dendaDefault?: number;
+  gracePeriodDefault?: number;
+  // Sprint 4 (SRS4-07): konfigurasi Snap Midtrans. Client key boleh dibaca praktikan;
+  // Server Key TIDAK boleh disimpan di koleksi ini.
+  midtransClientKey?: string;
+  midtransSnapIsSandbox?: boolean;
 }
 
 /** @deprecated Sprint 1 legacy state — akan dihapus saat pembersihan AppProvider (SRS3-02) */

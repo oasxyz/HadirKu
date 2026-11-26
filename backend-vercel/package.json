@@ -1,0 +1,19 @@
+{
+  "name": "hadirku-backend",
+  "version": "1.0.0",
+  "description": "Backend Vercel HadirKu Sprint 4: Midtrans Snap, webhook, cleanup sesi.",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel deploy --prod",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.2",
+    "midtrans-client": "^1.4.2"
+  },
+  "devDependencies": {
+    "@vercel/node": "^5.0.0",
+    "typescript": "~5.6.3"
+  }
+}
