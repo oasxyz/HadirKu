@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "621397636275-pm7fqhg3gou53bmj94jt04s64bth9lum.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.oasxyz.HadirKu",
+            "certificate_hash": "a866505ac4873356c169a23246c3a32ee039eb52"
+          }
+        },
+        {
           "client_id": "621397636275-vvftgis03edkmeq8q2cquo3q44okeuo5.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
