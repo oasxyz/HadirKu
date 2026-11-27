@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { shadow, type IconName } from '@/components/ui';
@@ -44,6 +44,10 @@ export function FloatingTabBar({ state, navigation }: TabBarProps) {
   // SRS4-03: praktikan mendapat tombol Absen bundar di tengah tab bar.
   const absen = useSesiAbsen();
   const kecil = absen.tampil;
+  // Bar praktikan ±325 dp. Di layar sangat sempit (< 360 dp) label tab aktif disembunyikan
+  // supaya bar tidak melewati tepi layar.
+  const { width: lebarLayar } = useWindowDimensions();
+  const tanpaLabel = kecil && lebarLayar < 360;
 
   const tabs = state.routes
     .filter((route) => TAB_META[tabKey(route.name)] && !hidden.includes(tabKey(route.name)))
@@ -56,9 +60,15 @@ export function FloatingTabBar({ state, navigation }: TabBarProps) {
           accessibilityRole="button"
           accessibilityLabel={meta.label}
           onPress={() => navigation.navigate(route.name)}
-          style={[styles.item, kecil && styles.itemKecil, active && styles.itemActive]}>
+          style={[
+            styles.item,
+            kecil && styles.itemKecil,
+            active && !tanpaLabel && styles.itemActive,
+            active && kecil && !tanpaLabel && styles.itemActiveKecil,
+            active && tanpaLabel && { backgroundColor: Palette.primary },
+          ]}>
           <Ionicons name={meta.icon} size={18} color={active ? '#FFFFFF' : Palette.text} />
-          {active ? <Text style={styles.label}>{meta.label}</Text> : null}
+          {active && !tanpaLabel ? <Text style={styles.label}>{meta.label}</Text> : null}
         </Pressable>
       );
     });
@@ -80,7 +90,7 @@ export function FloatingTabBar({ state, navigation }: TabBarProps) {
 
   return (
     <View pointerEvents="box-none" style={[styles.wrapper, { bottom: insets.bottom + 18 }]}>
-      <View style={styles.bar}>{tabs}</View>
+      <View style={[styles.bar, kecil && styles.barKecil]}>{tabs}</View>
     </View>
   );
 }
@@ -162,9 +172,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  // Ukuran ringkas khusus bar praktikan (ada tombol Absen di tengah).
+  barKecil: {
+    gap: 4,
+    padding: 5,
+  },
   itemKecil: {
     height: 40,
     width: 40,
+  },
+  itemActiveKecil: {
+    gap: 5,
+    paddingHorizontal: 12,
   },
   // Bulatan menyembul ke atas bar; label kecil di bawahnya tetap di dalam bar.
   absenWrapper: {
@@ -180,9 +199,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 4,
     boxShadow: '0 12px 26px rgba(226, 27, 208, 0.38)',
-    height: 56,
+    height: 52,
     justifyContent: 'center',
-    width: 56,
+    width: 52,
   },
   absenButtonMati: {
     backgroundColor: Palette.textMuted,
