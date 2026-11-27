@@ -83,6 +83,8 @@ export function useSessions() {
             pesertaIds: Array.isArray(data.pesertaIds) ? data.pesertaIds : [],
             kodeSesi: data.kodeSesi ?? null,
             status: data.status ?? 'belum_dibuka',
+            // SRS4-04: ditandai cron cleanup-sessions untuk sesi selesai > 24 jam.
+            diarsipkan: data.diarsipkan === true,
           });
         });
 

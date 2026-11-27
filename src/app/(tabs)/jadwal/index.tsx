@@ -48,12 +48,13 @@ export default function BerandaJadwalScreen() {
 
   const isAsisten = currentUser?.role === 'asisten';
 
-  // Urutkan sesi berdasarkan tanggal dan jam mulai
+  // Urutkan sesi berdasarkan tanggal dan jam mulai. Sesi yang diarsipkan cron (selesai > 24 jam,
+  // SRS4-04) tidak tampil di Beranda; riwayatnya tetap ada di Catatan, Rekap, dan Dashboard.
   const sortedSessions = useMemo(
     () =>
-      [...sessions].sort((a, b) =>
-        (a.tanggal + a.jamMulai).localeCompare(b.tanggal + b.jamMulai),
-      ),
+      sessions
+        .filter((session) => !session.diarsipkan)
+        .sort((a, b) => (a.tanggal + a.jamMulai).localeCompare(b.tanggal + b.jamMulai)),
     [sessions],
   );
 
