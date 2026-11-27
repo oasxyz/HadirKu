@@ -1,4 +1,27 @@
+import { createSentimentClassifier, type LabelSentimen, type ModelSentimen } from '@/services/sentiment/sentiment';
+import modelEdom from '@/services/sentiment/model-edom.json';
 import type { LeaveCategory } from '@/types';
+
+// SRS4-05: model sentimen on-device dibuat sekali saat pertama dipakai (±270 KB JSON).
+let klasifikasiSentimen: ((text: string) => { label: LabelSentimen | null }) | null = null;
+
+/**
+ * Label sentimen alasan izin (positif / netral / negatif) sebagai informasi pendukung
+ * asprak, bukan keputusan. Berjalan di HP (tanpa internet, tanpa API key), sesuai arahan
+ * asprak memakai sentiment.js + model-edom.json. Return null bila alasan kosong, tidak ada
+ * kata yang dikenal model, atau model gagal dimuat; izin tetap tersimpan (SRS 5.7).
+ */
+export function classifySentiment(alasan: string): LabelSentimen | null {
+  const teks = alasan.trim();
+  if (teks.length === 0) return null;
+  try {
+    klasifikasiSentimen ??= createSentimentClassifier(modelEdom as ModelSentimen);
+    return klasifikasiSentimen(teks).label;
+  } catch (err) {
+    console.warn('[ai.ts] Sentimen gagal:', err);
+    return null;
+  }
+}
 
 /**
  * Baca konfigurasi AI setiap kali dipanggil (bukan const modul) supaya

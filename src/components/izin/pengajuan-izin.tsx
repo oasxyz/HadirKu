@@ -33,7 +33,7 @@ import { Palette, Spacing } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useLeaveRequests } from '@/hooks/use-leave-requests';
 import { useSessions } from '@/hooks/use-sessions';
-import { classifyLeaveReason } from '@/services/ai';
+import { classifyLeaveReason, classifySentiment } from '@/services/ai';
 import { COLLECTIONS, getCompositeId } from '@/services/firebase';
 import type { LeaveRequest } from '@/types';
 import { normalizeLeaveCategory } from '@/types';
@@ -129,6 +129,8 @@ export function PengajuanIzin() {
     setSubmitting(true);
     try {
       const kategoriAi = await classifyLeaveReason(trimmed, config.aiTimeoutMs);
+      // SRS4-05: sentimen dihitung di HP (on-device), null bila tidak terbaca.
+      const sentimenAi = classifySentiment(trimmed);
 
       const firestore = getFirestore();
       const ref = doc(firestore, COLLECTIONS.leaveRequests, compositeId);
@@ -138,6 +140,7 @@ export function PengajuanIzin() {
         userId: currentUser.id,
         alasan: trimmed,
         kategoriAi,
+        sentimenAi,
         status: 'menunggu',
         createdAt: new Date().toISOString(),
         diputuskanOleh: null,
@@ -147,6 +150,7 @@ export function PengajuanIzin() {
       Logger.info('FIRESTORE', 'LeaveRequestCreate', 'Pengajuan izin tersimpan', {
         sessionId: selectedSessionId,
         kategoriAi,
+        sentimenAi,
       });
 
       resetForm();
