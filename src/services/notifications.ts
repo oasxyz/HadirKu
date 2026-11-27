@@ -252,6 +252,8 @@ export type PesanNotifikasi = {
   title: string;
   body: string;
   sessionId?: string;
+  /** Sprint 4: rujukan deep link untuk notifikasi tagihan. */
+  fineId?: string;
 };
 
 export type HasilKirim = {
@@ -298,7 +300,7 @@ async function kirimKeExpo(tokens: string[], pesan: PesanNotifikasi) {
       body: pesan.body,
       sound: 'default',
       channelId: CHANNEL_ID,
-      data: { type: pesan.type, sessionId: pesan.sessionId ?? null },
+      data: { type: pesan.type, sessionId: pesan.sessionId ?? null, fineId: pesan.fineId ?? null },
     }));
     try {
       const res = await fetch(EXPO_PUSH_URL, {
@@ -354,6 +356,7 @@ export async function kirimNotifikasi(pesan: PesanNotifikasi): Promise<HasilKiri
       body: pesan.body,
       type: pesan.type,
       sessionId: pesan.sessionId ?? null,
+      ...(pesan.fineId ? { fineId: pesan.fineId } : {}),
       createdAt: new Date().toISOString(),
       readBy: [],
     });
@@ -428,5 +431,22 @@ export function pesanIzinDiputuskan(
     title: keputusan === 'diterima' ? 'Izin diterima' : 'Izin ditolak',
     body: `Pengajuan izin${untuk} ${keputusan} oleh asisten.`,
     sessionId: izin.sessionId,
+  };
+}
+
+/** SRS4-05: izin diterima membatalkan denda keterlambatan sesi itu → praktikan pemilik denda. */
+export function pesanTagihanDibatalkan(
+  fine: { id: string; userId: string; sessionId: string; nominal: number },
+  session?: Pick<Session, 'praktikum' | 'kelasLab'>,
+): PesanNotifikasi {
+  const rupiah = 'Rp' + Math.round(fine.nominal).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const sesi = session ? ` ${namaSesi(session)}` : '';
+  return {
+    type: 'tagihan_dibatalkan',
+    targetUserIds: [fine.userId],
+    title: 'Denda dibatalkan',
+    body: `Denda keterlambatan${sesi} sebesar ${rupiah} dibatalkan karena izinmu diterima.`,
+    sessionId: fine.sessionId,
+    fineId: fine.id,
   };
 }

@@ -17,6 +17,7 @@ import {
   EmptyNote,
   GlassCard,
   Screen,
+  SentimentBadge,
   TopBar,
 } from "@/components/ui";
 import { Palette, Spacing } from "@/constants/theme";
@@ -24,7 +25,9 @@ import { useCurrentUser } from "@/context/auth-context";
 import { useSessions } from "@/hooks/use-sessions";
 import { usePraktikanList } from "@/hooks/use-users";
 import { useLeaveRequests } from "@/hooks/use-leave-requests";
-import { kirimNotifikasi, pesanIzinDiputuskan } from "@/services/notifications";
+import { kirimNotifikasi, pesanIzinDiputuskan, pesanTagihanDibatalkan } from "@/services/notifications";
+import { classifySentiment } from "@/services/ai";
+import { putuskanIzin } from "@/components/izin/putuskan-izin";
 import { KategoriIzinBadge } from "@/components/status-kehadiran-badge";
 import { IlustrasiKosong, IlustrasiSurat } from "@/components/ilustrasi";
 import { BATAS_HARI_KEPUTUSAN_IZIN, masihBolehPutuskanIzin } from "@/utils/waktu-sesi";
@@ -67,7 +70,6 @@ export function PemeriksaanIzin() {
     leaveRequests,
     loading: leaveLoading,
     error: leaveError,
-    updateLeaveStatus,
   } = useLeaveRequests();
 
   const [filter, setFilter] = useState<FilterWaktu>("hari_ini");
@@ -180,19 +182,31 @@ export function PemeriksaanIzin() {
     isSubmittingRef.current = true;
     try {
       setProcessing(true);
-      await updateLeaveStatus(decision.id, decision.action, currentUser!.nama);
+      const izin = leaveRequests.find((req) => req.id === decision.id);
+      if (!izin) throw new Error("Pengajuan izin tidak ditemukan");
+      // SRS4-05: keputusan izin + pembatalan denda pending dalam satu transaksi.
+      const { dendaDibatalkan } = await putuskanIzin({
+        izinId: izin.id,
+        sessionId: izin.sessionId,
+        userId: izin.userId,
+        keputusan: decision.action,
+        asistenId: currentUser!.id,
+        asistenNama: currentUser!.nama,
+      });
       tampilkanToast(
-        'Praktikan diberi tahu lewat notifikasi.',
+        dendaDibatalkan
+          ? 'Denda keterlambatannya ikut dibatalkan. Praktikan diberi tahu lewat notifikasi.'
+          : 'Praktikan diberi tahu lewat notifikasi.',
         'sukses',
         decision.action === 'diterima' ? 'Izin diterima' : 'Izin ditolak'
       );
 
       // SRS3-04: beri tahu praktikan pemohon. Dijalankan di latar belakang supaya dialog
       // langsung tertutup; kegagalan notifikasi tidak membatalkan keputusan izin.
-      const izin = leaveRequests.find((req) => req.id === decision.id);
-      if (izin) {
-        const sesi = sessions.find((s) => s.id === izin.sessionId);
-        void kirimNotifikasi(pesanIzinDiputuskan(izin, decision.action, sesi));
+      const sesi = sessions.find((s) => s.id === izin.sessionId);
+      void kirimNotifikasi(pesanIzinDiputuskan(izin, decision.action, sesi));
+      if (dendaDibatalkan) {
+        void kirimNotifikasi(pesanTagihanDibatalkan(dendaDibatalkan, sesi));
       }
     } catch (err) {
       Logger.error("FIRESTORE", "putuskanIzin", err, { leaveRequestId: decision.id });
@@ -308,6 +322,10 @@ export function PemeriksaanIzin() {
                 const session = sessions.find((s) => s.id === req.sessionId);
                 // Kategori Sprint 2 (keluarga/akademik/lainnya) dibaca sebagai "izin".
                 const kategori = normalizeLeaveCategory(req.kategoriAi);
+                // SRS4-05: izin lama (sebelum Sprint 4) belum punya field sentimenAi; karena
+                // modelnya di HP, sentimennya dihitung langsung saat ditampilkan.
+                const sentimen =
+                  req.sentimenAi === undefined ? classifySentiment(req.alasan) : req.sentimenAi;
 
                 return (
                   <View key={req.id} style={styles.reqCard}>
@@ -330,6 +348,7 @@ export function PemeriksaanIzin() {
                     <View style={styles.aiSection}>
                       <Text style={styles.aiLabel}>Saran AI</Text>
                       <KategoriIzinBadge kategori={kategori} />
+                      <SentimentBadge value={sentimen} />
                     </View>
 
                     {req.status === "menunggu" && !masihBolehPutuskanIzin(session?.tanggal) ? (
@@ -554,6 +573,7 @@ const styles = StyleSheet.create({
   },
   aiSection: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: Spacing.two,
   },
