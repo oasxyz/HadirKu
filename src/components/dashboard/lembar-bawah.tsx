@@ -1,6 +1,5 @@
 // SRS4-03 (PIC B — Annis): lembar dari bawah untuk Dashboard Aslab.
 // - LembarAsprak: daftar asprak, yang sedang mengajar di atas (hanya baca).
-// - LembarSesi: detail sesi yang sedang berlangsung beserta peserta yang sudah/belum hadir.
 // Dibuat dengan Modal bawaan supaya tidak menambah paket baru.
 import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
@@ -9,9 +8,8 @@ import Animated, { SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Palette } from '@/constants/theme';
-import type { Attendance, Session, User } from '@/types';
 
-import { jamTitik, type BarisAsprak } from './data-dashboard';
+import type { BarisAsprak } from './data-dashboard';
 
 function LembarBawah({
   terbuka,
@@ -87,56 +85,6 @@ export function LembarAsprak({
       {lainnya.length > 0 ? <Text style={styles.blok}>Lainnya</Text> : null}
       {lainnya.map((d) => (
         <Baris key={d.user.id} judul={d.user.nama} sub={d.keterangan} />
-      ))}
-    </LembarBawah>
-  );
-}
-
-export function LembarSesi({
-  session,
-  onTutup,
-  attendances,
-  users,
-  namaLab,
-}: {
-  session: Session | null;
-  onTutup: () => void;
-  attendances: Attendance[];
-  users: Map<string, User>;
-  namaLab: (labId?: string) => string;
-}) {
-  const hadirIds = new Set(
-    session ? attendances.filter((a) => a.sessionId === session.id).map((a) => a.userId) : [],
-  );
-  const peserta = (session?.pesertaIds ?? [])
-    .map((id) => ({ id, nama: users.get(id)?.nama ?? 'Praktikan', nim: users.get(id)?.nim ?? '' }))
-    .sort((a, b) => a.nama.localeCompare(b.nama));
-  const sudah = peserta.filter((p) => hadirIds.has(p.id));
-  const belum = peserta.filter((p) => !hadirIds.has(p.id));
-
-  return (
-    <LembarBawah
-      terbuka={session !== null}
-      onTutup={onTutup}
-      judul={session ? `${session.praktikum} ${session.kelasLab}` : ''}
-      sub={
-        session
-          ? `${jamTitik(session.jamMulai)}-${jamTitik(session.jamSelesai)} · ${namaLab(session.labId)}${
-              session.asistenNama ? ` · ${session.asistenNama}` : ''
-            }`
-          : ''
-      }>
-      <Text style={styles.blok}>
-        Sudah hadir ({sudah.length}/{peserta.length})
-      </Text>
-      {sudah.length === 0 ? <Text style={styles.kosong}>Belum ada yang presensi.</Text> : null}
-      {sudah.map((p) => (
-        <Baris key={p.id} judul={p.nama} sub={p.nim} />
-      ))}
-      <Text style={styles.blok}>Belum hadir ({belum.length})</Text>
-      {belum.length === 0 ? <Text style={styles.kosong}>Semua peserta sudah hadir.</Text> : null}
-      {belum.map((p) => (
-        <Baris key={p.id} judul={p.nama} sub={p.nim} />
       ))}
     </LembarBawah>
   );

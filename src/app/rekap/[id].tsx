@@ -1,5 +1,6 @@
 // SRS3-04 (PIC B — Annis): detail rekap per sesi dengan 4 status (Hadir, Sakit, Izin, Alpha).
 // Data realtime dari Firestore: sesi, presensi, dan pengajuan izin.
+import { doc, onSnapshot } from '@react-native-firebase/firestore';
 import { useLocalSearchParams, router, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -19,7 +20,9 @@ import { useCurrentUser } from '@/context/auth-context';
 import { useLeaveRequests } from '@/hooks/use-leave-requests';
 import { useSessions } from '@/hooks/use-sessions';
 import { usePraktikanList } from '@/hooks/use-users';
-import type { Attendance, FinalAttendanceStatus } from '@/types';
+import { COLLECTIONS, db } from '@/services/firebase';
+import type { Attendance, FinalAttendanceStatus, Session } from '@/types';
+import { isAslabLike } from '@/types';
 import { formatRentangJam, formatTanggalSingkat } from '@/utils/format';
 import { hitungStatusKehadiran, ringkasKehadiran, sesiSelesai } from '@/utils/status-kehadiran';
 
@@ -44,6 +47,44 @@ function useSekarang(): Date {
   return sekarang;
 }
 
+/**
+ * SRS4-03: aslab membuka rekap sesi milik asprak lain dari Dashboard. useSessions hanya memuat
+ * sesi buatan pengguna sendiri, jadi untuk aslab dokumen sesi dibaca langsung (rules: aslab
+ * termasuk isAsisten sehingga boleh membaca semua sesi).
+ */
+function useSesiUntukAslab(id: string | undefined, aktif: boolean): { sesi: Session | null; siap: boolean } {
+  const [state, setState] = useState<{ id: string | null; sesi: Session | null }>({ id: null, sesi: null });
+  useEffect(() => {
+    if (!aktif || !id) return;
+    return onSnapshot(
+      doc(db, COLLECTIONS.sessions, id),
+      (snap) => {
+        const data = snap.exists() ? snap.data() : undefined;
+        setState({
+          id,
+          sesi: data
+            ? {
+                id,
+                praktikum: data.praktikum ?? '',
+                labId: typeof data.labId === 'string' ? data.labId : undefined,
+                kelasLab: data.kelasLab ?? '',
+                tanggal: data.tanggal ?? '',
+                jamMulai: data.jamMulai ?? '',
+                jamSelesai: data.jamSelesai ?? '',
+                asistenId: data.asistenId ?? '',
+                asistenNama: typeof data.asistenNama === 'string' ? data.asistenNama : undefined,
+                pesertaIds: Array.isArray(data.pesertaIds) ? data.pesertaIds : [],
+                status: data.status ?? 'belum_dibuka',
+              }
+            : null,
+        });
+      },
+      () => setState({ id, sesi: null }),
+    );
+  }, [id, aktif]);
+  return { sesi: state.id === id ? state.sesi : null, siap: !aktif || state.id === id };
+}
+
 function formatJam(iso: string): string {
   return new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 }
@@ -56,6 +97,10 @@ export default function RekapDetailScreen() {
   const { leaveRequests, loading: izinLoading, error: izinError } = useLeaveRequests();
   const { praktikanList, loading: usersLoading } = usePraktikanList();
   const [filter, setFilter] = useState<FinalAttendanceStatus | null>(null);
+  const aslab = isAslabLike(currentUser?.role);
+  const sesiAslab = useSesiUntukAslab(id, aslab);
+  // Aslab datang dari Dashboard (tab Rekap disembunyikan untuknya).
+  const kembaliKe = aslab ? '/dashboard' : '/rekap';
 
   useEffect(() => {
     if (!currentUser) {
@@ -67,11 +112,11 @@ export default function RekapDetailScreen() {
     return null;
   }
 
-  if (sessionsLoading || usersLoading || izinLoading) {
+  if (sessionsLoading || usersLoading || izinLoading || !sesiAslab.siap) {
     return (
       <Screen
         withTabBar={false}
-        header={<TopBar title="Rekap" back fallback="/rekap" />}>
+        header={<TopBar title="Rekap" back fallback={kembaliKe} />}>
         <GlassCard style={styles.loadingCard}>
           <ActivityIndicator size="large" color={Palette.primary} />
           <Text style={styles.loadingText}>Memuat rekap sesi…</Text>
@@ -84,7 +129,7 @@ export default function RekapDetailScreen() {
     return (
       <Screen
         withTabBar={false}
-        header={<TopBar title="Rekap" back fallback="/rekap" />}>
+        header={<TopBar title="Rekap" back fallback={kembaliKe} />}>
         <EmptyNote
           icon="cloud-offline-outline"
           message="Rekap belum bisa dimuat. Periksa koneksi internet lalu coba lagi."
@@ -93,13 +138,13 @@ export default function RekapDetailScreen() {
     );
   }
 
-  const session = sessions.find((item) => item.id === id);
+  const session = sessions.find((item) => item.id === id) ?? sesiAslab.sesi;
 
   if (!session) {
     return (
       <Screen
         withTabBar={false}
-        header={<TopBar title="Rekap" back fallback="/rekap" />}>
+        header={<TopBar title="Rekap" back fallback={kembaliKe} />}>
         <EmptyNote message="Sesi praktikum tidak ditemukan atau telah dihapus." />
       </Screen>
     );
@@ -163,7 +208,7 @@ export default function RekapDetailScreen() {
   return (
     <Screen
       withTabBar={false}
-      header={<TopBar title="Rekap" back fallback="/rekap" />}>
+      header={<TopBar title="Rekap" back fallback={kembaliKe} />}>
       {/* Kartu sesi bergaya sama dengan Detail Sesi: status, judul, chip bertumpuk, ilustrasi. */}
       <View style={styles.hero}>
         <View style={styles.heroText}>
