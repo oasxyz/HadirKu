@@ -4,10 +4,10 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ExpandableCalendar } from '@/components/expandable-calendar';
-import { IlustrasiLaptop } from '@/components/ilustrasi';
+import { IlustrasiKosong, IlustrasiLaptop, IlustrasiMenunggu } from '@/components/ilustrasi';
+import { KartuKosong } from '@/components/kartu-kosong';
 import {
   Avatar,
-  EmptyNote,
   GlassCard,
   Illustration,
   RoundButton,
@@ -19,6 +19,7 @@ import { Palette } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useSessions } from '@/hooks/use-sessions';
 import type { Attendance, Session } from '@/types';
+import { isStafLab } from '@/types';
 
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -46,7 +47,7 @@ export default function BerandaJadwalScreen() {
   const currentUser = useCurrentUser();
   const { sessions, attendances, loading, error } = useSessions();
 
-  const isAsisten = currentUser?.role === 'asisten';
+  const isAsisten = isStafLab(currentUser?.role);
 
   // Urutkan sesi berdasarkan tanggal dan jam mulai. Sesi yang diarsipkan cron (selesai > 24 jam,
   // SRS4-04) tidak tampil di Beranda; riwayatnya tetap ada di Catatan, Rekap, dan Dashboard.
@@ -120,11 +121,18 @@ export default function BerandaJadwalScreen() {
       {featured ? (
         <FeaturedCard session={featured} attendances={attendances} />
       ) : (
-        <EmptyNote
-          message={
+        <KartuKosong
+          judul={isAsisten ? 'Belum ada sesi' : 'Belum ada jadwal'}
+          pesan={
             isAsisten
-              ? 'Kamu belum membuat sesi praktikum mana pun. Tekan tombol + untuk menambahkan.'
-              : 'Kamu belum terdaftar di sesi praktikum mana pun.'
+              ? 'Buat sesi praktikum pertamamu, lalu buka sesi saat praktikum dimulai.'
+              : 'Sesi praktikum kelasmu akan muncul di sini setelah asisten membuatnya.'
+          }
+          ilustrasi={isAsisten ? <IlustrasiLaptop lebar={108} /> : <IlustrasiMenunggu lebar={108} />}
+          aksi={
+            isAsisten
+              ? { label: 'Tambah sesi', icon: 'add', onPress: () => router.push('/jadwal/form' as Href) }
+              : undefined
           }
         />
       )}
@@ -138,7 +146,12 @@ export default function BerandaJadwalScreen() {
 
       <SectionTitle title="Timeline" />
       {daySessions.length === 0 ? (
-        <EmptyNote message="Tidak ada sesi pada tanggal ini." />
+        <KartuKosong
+          ringkas
+          judul="Tidak ada sesi"
+          pesan="Pilih tanggal yang bertanda titik di kalender untuk melihat sesinya."
+          ilustrasi={<IlustrasiKosong lebar={92} />}
+        />
       ) : (
         <View style={styles.timeline}>
           {daySessions.map((session) => {
@@ -284,7 +297,7 @@ const styles = StyleSheet.create({
   },
   loadingCard: {
     alignItems: 'center',
-    borderRadius: 24,
+    borderRadius: 28,
     gap: 12,
     paddingHorizontal: 28,
     paddingVertical: 24,

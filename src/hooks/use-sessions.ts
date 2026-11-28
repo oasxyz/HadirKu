@@ -14,6 +14,7 @@ import { useCurrentUser } from '@/context/auth-context';
 import { db, COLLECTIONS } from '@/services/firebase';
 import type { Attendance, Coordinates, Session } from '@/types';
 import { waktuIsoAtauSekarang } from '@/utils/waktu';
+import { isStafLab } from '@/types';
 
 type SessionsState = {
   userId: string | null;
@@ -45,7 +46,7 @@ export function useSessions() {
     // Belum login: jangan setState di dalam effect; nilai kosong diturunkan saat return.
     if (!currentUser) return;
 
-    const isAsisten = currentUser.role === 'asisten';
+    const isAsisten = isStafLab(currentUser.role);
     const sessionsCol = collection(db, COLLECTIONS.sessions);
 
     // Asisten membaca sesi bimbingannya; Praktikan hanya membaca sesi yang memuat ID-nya di pesertaIds
@@ -113,7 +114,7 @@ export function useSessions() {
   useEffect(() => {
     if (!currentUser) return;
 
-    const isAsisten = currentUser.role === 'asisten';
+    const isAsisten = isStafLab(currentUser.role);
     const attendancesCol = collection(db, COLLECTIONS.attendances);
 
     // Praktikan hanya membaca presensi miliknya sendiri; Asisten membaca seluruh presensi
@@ -166,7 +167,7 @@ export function useSessions() {
       'id' | 'kodeSesi' | 'status' | 'asistenId' | 'asistenNama' | 'asistenCoords'
     >,
   ) {
-    if (!currentUser || currentUser.role !== 'asisten') {
+    if (!currentUser || !isStafLab(currentUser.role)) {
       throw new Error('Hanya asisten yang dapat menambahkan sesi');
     }
 

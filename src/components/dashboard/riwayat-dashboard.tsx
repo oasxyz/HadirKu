@@ -1,6 +1,6 @@
 // SRS4-03 (PIC B — Annis): Riwayat Kegiatan (10 sesi ditutup terakhir) dan
 // Riwayat Pembayaran (10 pembayaran lunas terakhir) di tab Riwayat Dashboard Aslab.
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, formatRupiah } from '@/components/ui';
 import { Palette } from '@/constants/theme';
@@ -11,9 +11,27 @@ import { jamTitik, LABEL_METODE, labelWaktuBayar } from './data-dashboard';
 
 export type JenisRiwayat = 'kegiatan' | 'pembayaran';
 
-function Baris({ judul, sub, ket, tag, warnaTag }: { judul: string; sub: string; ket: string; tag: string; warnaTag: string }) {
+function Baris({
+  judul,
+  sub,
+  ket,
+  tag,
+  warnaTag,
+  onPress,
+}: {
+  judul: string;
+  sub: string;
+  ket: string;
+  tag: string;
+  warnaTag: string;
+  onPress?: () => void;
+}) {
   return (
-    <View style={styles.baris}>
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      style={({ pressed }) => [styles.baris, pressed && { opacity: 0.75 }]}>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={styles.judul} numberOfLines={1}>
           {judul}
@@ -28,7 +46,7 @@ function Baris({ judul, sub, ket, tag, warnaTag }: { judul: string; sub: string;
       <View style={[styles.tag, { backgroundColor: warnaTag }]}>
         <Text style={styles.tagTeks}>{tag}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -48,6 +66,7 @@ export function RiwayatDashboard({
   users,
   fines,
   sekarang,
+  onTekanKegiatan,
 }: {
   jenis: JenisRiwayat;
   onJenis: (j: JenisRiwayat) => void;
@@ -58,6 +77,8 @@ export function RiwayatDashboard({
   users: Map<string, User>;
   fines: Map<string, Fine>;
   sekarang: Date;
+  /** Ketuk sesi di riwayat kegiatan → rekap kehadiran sesi itu. */
+  onTekanKegiatan?: (s: Session) => void;
 }) {
   return (
     <View style={{ gap: 10 }}>
@@ -78,6 +99,7 @@ export function RiwayatDashboard({
               ket={`Hadir ${hadir(s.id)}/${s.pesertaIds.length} · ${namaLab(s.labId)}`}
               tag="Ditutup"
               warnaTag={Palette.ink}
+              onPress={onTekanKegiatan ? () => onTekanKegiatan(s) : undefined}
             />
           ))
         )

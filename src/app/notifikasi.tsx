@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IlustrasiNotifikasi } from '@/components/ilustrasi';
 import { BarisNotifikasi } from '@/components/notifikasi/baris-notifikasi';
 import { useToast } from '@/components/toast';
-import { EmptyNote, Screen, TopBar } from '@/components/ui';
+import { EmptyNote, GlassCard, Screen, TopBar } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useNotifikasiSaya } from '@/services/notifications';
 import type { Notification } from '@/types';
@@ -97,7 +97,10 @@ export default function NotifikasiScreen() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Screen withTabBar={false} header={<TopBar title="Notifikasi" back fallback="/profil" right={tombolDibaca} />}>
         {notif.loading ? (
-          <ActivityIndicator color={Palette.primary} style={{ marginTop: 24 }} />
+          <GlassCard style={styles.memuat}>
+            <ActivityIndicator size="large" color={Palette.primary} />
+            <Text style={styles.memuatTeks}>Memuat notifikasi…</Text>
+          </GlassCard>
         ) : notif.error ? (
           <EmptyNote icon="cloud-offline-outline" message={notif.error} />
         ) : daftar.length === 0 ? (
@@ -164,10 +167,13 @@ const styles = StyleSheet.create({
     width: 48,
   },
   petunjuk: { color: Palette.textMuted, fontSize: 12 },
+  // Sama dengan kartu memuat di Beranda, Rekap, dan Pemeriksaan Izin.
+  memuat: { alignItems: 'center', gap: 12, padding: 24 },
+  memuatTeks: { color: Palette.textSecondary, fontSize: 14 },
   aksiHapus: {
     alignItems: 'center',
     backgroundColor: Palette.ink,
-    borderRadius: 20,
+    borderRadius: 18,
     gap: 2,
     justifyContent: 'center',
     marginLeft: 8,
@@ -181,7 +187,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'center',
     backgroundColor: Palette.ink,
-    borderRadius: 16,
+    borderRadius: 18,
     flexDirection: 'row',
     gap: 16,
     left: 20,

@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
   ajukanCard: {
     alignItems: 'center',
     backgroundColor: Palette.infoMuted,
-    borderRadius: 24,
+    borderRadius: 28,
     flexDirection: 'row',
     gap: 4,
     paddingLeft: 18,
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    borderRadius: 28,
     padding: Spacing.four,
     width: '100%',
     maxHeight: '85%',

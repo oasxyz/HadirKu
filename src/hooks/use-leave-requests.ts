@@ -12,6 +12,7 @@ import { useCurrentUser } from '@/context/auth-context';
 import { db, COLLECTIONS } from '@/services/firebase';
 import type { LeaveRequest } from '@/types';
 import { waktuIso, waktuIsoAtauSekarang } from '@/utils/waktu';
+import { isStafLab } from '@/types';
 
 export function useLeaveRequests() {
   const currentUser = useCurrentUser();
@@ -32,7 +33,7 @@ export function useLeaveRequests() {
       return;
     }
 
-    const isAsisten = currentUser.role === 'asisten';
+    const isAsisten = isStafLab(currentUser.role);
     const leaveRequestsCol = collection(db, COLLECTIONS.leaveRequests);
 
     // Sesuai firestore.rules:

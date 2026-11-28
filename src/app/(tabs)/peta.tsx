@@ -34,6 +34,7 @@ import { GlassCard, RoundButton, TAB_BAR_SPACE } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useSessions } from '@/hooks/use-sessions';
+import { isAslabLike, isStafLab } from '@/types';
 
 const INTERVAL_JAM_MS = 30_000;
 
@@ -69,7 +70,9 @@ export default function PetaScreen() {
   const { sessions: sesiSaya, attendances, error: sesiSayaError } = useSessions();
   const semuaAsisten = useSesiSemuaAsisten();
   // Keputusan tim: asisten melihat semua sesi di tiap lab, praktikan hanya sesi yang diikutinya.
-  const isAsisten = currentUser?.role === 'asisten';
+  const isAsisten = isStafLab(currentUser?.role);
+  // SRS 5.3: hanya aslab yang boleh membuka Kelola Lab; asprak tidak melihat tombolnya.
+  const bisaKelolaLab = isAslabLike(currentUser?.role);
   const sessions = isAsisten ? semuaAsisten.sessions : sesiSaya;
   const sessionsError = isAsisten ? semuaAsisten.error : sesiSayaError;
   const lokasi = useLokasiPengguna();
@@ -223,7 +226,7 @@ export default function PetaScreen() {
           <Text style={styles.title}>Peta Laboratorium Informatika</Text>
           {labsLoading ? <ActivityIndicator color={Palette.primary} /> : null}
           <RoundButton icon="locate-outline" size={40} onPress={keLokasiSaya} />
-          {isAsisten ? (
+          {bisaKelolaLab ? (
             <RoundButton
               icon="settings-outline"
               size={40}

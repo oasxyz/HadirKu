@@ -37,6 +37,7 @@ import { formatRentangJam, formatTanggalSingkat } from '@/utils/format';
 import { Logger } from '@/utils/logger';
 import { sesiSudahBerakhir } from '@/utils/sesi';
 import type { Session } from '@/types';
+import { isStafLab } from '@/types';
 
 // Kotak status berteks putih, warnanya sama dengan kartu Sesi Terdekat di Beranda.
 const LABEL_STATUS: Record<Session['status'], string> = {
@@ -62,7 +63,7 @@ export default function SesiDetailScreen() {
   const { tampilkanToast } = useToast();
 
   const session = sessions.find((item) => item.id === id);
-  const isAsisten = currentUser?.role === 'asisten';
+  const isAsisten = isStafLab(currentUser?.role);
   const locationState = useLocationValidation(session?.labId);
 
   if (!session) {

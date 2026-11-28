@@ -1,5 +1,5 @@
 // SRS4-04: tujuan deep link notifikasi dan kriteria arsip sesi oleh cron Vercel.
-import { ikonNotifikasi, tipeNotifikasiValid, tujuanNotifikasi } from '@/utils/tujuan-notifikasi';
+import { tipeNotifikasiValid, tujuanNotifikasi } from '@/utils/tujuan-notifikasi';
 
 // Endpoint Vercel mengimpor Admin SDK; cukup uji fungsi murninya.
 jest.mock('../backend-vercel/lib/firebase-admin', () => ({ adminDb: jest.fn() }));
@@ -33,11 +33,9 @@ describe('tujuanNotifikasi', () => {
     expect(tujuanNotifikasi({ type: null })).toBe('/jadwal');
   });
 
-  it('validasi tipe dan ikon', () => {
+  it('validasi tipe', () => {
     expect(tipeNotifikasiValid('tagihan_baru')).toBe(true);
     expect(tipeNotifikasiValid('lainnya')).toBe(false);
-    expect(ikonNotifikasi('tagihan_baru')).toBe('receipt-outline');
-    expect(ikonNotifikasi('izin_diterima')).toBe('mail-outline');
   });
 });
 

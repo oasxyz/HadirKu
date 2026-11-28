@@ -16,6 +16,7 @@ import { COLLECTIONS, db } from '@/services/firebase';
 import { kirimNotifikasi, pesanKelasDiputuskan } from '@/services/notifications';
 import type { PengajuanKelas } from '@/types';
 import { Logger } from '@/utils/logger';
+import { isStafLab } from '@/types';
 
 function keWaktu(nilai: unknown): string {
   if (typeof nilai === 'string') return nilai;
@@ -99,7 +100,7 @@ type StateAsisten = { userId: string | null; daftar: PengajuanKelas[]; loading: 
 /** Asisten: pengajuan dari praktikan yang dipegangnya, terbaru di atas. */
 export function usePengajuanKelasMasuk() {
   const currentUser = useCurrentUser();
-  const aktif = currentUser?.role === 'asisten';
+  const aktif = isStafLab(currentUser?.role);
   const [state, setState] = useState<StateAsisten>({
     userId: null,
     daftar: [],
@@ -108,7 +109,7 @@ export function usePengajuanKelasMasuk() {
   });
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== 'asisten') return;
+    if (!currentUser || !isStafLab(currentUser.role)) return;
     const q = query(
       collection(db, COLLECTIONS.pengajuanKelas),
       where('asistenIds', 'array-contains', currentUser.id),

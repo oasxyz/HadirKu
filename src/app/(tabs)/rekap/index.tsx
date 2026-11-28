@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   ringkas: {
     alignItems: "center",
     backgroundColor: Palette.warningMuted,
-    borderRadius: 24,
+    borderRadius: 28,
     flexDirection: "row",
     gap: 4,
     paddingLeft: 18,

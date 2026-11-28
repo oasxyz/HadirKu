@@ -11,9 +11,11 @@ import { batangDenda, daftarAsprak, jadwalPerLab, jumlahHadir, labDikelola, ring
 import { GrafikDenda } from '@/components/dashboard/grafik-denda';
 import { JadwalLabHariIni, Pengalih } from '@/components/dashboard/jadwal-lab';
 import { KartuBerlangsung, KartuDenda, KartuRingkas, KartuRiwayatRingkas } from '@/components/dashboard/kartu-dashboard';
-import { LembarAsprak, LembarSesi } from '@/components/dashboard/lembar-bawah';
+import { LembarAsprak } from '@/components/dashboard/lembar-bawah';
 import { RiwayatDashboard, type JenisRiwayat } from '@/components/dashboard/riwayat-dashboard';
 import { useDashboardAslab } from '@/components/dashboard/use-dashboard-aslab';
+import { IlustrasiLab } from '@/components/ilustrasi';
+import { KartuKosong } from '@/components/kartu-kosong';
 import { gradientStyle } from '@/components/screen-background';
 import { Avatar, EmptyNote, GlassCard, Screen, SectionTitle, TAB_BAR_SPACE, TopBar } from '@/components/ui';
 import { Palette } from '@/constants/theme';
@@ -63,7 +65,6 @@ export default function DashboardAslabScreen() {
   const [periode, setPeriode] = useState<Periode>('hari');
   const [jenisRiwayat, setJenisRiwayat] = useState<JenisRiwayat>('kegiatan');
   const [lembarAsprak, setLembarAsprak] = useState(false);
-  const [sesiDetail, setSesiDetail] = useState<Session | null>(null);
 
   const scrollRef = useRef<ScrollView>(null);
   const [posisiRiwayat, setPosisiRiwayat] = useState(0);
@@ -165,13 +166,17 @@ export default function DashboardAslabScreen() {
         <>
           <SectionTitle title="Sedang Berlangsung" />
           {hitung.berlangsung.length === 0 ? (
-            <EmptyNote icon="flask-outline" message="Belum ada sesi yang berlangsung di lab yang kamu kelola." />
+            <KartuKosong
+              judul="Belum ada sesi berlangsung"
+              pesan="Sesi yang dibuka asprak di lab kelolaanmu langsung muncul di sini, lengkap dengan jumlah hadirnya."
+              ilustrasi={<IlustrasiLab lebar={104} />}
+            />
           ) : (
             <KartuBerlangsung
               sessions={hitung.berlangsung}
               hadir={hitung.hadir}
               namaLab={hitung.namaLab}
-              onTekan={setSesiDetail}
+              onTekan={(s: Session) => router.push(`/rekap/${s.id}` as Href)}
             />
           )}
 
@@ -206,19 +211,13 @@ export default function DashboardAslabScreen() {
               users={hitung.users}
               fines={hitung.fineMap}
               sekarang={sekarang}
+              onTekanKegiatan={(s: Session) => router.push(`/rekap/${s.id}` as Href)}
             />
           </View>
         </>
       )}
 
       <LembarAsprak terbuka={lembarAsprak} onTutup={() => setLembarAsprak(false)} daftar={hitung.asprak} />
-      <LembarSesi
-        session={sesiDetail}
-        onTutup={() => setSesiDetail(null)}
-        attendances={data.attendances}
-        users={hitung.users}
-        namaLab={hitung.namaLab}
-      />
     </LayarGulir>
   );
 }

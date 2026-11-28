@@ -74,6 +74,18 @@ export function ringkasLab(
   };
 }
 
+/**
+ * Label pendek untuk pengalih lab (4 lab harus muat satu baris di HP):
+ * "Lab Informatika B" → "Lab B", "Dekanat FSM" → "Dekanat".
+ */
+export function labelPengalih(namaLab: string): string {
+  const singkat = namaLabSingkat(namaLab);
+  if (singkat.length <= 8) return singkat;
+  // Nama panjang: ambil kata pembedanya. "Lab Multimedia" → "Multimedia", bukan "Lab".
+  const kata = singkat.split(/\s+/);
+  return /^(lab|laboratorium)$/i.test(kata[0]) && kata[1] ? kata[1] : kata[0];
+}
+
 export type JadwalLab = {
   lab: Lab;
   label: string;
@@ -89,7 +101,7 @@ export function jadwalPerLab(labs: Lab[], sessions: Session[], sekarang: Date): 
     const { berlangsung, berikutnya } = aktivitasLab(sessions, lab.id, sekarang);
     return {
       lab,
-      label: namaLabSingkat(lab.namaLab),
+      label: labelPengalih(lab.namaLab),
       berlangsung,
       // Berikutnya hanya yang masih hari ini supaya sesuai judul "Jadwal Lab Hari Ini".
       berikutnya: berikutnya && berikutnya.tanggal === hariIni ? berikutnya : null,

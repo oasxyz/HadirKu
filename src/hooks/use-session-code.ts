@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { useCurrentUser } from '@/context/auth-context';
 import { COLLECTIONS, db } from '@/services/firebase';
+import { isStafLab } from '@/types';
 
 type SessionCodeState = {
   sessionId: string;
@@ -16,7 +17,7 @@ type SessionCodeState = {
  */
 export function useSessionCode(sessionId: string): string | null {
   const currentUser = useCurrentUser();
-  const isAsisten = currentUser?.role === 'asisten';
+  const isAsisten = isStafLab(currentUser?.role);
   const [state, setState] = useState<SessionCodeState | null>(null);
 
   useEffect(() => {

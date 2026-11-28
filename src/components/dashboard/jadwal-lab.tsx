@@ -2,7 +2,7 @@
 // (seperti Hari Ini / Riwayat), isi per lab mengikuti panel lab di tab Peta:
 // Sedang berlangsung, Berikutnya, lalu Jadwal hari ini yang ringkas sampai "Lihat semua" diketuk.
 import { useState } from 'react';
-import { LayoutAnimation, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LayoutAnimation, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { shadow } from '@/components/ui';
 import { Palette } from '@/constants/theme';
@@ -14,13 +14,15 @@ export function Pengalih<T extends string>({
   opsi,
   nilai,
   onPilih,
+  gaya,
 }: {
   opsi: { nilai: T; label: string }[];
   nilai: T;
   onPilih: (v: T) => void;
+  gaya?: StyleProp<ViewStyle>;
 }) {
   return (
-    <View style={styles.pengalih} accessibilityRole="tablist">
+    <View style={[styles.pengalih, gaya]} accessibilityRole="tablist">
       {opsi.map((o) => {
         const aktif = o.nilai === nilai;
         return (
@@ -30,7 +32,11 @@ export function Pengalih<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: aktif }}
             style={[styles.pengalihItem, aktif && styles.pengalihAktif]}>
-            <Text style={[styles.pengalihTeks, aktif && styles.pengalihTeksAktif]} numberOfLines={1}>
+            <Text
+              style={[styles.pengalihTeks, aktif && styles.pengalihTeksAktif]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}>
               {o.label}
             </Text>
           </Pressable>
@@ -67,7 +73,11 @@ export function JadwalLabHariIni({ jadwal, sekarang }: { jadwal: JadwalLab[]; se
   const isi = jadwal.find((j) => j.lab.id === labId) ?? jadwal[0];
 
   if (!isi) {
-    return <Text style={styles.kosong}>Belum ada lab yang kamu kelola.</Text>;
+    return (
+      <View style={styles.wadah}>
+        <Text style={styles.kosong}>Belum ada lab yang kamu kelola.</Text>
+      </View>
+    );
   }
 
   const ringkas =
@@ -78,8 +88,9 @@ export function JadwalLabHariIni({ jadwal, sekarang }: { jadwal: JadwalLab[]; se
         )}`;
 
   return (
-    <View style={{ gap: 12 }}>
+    <View style={styles.wadah}>
       <Pengalih
+        gaya={styles.pengalihDiKartu}
         opsi={jadwal.map((j) => ({ nilai: j.lab.id, label: j.label }))}
         nilai={isi.lab.id}
         onPilih={(v) => {
@@ -140,6 +151,18 @@ export function JadwalLabHariIni({ jadwal, sekarang }: { jadwal: JadwalLab[]; se
 }
 
 const styles = StyleSheet.create({
+  // Kartu putih solid pembungkus Jadwal Lab Hari Ini supaya terpisah dari latar gradien.
+  wadah: {
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 28,
+    borderWidth: 1,
+    boxShadow: shadow,
+    gap: 12,
+    padding: 16,
+  },
+  // Di atas kartu putih, pengalih diberi latar abu-lavender supaya tetap terlihat.
+  pengalihDiKartu: { backgroundColor: '#F3F1F6', borderColor: '#F3F1F6' },
   pengalih: {
     backgroundColor: 'rgba(255, 255, 255, 0.6)',
     borderColor: 'rgba(255, 255, 255, 0.95)',
@@ -168,18 +191,19 @@ const styles = StyleSheet.create({
   baris: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   jam: { color: Palette.text, fontSize: 13, fontWeight: '600', width: 42 },
   jamLewat: { color: Palette.textMuted, fontWeight: '400' },
+  // Di dalam kartu putih: kartu sesi abu-lavender supaya tidak menyatu dengan latarnya.
   kartu: {
-    backgroundColor: '#F7F6FB',
-    borderColor: Palette.border,
+    backgroundColor: '#EFECF5',
+    borderColor: 'rgba(110, 90, 150, 0.14)',
     borderRadius: 18,
     borderWidth: 1,
-    boxShadow: shadow,
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 11,
   },
-  kartuAktif: { borderColor: Palette.primary, borderWidth: 1.5 },
-  kartuLewat: { backgroundColor: '#F3F1F6', boxShadow: 'none' },
+  kartuAktif: { backgroundColor: '#FBEAF8', borderColor: Palette.primary, borderWidth: 1.5 },
+  // Sesi yang sudah selesai: lebih pudar dari kartu biasa.
+  kartuLewat: { backgroundColor: '#F6F5F9', borderColor: 'rgba(110, 90, 150, 0.08)' },
   judul: { color: Palette.text, fontSize: 13, fontWeight: '700' },
   sub: { color: Palette.textMuted, fontSize: 11 },
 });

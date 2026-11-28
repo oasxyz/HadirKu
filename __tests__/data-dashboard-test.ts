@@ -6,6 +6,7 @@ import {
   jadwalPerLab,
   kelompokDenda,
   labDikelola,
+  labelPengalih,
   ringkasDenda,
   ringkasLab,
   ringkasMingguIni,
@@ -74,6 +75,14 @@ describe('ringkasLab', () => {
       jumlahAsprak: 2,
       asprakMengajar: 1,
     });
+  });
+});
+
+describe('labelPengalih', () => {
+  it('nama lab dipendekkan supaya 4 lab muat satu baris', () => {
+    expect(labelPengalih('Lab Informatika B')).toBe('Lab B');
+    expect(labelPengalih('Dekanat FSM')).toBe('Dekanat');
+    expect(labelPengalih('Lab Multimedia')).toBe('Multimedia');
   });
 });
 
