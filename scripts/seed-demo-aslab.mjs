@@ -114,7 +114,16 @@ async function isi() {
   // Lab yang dipakai: ambil yang bukan "Dekanat" dulu supaya Dekanat tetap tampil kosong.
   const labUtama = labs.filter((l) => !/dekanat/i.test(l.nama));
   const [labA, labB, labC] = [labUtama[0] ?? labs[0], labUtama[1] ?? labs[1], labUtama[2] ?? labUtama[0] ?? labs[0]];
-  const [asp1, asp2, asp3] = [asprak[0], asprak[1], asprak[2] ?? asprak[0]];
+  // Akun uji dibaca lebih dulu: asprak uji tidak dipakai di sesi Dashboard supaya tidak
+  // mengajar dua sesi di jam yang sama (aturan bentrok asisten).
+  const asprakUji = await akunDariEmail(ambilArg('asprak'));
+  const praktikanUji = await akunDariEmail(ambilArg('praktikan'));
+  const asprakLain = asprak.filter((a) => a.id !== asprakUji?.id);
+  if (asprakLain.length < 3) {
+    throw new Error(`Butuh minimal 3 asprak selain asprak uji (ada ${asprakLain.length}).`);
+  }
+  // Tiap asprak hanya punya satu sesi di jam yang sama.
+  const [asp1, asp2, asp3] = asprakLain;
 
   const sekarang = new Date();
   const menitKini = sekarang.getHours() * 60 + sekarang.getMinutes();
@@ -272,11 +281,7 @@ async function isi() {
     }
   }
 
-  await tulisBertahap(tulisan);
-
   // --- 2 & 3. Data uji asprak dan praktikan --------------------------------------------
-  const asprakUji = await akunDariEmail(ambilArg('asprak'));
-  const praktikanUji = await akunDariEmail(ambilArg('praktikan'));
   const tambahan = [];
   const ringkas = [];
   const idKemarin = `${AWALAN}uji-izin`;
@@ -361,7 +366,8 @@ async function isi() {
       {
         praktikum: 'Pemrograman Mobile',
         kelasLab: praktikanUji.kelas ?? 'D1',
-        labId: labB.id,
+        // Lab ketiga: lab A dan B sudah dipakai sesi berlangsung Dashboard di jam yang sama.
+        labId: labC.id,
         tanggal: tglHariIni,
         jamMulai: isoJam(menitKini - 10),
         jamSelesai: isoJam(menitKini + 110),
@@ -409,6 +415,38 @@ async function isi() {
     ringkas.push(`6 notifikasi untuk ${praktikanUji.nama} (3 belum dibaca)`);
   }
 
+  // --- Validasi aturan jadwal sebelum menulis apa pun ------------------------------------
+  // Sama dengan aturan form Tambah Sesi: satu lab hanya satu sesi di jam yang sama, satu asprak
+  // hanya mengajar satu sesi di jam yang sama, dan jam berada di 07.00–21.00.
+  const keMenit = (j) => Number(j.slice(0, 2)) * 60 + Number(j.slice(3, 5));
+  const rencanaSesi = [...tulisan, ...tambahan]
+    .filter(([ref]) => ref.parent.id === 'sessions')
+    .map(([ref, d]) => ({ id: ref.id, ...d }));
+  const sesiAsli = (await db.collection('sessions').get()).docs
+    .filter((d) => !d.id.startsWith(AWALAN))
+    .map((d) => ({ id: d.id, ...d.data() }));
+  const masalah = [];
+  rencanaSesi.forEach((a, i) => {
+    const [m, sl] = [keMenit(a.jamMulai), keMenit(a.jamSelesai)];
+    if (m < 7 * 60 || sl > 21 * 60 || sl <= m) {
+      masalah.push(`${a.id} di luar jam lab 07.00–21.00 (${a.jamMulai}–${a.jamSelesai})`);
+    }
+    [...rencanaSesi.slice(i + 1), ...sesiAsli].forEach((b) => {
+      if (b.tanggal !== a.tanggal || typeof b.jamMulai !== 'string' || typeof b.jamSelesai !== 'string') return;
+      const tumpang = m < keMenit(b.jamSelesai) && keMenit(b.jamMulai) < sl;
+      if (!tumpang) return;
+      if (b.labId === a.labId) masalah.push(`${a.id} bentrok lab dengan ${b.id} (${b.jamMulai}–${b.jamSelesai})`);
+      if (b.asistenId === a.asistenId) masalah.push(`${a.id} bentrok asprak dengan ${b.id} (${b.jamMulai}–${b.jamSelesai})`);
+    });
+  });
+  if (masalah.length > 0) {
+    console.error('Data demo TIDAK ditulis karena melanggar aturan jadwal:');
+    masalah.forEach((x) => console.error(`  - ${x}`));
+    console.error('Jalankan di jam 09.00–17.00 (jadwal dihitung dari jam sekarang), atau hapus sesi asli yang bentrok.');
+    process.exit(1);
+  }
+
+  await tulisBertahap(tulisan);
   await tulisBertahap(tambahan);
 
   const hitung = (k) => tulisan.filter(([ref]) => ref.parent.id === k).length;
