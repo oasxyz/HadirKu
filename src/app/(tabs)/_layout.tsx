@@ -5,12 +5,14 @@ import { FloatingTabBar } from '@/components/floating-tab-bar';
 import { gradientStyle } from '@/components/screen-background';
 import { useCurrentUser } from '@/context/auth-context';
 import { seedDummyPraktikan200IfNeeded, seedInitialLabsIfNeeded } from '@/services/firebase';
-import { useDaftarkanPushToken } from '@/services/notifications';
+import { useBukaDariNotifikasi, useDaftarkanPushToken } from '@/services/notifications';
 
 export default function TabsLayout() {
   const currentUser = useCurrentUser();
   // SRS3-04: simpan token notifikasi perangkat begitu pengguna masuk ke aplikasi.
   useDaftarkanPushToken();
+  // SRS4-04: ketuk notifikasi push → langsung ke halaman spesifiknya (deep link).
+  useBukaDariNotifikasi();
 
   useEffect(() => {
     // Seeder hanya berjalan jika pengguna yang login adalah asisten

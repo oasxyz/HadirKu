@@ -22,7 +22,7 @@ import {
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
@@ -37,6 +37,7 @@ import type {
 } from '@/types';
 import { formatRentangJam, formatTanggal } from '@/utils/format';
 import { Logger } from '@/utils/logger';
+import { tipeNotifikasiValid, tujuanNotifikasi } from '@/utils/tujuan-notifikasi';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const CHANNEL_ID = 'default';
@@ -142,6 +143,40 @@ export function usePushNotifikasi() {
   return { status, cobaLagi: () => setPercobaan((n) => n + 1) };
 }
 
+// ---------------------------------------------------------------------------
+// SRS4-04: deep link saat notifikasi push diketuk
+// ---------------------------------------------------------------------------
+
+// Notifikasi yang sudah dibuka, supaya tidak dibuka ulang saat layout dipasang lagi.
+let responTerakhirDitangani: string | null = null;
+
+/**
+ * Mengetuk notifikasi push membuka halaman spesifiknya (bukan Beranda), termasuk saat
+ * aplikasi dibuka dari keadaan tertutup lewat notifikasi. Dipasang sekali di layout tab.
+ */
+export function useBukaDariNotifikasi() {
+  const currentUser = useCurrentUser();
+  const respon = Notifications.useLastNotificationResponse();
+
+  useEffect(() => {
+    if (!currentUser || !respon) return;
+    if (respon.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
+    const id = respon.notification.request.identifier;
+    if (id === responTerakhirDitangani) return;
+    responTerakhirDitangani = id;
+
+    const data = respon.notification.request.content.data ?? {};
+    const tujuan = tujuanNotifikasi({
+      type: typeof data.type === 'string' ? data.type : null,
+      sessionId: typeof data.sessionId === 'string' ? data.sessionId : null,
+      fineId: typeof data.fineId === 'string' ? data.fineId : null,
+    });
+    Logger.info('FCM', 'bukaDariNotifikasi', `Membuka ${tujuan}`, { type: data.type });
+    router.push(tujuan as Href);
+    Notifications.clearLastNotificationResponse();
+  }, [currentUser, respon]);
+}
+
 /**
  * Versi tanpa fokus layar, untuk dipasang sekali di layout tab (semua layar setelah login).
  * PM cukup menambahkan `useDaftarkanPushToken();` di src/app/(tabs)/_layout.tsx.
@@ -194,10 +229,12 @@ export function useNotifikasiSaya() {
             targetUserIds: Array.isArray(data.targetUserIds) ? data.targetUserIds : [],
             title: typeof data.title === 'string' ? data.title : '',
             body: typeof data.body === 'string' ? data.body : '',
-            type: data.type,
+            type: tipeNotifikasiValid(data.type) ? data.type : 'sesi_dibuka',
             sessionId: typeof data.sessionId === 'string' ? data.sessionId : undefined,
+            fineId: typeof data.fineId === 'string' ? data.fineId : undefined,
             createdAt: typeof data.createdAt === 'string' ? data.createdAt : '',
             readBy: Array.isArray(data.readBy) ? data.readBy : [],
+            hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor : [],
           });
         });
         items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -217,8 +254,21 @@ export function useNotifikasiSaya() {
   }, [userId]);
 
   const sinkron = userId !== null && state.userId === userId;
-  const items = sinkron ? state.items : [];
+  // SRS4-04: notifikasi yang dihapus pengguna ini (hiddenFor) tidak ditampilkan lagi.
+  const items = sinkron && userId ? state.items.filter((item) => !item.hiddenFor?.includes(userId)) : [];
   const belumDibaca = userId ? items.filter((item) => !item.readBy.includes(userId)) : [];
+
+  /** Hapus dari daftar pengguna ini saja (soft delete); dokumen tetap ada untuk audit. */
+  async function sembunyikan(id: string) {
+    if (!userId) return;
+    await updateDoc(doc(db, COLLECTIONS.notifications, id), { hiddenFor: arrayUnion(userId) });
+  }
+
+  /** Urungkan hapus. */
+  async function tampilkanLagi(id: string) {
+    if (!userId) return;
+    await updateDoc(doc(db, COLLECTIONS.notifications, id), { hiddenFor: arrayRemove(userId) });
+  }
 
   async function tandaiDibaca(ids: string[]) {
     if (!userId) return;
@@ -239,6 +289,8 @@ export function useNotifikasiSaya() {
     error: sinkron ? state.error : null,
     tandaiDibaca,
     tandaiSemuaDibaca: () => tandaiDibaca(belumDibaca.map((item) => item.id)),
+    sembunyikan,
+    tampilkanLagi,
   };
 }
 
@@ -252,6 +304,8 @@ export type PesanNotifikasi = {
   title: string;
   body: string;
   sessionId?: string;
+  /** Sprint 4: rujukan deep link untuk notifikasi tagihan. */
+  fineId?: string;
 };
 
 export type HasilKirim = {
@@ -298,7 +352,7 @@ async function kirimKeExpo(tokens: string[], pesan: PesanNotifikasi) {
       body: pesan.body,
       sound: 'default',
       channelId: CHANNEL_ID,
-      data: { type: pesan.type, sessionId: pesan.sessionId ?? null },
+      data: { type: pesan.type, sessionId: pesan.sessionId ?? null, fineId: pesan.fineId ?? null },
     }));
     try {
       const res = await fetch(EXPO_PUSH_URL, {
@@ -354,6 +408,7 @@ export async function kirimNotifikasi(pesan: PesanNotifikasi): Promise<HasilKiri
       body: pesan.body,
       type: pesan.type,
       sessionId: pesan.sessionId ?? null,
+      ...(pesan.fineId ? { fineId: pesan.fineId } : {}),
       createdAt: new Date().toISOString(),
       readBy: [],
     });
@@ -428,5 +483,22 @@ export function pesanIzinDiputuskan(
     title: keputusan === 'diterima' ? 'Izin diterima' : 'Izin ditolak',
     body: `Pengajuan izin${untuk} ${keputusan} oleh asisten.`,
     sessionId: izin.sessionId,
+  };
+}
+
+/** SRS4-05: izin diterima membatalkan denda keterlambatan sesi itu → praktikan pemilik denda. */
+export function pesanTagihanDibatalkan(
+  fine: { id: string; userId: string; sessionId: string; nominal: number },
+  session?: Pick<Session, 'praktikum' | 'kelasLab'>,
+): PesanNotifikasi {
+  const rupiah = 'Rp' + Math.round(fine.nominal).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const sesi = session ? ` ${namaSesi(session)}` : '';
+  return {
+    type: 'tagihan_dibatalkan',
+    targetUserIds: [fine.userId],
+    title: 'Denda dibatalkan',
+    body: `Denda keterlambatan${sesi} sebesar ${rupiah} dibatalkan karena izinmu diterima.`,
+    sessionId: fine.sessionId,
+    fineId: fine.id,
   };
 }

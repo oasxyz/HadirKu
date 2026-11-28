@@ -44,6 +44,12 @@ service cloud.firestore {
       return signedIn() && (request.auth.uid in data.pesertaIds);
     }
 
+    // SRS4-04: perbedaan isi array lama dan baru hanya boleh uid pengguna yang sedang login.
+    function hanyaUidSendiriBerubah(lama, baru) {
+      return baru.toSet().difference(lama.toSet()).union(lama.toSet().difference(baru.toSet()))
+        .hasOnly([request.auth.uid]);
+    }
+
     // Koleksi Users
     match /users/{uid} {
       // User bisa membaca profilnya sendiri; Asisten bisa membaca daftar user untuk rekap/peserta
@@ -221,9 +227,13 @@ service cloud.firestore {
         isAsisten() || (request.auth.uid in resource.data.targetUserIds)
       );
       allow create: if isAsisten();
-      // Pengguna hanya dapat menandai dokumen sebagai dibaca (menambah UID ke readBy)
+      // Penerima hanya boleh mengubah readBy (tandai dibaca) dan hiddenFor (SRS4-04: hapus
+      // dari daftarnya sendiri / urungkan). Isi kedua array hanya boleh berubah sebesar uid-nya
+      // sendiri, jadi pengguna tidak bisa menyembunyikan atau menandai notifikasi milik orang lain.
       allow update: if signedIn() && request.auth.uid in resource.data.targetUserIds
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'hiddenFor'])
+        && hanyaUidSendiriBerubah(resource.data.get('readBy', []), request.resource.data.get('readBy', []))
+        && hanyaUidSendiriBerubah(resource.data.get('hiddenFor', []), request.resource.data.get('hiddenFor', []));
       allow delete: if false;
     }
 
@@ -254,13 +264,23 @@ service cloud.firestore {
         && request.resource.data.jumlahMenitTerlambat is number
         && request.resource.data.jumlahMenitTerlambat > 0;
 
-      // Update dari client hanya untuk menyimpan orderId/snapToken saat tombol Bayar ditekan.
-      // Perubahan status pembayaran (paid/failed/cancelled) HANYA via Cloud Function (admin SDK).
-      allow update: if signedIn()
-        && resource.data.userId == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['midtransOrderId', 'snapToken', 'snapRedirectUrl', 'status', 'updatedAt'])
-        && request.resource.data.status in ['pending', 'processing'];
+      // Update dari client:
+      // 1. Praktikan pemilik menyimpan orderId/snapToken saat tombol Bayar ditekan.
+      //    Status lunas/gagal tetap hanya lewat server (Admin SDK).
+      // 2. SRS4-05 (PIC B): asprak/aslab membatalkan denda yang masih pending saat izin
+      //    diterima; hanya pending → cancelled dan hanya field pembatalan yang boleh berubah.
+      allow update: if signedIn() && (
+        (isAsisten()
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'cancelledReason', 'cancelledBy', 'updatedAt'])
+          && request.resource.data.cancelledBy == request.auth.uid)
+        || (resource.data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['midtransOrderId', 'snapToken', 'snapRedirectUrl', 'status', 'updatedAt'])
+          && request.resource.data.status in ['pending', 'processing'])
+      );
 
       allow delete: if false;
     }

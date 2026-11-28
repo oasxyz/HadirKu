@@ -72,6 +72,11 @@ export interface Session {
   status: SessionStatus;
   asistenNama?: string;
   updatedAt?: string;
+  // Sprint 4 (SRS4-04): diisi cron cleanup-sessions untuk sesi selesai > 24 jam. Sesi
+  // diarsipkan (bukan dihapus) supaya riwayat Catatan, Rekap, dan Dashboard tetap utuh;
+  // Beranda menyembunyikannya.
+  diarsipkan?: boolean;
+  diarsipkanAt?: string;
   /** @deprecated Sprint 3: Gunakan koleksi sessionCodes / sessionSecrets */
   kodeSesi?: string | null;
   /** @deprecated Sprint 3: Titik acuan lokasi kini diambil dari koleksi labs */
@@ -182,6 +187,9 @@ export interface Notification {
   pengajuanKelasUid?: string;
   createdAt: string;
   readBy: string[];
+  // Sprint 4 (SRS4-04): uid yang menghapus notifikasi ini dari daftarnya (soft delete).
+  // Dokumen tetap disimpan untuk audit; pengguna lain tetap melihatnya.
+  hiddenFor?: string[];
 }
 
 // Sprint 4 (SRS4-06..08): tagihan denda keterlambatan praktikum.

@@ -53,6 +53,13 @@ export function useLeaveRequests() {
             userId: data.userId,
             alasan: data.alasan ?? '',
             kategoriAi: data.kategoriAi ?? null,
+            // SRS4-05: undefined = izin lama sebelum Sprint 4 (belum pernah dianalisis).
+            sentimenAi:
+              data.sentimenAi === 'positif' || data.sentimenAi === 'netral' || data.sentimenAi === 'negatif'
+                ? data.sentimenAi
+                : data.sentimenAi === null
+                  ? null
+                  : undefined,
             status: data.status ?? 'menunggu',
             // Sprint 3 menulis serverTimestamp(); diseragamkan ke ISO string.
             createdAt: waktuIsoAtauSekarang(data.createdAt),

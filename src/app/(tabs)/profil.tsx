@@ -5,6 +5,7 @@ import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, Text, View } 
 
 import { IlustrasiSapaan } from '@/components/ilustrasi';
 import { KartuKelasPraktikan } from '@/components/kartu-kelas-praktikan';
+import { BarisNotifikasi } from '@/components/notifikasi/baris-notifikasi';
 import { KartuKondisi } from '@/components/peta/kartu-kondisi';
 import { useToast } from '@/components/toast';
 import { Avatar, Badge, GlassCard, Screen, SectionTitle, TopBar } from '@/components/ui';
@@ -16,20 +17,10 @@ import {
   usePushNotifikasi,
   type StatusPush,
 } from '@/services/notifications';
+import { tujuanNotifikasi } from '@/utils/tujuan-notifikasi';
 
-const MAKS_NOTIF = 10;
-
-/** "2026-11-20T14:05:00Z" -> "20 Nov, 21.05" (jam perangkat). */
-function formatWaktuNotif(iso: string): string {
-  const waktu = new Date(iso);
-  if (Number.isNaN(waktu.getTime())) return '';
-  return waktu.toLocaleString('id-ID', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+// SRS4-04: Profil hanya menampilkan 3 notifikasi terbaru; sisanya di halaman /notifikasi.
+const MAKS_NOTIF = 3;
 
 const LABEL_STATUS_PUSH: Record<StatusPush, string> = {
   memeriksa: 'Memeriksa…',
@@ -151,24 +142,31 @@ export default function ProfilScreen() {
         ) : notif.items.length === 0 ? (
           <Text style={styles.notifEmpty}>Belum ada pemberitahuan.</Text>
         ) : (
-          notif.items.slice(0, MAKS_NOTIF).map((item) => {
-            const baru = !notif.sudahDibaca(item);
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => (baru ? notif.tandaiDibaca([item.id]) : undefined)}
-                accessibilityRole="button"
-                accessibilityLabel={`${baru ? 'Belum dibaca. ' : ''}${item.title}. ${item.body}`}
-                style={({ pressed }) => [styles.notifRow, pressed && { opacity: 0.7 }]}>
-                <View style={[styles.notifDot, baru && styles.notifDotNew]} />
-                <View style={styles.notifText}>
-                  <Text style={[styles.notifTitle, baru && styles.notifTitleNew]}>{item.title}</Text>
-                  <Text style={styles.notifBody}>{item.body}</Text>
-                  <Text style={styles.notifTime}>{formatWaktuNotif(item.createdAt)}</Text>
-                </View>
-              </Pressable>
-            );
-          })
+          <>
+            {notif.items.slice(0, MAKS_NOTIF).map((item) => {
+              const baru = !notif.sudahDibaca(item);
+              return (
+                <BarisNotifikasi
+                  key={item.id}
+                  item={item}
+                  baru={baru}
+                  onPress={() => {
+                    if (baru) void notif.tandaiDibaca([item.id]);
+                    router.push(tujuanNotifikasi(item) as Href);
+                  }}
+                />
+              );
+            })}
+            <Pressable
+              onPress={() => router.push('/notifikasi' as Href)}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.lihatSemua, pressed && { opacity: 0.7 }]}>
+              <Text style={styles.lihatSemuaTeks}>
+                {notif.items.length > MAKS_NOTIF ? `Lihat semua (${notif.items.length})` : 'Lihat semua'}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={Palette.text} />
+            </Pressable>
+          </>
         )}
       </GlassCard>
 
@@ -288,44 +286,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  notifRow: {
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    flexDirection: 'row',
-    gap: 10,
-    padding: 12,
-  },
-  notifDot: {
+  lihatSemua: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: Palette.lavender,
     borderRadius: 999,
-    height: 8,
-    marginTop: 6,
-    width: 8,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
   },
-  notifDotNew: {
-    backgroundColor: Palette.primary,
-  },
-  notifText: {
-    flex: 1,
-    gap: 2,
-  },
-  notifTitle: {
+  lihatSemuaTeks: {
     color: Palette.text,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  notifTitleNew: {
+    fontSize: 13,
     fontWeight: '700',
-  },
-  notifBody: {
-    color: Palette.textSecondary,
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  notifTime: {
-    color: Palette.textMuted,
-    fontSize: 11,
-    marginTop: 2,
   },
   logout: {
     alignItems: 'center',
