@@ -1,9 +1,15 @@
-// Seeder demo Dashboard Aslab (SRS4-03, PIC B — Annis).
+// Seeder demo fitur Sprint 4 PIC B (SRS4-03/04/05, Annis).
 //
-// Mengisi data supaya semua bagian Dashboard Aslab terlihat terisi saat demo:
+// 1. Dashboard Aslab (selalu):
 //   - Hari Ini: 2 sesi sedang berlangsung (beda lab), sesi berikutnya, sesi selesai tadi pagi
 //   - Riwayat: sesi ditutup minggu ini, denda (lunas/belum/batal) tersebar hari/minggu/bulan,
 //     dan pembayaran lunas (GoPay/QRIS/Virtual Account)
+// 2. Asprak (bila --asprak diisi): sesi kemarin milik asprak itu dengan 4 izin menunggu
+//    beralasan beragam (badge sentimen); salah satunya punya denda pending (uji pembatalan
+//    denda saat izin diterima).
+// 3. Praktikan (bila --praktikan diisi): sesi milik asprak yang SEDANG DIBUKA dan memuat
+//    praktikan itu (tombol Absen aktif), plus 6 notifikasi beragam jenis (3 belum dibaca)
+//    untuk Profil, halaman Notifikasi, geser-hapus, dan deep link.
 //
 // Semua dokumen ber-ID awalan "demo-aslab-" supaya mudah dihapus, dan TIDAK menyentuh
 // dokumen lain (akun, lab, sesi asli). Asprak dan praktikan diambil dari akun yang sudah ada.
@@ -11,15 +17,17 @@
 // Persiapan: sama dengan scripts/seed-uji.mjs (firebase-admin + GOOGLE_APPLICATION_CREDENTIALS).
 //
 // Pakai:
-//   node scripts/seed-demo-aslab.mjs           (isi data demo; jalankan ulang sebelum demo
-//                                               karena jam sesi dihitung dari jam komputer)
+//   node scripts/seed-demo-aslab.mjs
+//   node scripts/seed-demo-aslab.mjs --asprak nissa@univ.ac.id --praktikan <email-praktikan>
+//      (jalankan ulang sebelum demo karena jam sesi dihitung dari jam komputer)
 //   node scripts/seed-demo-aslab.mjs --hapus   (hapus semua data demo)
 
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
 const AWALAN = 'demo-aslab-';
-const KOLEKSI = ['sessions', 'sessionCodes', 'attendances', 'fines', 'payments'];
+const KOLEKSI = ['sessions', 'sessionCodes', 'attendances', 'fines', 'payments', 'leaveRequests', 'notifications'];
 const DENDA = 10000;
 const KODE_SESI = '246810';
 
@@ -45,6 +53,19 @@ function waktu(hari, jamKe, menitKe = 0) {
   const d = hariIni(hari);
   d.setHours(jamKe, menitKe, 0, 0);
   return d.toISOString();
+}
+
+function ambilArg(nama) {
+  const i = process.argv.indexOf(`--${nama}`);
+  return i >= 0 ? process.argv[i + 1] : undefined;
+}
+
+async function akunDariEmail(email) {
+  if (!email) return null;
+  const akun = await getAuth().getUserByEmail(email);
+  const dok = await db.collection('users').doc(akun.uid).get();
+  if (!dok.exists) throw new Error(`Akun ${email} belum melengkapi profil (dokumen users belum ada).`);
+  return { id: akun.uid, ...dok.data() };
 }
 
 function acak(arr, n) {
@@ -253,10 +274,151 @@ async function isi() {
 
   await tulisBertahap(tulisan);
 
+  // --- 2 & 3. Data uji asprak dan praktikan --------------------------------------------
+  const asprakUji = await akunDariEmail(ambilArg('asprak'));
+  const praktikanUji = await akunDariEmail(ambilArg('praktikan'));
+  const tambahan = [];
+  const ringkas = [];
+  const idKemarin = `${AWALAN}uji-izin`;
+  const idBuka = `${AWALAN}uji-absen`;
+
+  if (asprakUji) {
+    const lainnya = acak(praktikan.filter((p) => p.id !== praktikanUji?.id), 17);
+    const pesertaKemarin = [...(praktikanUji ? [praktikanUji] : []), ...lainnya];
+
+    // Sesi kemarin milik asprak uji, sudah ditutup; izin masih bisa diputuskan (H+3).
+    tambahan.push([
+      db.collection('sessions').doc(idKemarin),
+      {
+        praktikum: 'Basis Data',
+        kelasLab: praktikanUji?.kelas ?? 'D1',
+        labId: labA.id,
+        tanggal: isoTanggal(hariIni(-1)),
+        jamMulai: '13:00',
+        jamSelesai: '15:00',
+        asistenId: asprakUji.id,
+        asistenNama: asprakUji.nama ?? 'Asprak',
+        pesertaIds: pesertaKemarin.map((p) => p.id),
+        status: 'ditutup',
+        updatedAt: waktu(-1, 15, 5),
+        demo: true,
+      },
+    ]);
+
+    // Alasan beragam supaya badge sentimen positif/netral/negatif terlihat.
+    const ALASAN = [
+      ['Motor saya mogok di jalan dan bengkel jauh, jadi tidak sempat sampai ke lab.', 'izin'],
+      ['Saya demam tinggi sejak semalam, sudah ada surat dokter.', 'sakit'],
+      ['Ada acara keluarga, nenek saya meninggal dunia.', 'izin'],
+      ['Saya mengikuti lomba GEMASTIK di luar kota mewakili kampus, terima kasih atas pengertiannya.', 'izin'],
+    ];
+    const pengaju = praktikanUji ? [praktikanUji, ...lainnya.slice(0, 3)] : lainnya.slice(0, 4);
+    pengaju.forEach((p, i) => {
+      tambahan.push([
+        db.collection('leaveRequests').doc(`${idKemarin}_${p.id}`),
+        {
+          sessionId: idKemarin,
+          userId: p.id,
+          alasan: ALASAN[i][0],
+          kategoriAi: ALASAN[i][1],
+          // sentimenAi sengaja tidak diisi: layar Pemeriksaan Izin menghitungnya di HP.
+          status: 'menunggu',
+          // Dibuat beberapa menit lalu supaya langsung tampil di filter "Hari ini".
+          createdAt: new Date(Date.now() - (i + 1) * 17 * 60000).toISOString(),
+          diputuskanOleh: null,
+          diputuskanAt: null,
+          demo: true,
+        },
+      ]);
+    });
+
+    // Pengaju pertama juga punya denda pending di sesi ini; hilang saat izinnya diterima.
+    const pemilikDenda = pengaju[0];
+    tambahan.push([
+      db.collection('fines').doc(`${idKemarin}_${pemilikDenda.id}`),
+      {
+        sessionId: idKemarin,
+        userId: pemilikDenda.id,
+        labId: labA.id,
+        praktikum: 'Basis Data',
+        kelasLab: praktikanUji?.kelas ?? 'D1',
+        jumlahMenitTerlambat: 20,
+        nominal: DENDA,
+        status: 'pending',
+        createdAt: waktu(-1, 13, 35),
+        updatedAt: waktu(-1, 13, 35),
+        demo: true,
+      },
+    ]);
+    ringkas.push(`asprak ${asprakUji.nama}: 4 izin menunggu di sesi kemarin (izin ${pemilikDenda.nama} punya denda pending)`);
+  }
+
+  if (praktikanUji && asprakUji) {
+    // Sesi milik asprak uji yang sedang dibuka dan memuat praktikan uji: tombol Absen aktif.
+    const peserta = [praktikanUji.id, ...acak(praktikan, 15).map((p) => p.id)];
+    tambahan.push([
+      db.collection('sessions').doc(idBuka),
+      {
+        praktikum: 'Pemrograman Mobile',
+        kelasLab: praktikanUji.kelas ?? 'D1',
+        labId: labB.id,
+        tanggal: tglHariIni,
+        jamMulai: isoJam(menitKini - 10),
+        jamSelesai: isoJam(menitKini + 110),
+        asistenId: asprakUji.id,
+        asistenNama: asprakUji.nama ?? 'Asprak',
+        pesertaIds: [...new Set(peserta)],
+        status: 'dibuka',
+        updatedAt: new Date().toISOString(),
+        demo: true,
+      },
+    ]);
+    tambahan.push([db.collection('sessionCodes').doc(idBuka), { kode: KODE_SESI, asistenId: asprakUji.id, demo: true }]);
+    ringkas.push(`sesi uji-absen sedang dibuka untuk ${praktikanUji.nama} (kode ${KODE_SESI})`);
+  }
+
+  if (praktikanUji) {
+    const sesiAcuan = asprakUji ? idBuka : `${AWALAN}berlangsung-1`;
+    const dendaAcuan = asprakUji ? `${idKemarin}_${praktikanUji.id}` : null;
+    // [type, judul, isi, rujukan, menit lalu, sudah dibaca]
+    const NOTIF = [
+      ['sesi_dibuka', 'Sesi praktikum dibuka', 'Pemrograman Mobile sudah dibuka. Segera lakukan presensi.', { sessionId: sesiAcuan }, 0, false],
+      ['tagihan_baru', 'Tagihan denda baru', 'Kamu terlambat 20 menit di Basis Data. Denda Rp10.000 menunggu pembayaran.', { sessionId: idKemarin, fineId: dendaAcuan }, 25, false],
+      ['izin_diterima', 'Izin diterima', 'Pengajuan izin untuk Sistem Operasi diterima oleh asisten.', {}, 90, false],
+      ['jadwal_berubah', 'Jadwal praktikum berubah', 'Jaringan Komputer kini Kamis, 14.00–16.00 di Lab Informatika C.', { sessionId: sesiAcuan }, 60 * 5, true],
+      ['pembayaran_sukses', 'Pembayaran berhasil', 'Denda Rp10.000 untuk Pemrograman Mobile sudah lunas lewat GoPay.', {}, 60 * 26, true],
+      ['kelas_diterima', 'Pindah kelas diterima', 'Kelas praktikummu sekarang D1. Sesi baru kelas ini otomatis mencantumkanmu.', {}, 60 * 50, true],
+    ];
+    NOTIF.forEach(([type, title, body, ref, menitLalu, dibaca], i) => {
+      tambahan.push([
+        db.collection('notifications').doc(`${AWALAN}notif-${i}`),
+        {
+          targetUserIds: [praktikanUji.id],
+          type,
+          title,
+          body,
+          sessionId: ref.sessionId ?? null,
+          ...(ref.fineId ? { fineId: ref.fineId } : {}),
+          createdAt: new Date(Date.now() - menitLalu * 60000).toISOString(),
+          readBy: dibaca ? [praktikanUji.id] : [],
+          hiddenFor: [],
+          demo: true,
+        },
+      ]);
+    });
+    ringkas.push(`6 notifikasi untuk ${praktikanUji.nama} (3 belum dibaca)`);
+  }
+
+  await tulisBertahap(tambahan);
+
   const hitung = (k) => tulisan.filter(([ref]) => ref.parent.id === k).length;
   console.log(`Data demo aslab dibuat (${tglHariIni}, jam ${isoJam(menitKini)}):`);
   console.log(`  sesi ${hitung('sessions')} (2 berlangsung di ${labA.nama} & ${labB.nama}), presensi ${hitung('attendances')},`);
   console.log(`  denda ${hitung('fines')}, pembayaran ${hitung('payments')}. Kode sesi berlangsung: ${KODE_SESI}`);
+  ringkas.forEach((r) => console.log(`  ${r}`));
+  if (!asprakUji || !praktikanUji) {
+    console.log('  (Tambah --asprak <email> --praktikan <email> untuk data uji izin, tombol Absen, dan notifikasi.)');
+  }
   console.log('Hapus lagi dengan: node scripts/seed-demo-aslab.mjs --hapus');
 }
 
