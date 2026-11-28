@@ -2,10 +2,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { IconName } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import type { Notification } from '@/types';
-import { ikonNotifikasi } from '@/utils/tujuan-notifikasi';
 
 /** "2026-11-20T14:05:00Z" -> "20 Nov, 21.05" (jam perangkat). */
 export function formatWaktuNotif(iso: string): string {
@@ -35,9 +33,6 @@ export function BarisNotifikasi({
       accessibilityLabel={`${baru ? 'Belum dibaca. ' : ''}${item.title}. ${item.body}`}
       accessibilityHint="Membuka halaman terkait"
       style={({ pressed }) => [styles.baris, pressed && { opacity: 0.75 }]}>
-      <View style={[styles.ikon, baru && styles.ikonBaru]}>
-        <Ionicons name={ikonNotifikasi(item.type) as IconName} size={18} color={baru ? '#FFFFFF' : Palette.text} />
-      </View>
       <View style={styles.teks}>
         <View style={styles.atas}>
           <Text style={[styles.judul, baru && styles.judulBaru]} numberOfLines={1}>
@@ -63,18 +58,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 12,
-    padding: 12,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  ikon: {
-    alignItems: 'center',
-    backgroundColor: Palette.lavender,
-    borderRadius: 999,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  ikonBaru: { backgroundColor: Palette.primary },
   teks: { flex: 1, gap: 2 },
   atas: { alignItems: 'center', flexDirection: 'row', gap: 6 },
   judul: { color: Palette.text, flexShrink: 1, fontSize: 14, fontWeight: '500' },

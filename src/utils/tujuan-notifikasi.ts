@@ -55,14 +55,3 @@ export function tujuanNotifikasi(data: DataNotifikasi): string {
       return '/jadwal';
   }
 }
-
-/** Ikon Ionicons per tipe untuk daftar notifikasi. */
-export function ikonNotifikasi(type: string): string {
-  if (type === 'sesi_dibuka') return 'qr-code-outline';
-  if (type === 'jadwal_berubah') return 'calendar-outline';
-  if (type.startsWith('izin_')) return 'mail-outline';
-  if (type.startsWith('kelas_')) return 'people-outline';
-  if (type.startsWith('tagihan_')) return 'receipt-outline';
-  if (type.startsWith('pembayaran_')) return 'wallet-outline';
-  return 'notifications-outline';
-}
