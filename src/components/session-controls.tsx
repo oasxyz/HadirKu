@@ -17,6 +17,7 @@ import { kirimNotifikasi, pesanSesiDibuka } from '@/services/notifications';
 import { Logger } from '@/utils/logger';
 import { getBatasTutupSesi, sesiSudahBerakhir } from '@/utils/sesi';
 import { jendelaBukaSesi, MENIT_BUKA_LEBIH_AWAL } from '@/utils/waktu-sesi';
+import { isStafLab } from '@/types';
 
 type Confirmation = 'open' | 'close' | null;
 
@@ -104,7 +105,7 @@ export default function SessionControls({ sessionId }: { sessionId: string }) {
 
         const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-        if (!currentUser || currentUser.role !== 'asisten') {
+        if (!currentUser || !isStafLab(currentUser.role)) {
           throw new Error('Hanya asisten yang dapat membuka sesi');
         }
 

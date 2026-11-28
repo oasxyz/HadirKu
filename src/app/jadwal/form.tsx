@@ -26,6 +26,7 @@ import { opsiPraktikum } from '@/constants/praktikum';
 import { Palette } from '@/constants/theme';
 import { useSesiSemuaAsisten } from '@/components/peta/use-sesi-semua-asisten';
 import { useCurrentUser } from '@/context/auth-context';
+import { isAslabLike } from '@/types';
 import { useLabs } from '@/hooks/use-labs';
 import { useSessions } from '@/hooks/use-sessions';
 import { usePraktikanList } from '@/hooks/use-users';
@@ -450,13 +451,16 @@ function JadwalFormContent({
                     {currentLab ? `${currentLab.radiusMeter} m` : '50 m'}
                   </Text>
                 </Text>
-                <Pressable
-                  onPress={() => router.push('/kelola-lab' as any)}
-                  style={styles.manageLabLink}
-                >
-                  <Ionicons name="map-outline" size={13} color={Palette.primary} />
-                  <Text style={styles.manageLabLinkText}>Kelola lokasi lab</Text>
-                </Pressable>
+                {/* SRS 5.3: Kelola Lab hanya untuk aslab. */}
+                {isAslabLike(currentUser?.role) ? (
+                  <Pressable
+                    onPress={() => router.push('/kelola-lab' as any)}
+                    style={styles.manageLabLink}
+                  >
+                    <Ionicons name="map-outline" size={13} color={Palette.primary} />
+                    <Text style={styles.manageLabLinkText}>Kelola lokasi lab</Text>
+                  </Pressable>
+                ) : null}
               </View>
             </View>
 

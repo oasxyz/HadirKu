@@ -9,6 +9,7 @@ import { useCurrentUser } from '@/context/auth-context';
 import { COLLECTIONS, db } from '@/services/firebase';
 import type { Session } from '@/types';
 import { Logger } from '@/utils/logger';
+import { isStafLab } from '@/types';
 
 type State = {
   userId: string | null;
@@ -18,7 +19,7 @@ type State = {
 
 export function useSesiSemuaAsisten() {
   const currentUser = useCurrentUser();
-  const userId = currentUser?.role === 'asisten' ? currentUser.id : null;
+  const userId = currentUser && isStafLab(currentUser.role) ? currentUser.id : null;
   const [state, setState] = useState<State>({ userId: null, sessions: [], error: null });
 
   useEffect(() => {

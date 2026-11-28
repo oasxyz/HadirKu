@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useCurrentUser } from '@/context/auth-context';
 import { db, COLLECTIONS } from '@/services/firebase';
 import type { User } from '@/types';
+import { isStafLab } from '@/types';
 
 type PraktikanState = {
   userId: string | null;
@@ -13,7 +14,7 @@ type PraktikanState = {
 
 export function usePraktikanList() {
   const currentUser = useCurrentUser();
-  const canRead = currentUser?.role === 'asisten';
+  const canRead = isStafLab(currentUser?.role);
   const [state, setState] = useState<PraktikanState>({
     userId: null,
     praktikanList: [],
@@ -23,7 +24,7 @@ export function usePraktikanList() {
   useEffect(() => {
     // Sesuai firestore.rules: Hanya asisten yang berhak membaca daftar semua user praktikan.
     // Jangan setState di dalam effect; nilai kosong diturunkan saat return.
-    if (!currentUser || currentUser.role !== 'asisten') return;
+    if (!currentUser || !isStafLab(currentUser.role)) return;
 
     const q = query(collection(db, COLLECTIONS.users), where('role', '==', 'praktikan'));
     const unsubscribe = onSnapshot(

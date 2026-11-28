@@ -11,6 +11,12 @@ export function isAslabLike(role: Role | null | undefined): boolean {
   return role === 'aslab';
 }
 
+// Sprint 4: staf lab (asprak, alias lama asisten, dan aslab). "aslab mewarisi semua izin asprak",
+// jadi layar Sprint 1-3 yang dulu mengecek `role === 'asisten'` memakai helper ini.
+export function isStafLab(role: Role | null | undefined): boolean {
+  return isAsprakLike(role) || isAslabLike(role);
+}
+
 export interface User {
   id: string; // uid Firebase Auth
   nama: string;

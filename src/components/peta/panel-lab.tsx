@@ -26,6 +26,7 @@ import { Badge, GlassCard } from '@/components/ui';
 import { Palette } from '@/constants/theme';
 import type { Attendance, Role, Session, SessionStatus } from '@/types';
 import { formatRentangJam, formatTanggal } from '@/utils/format';
+import { isStafLab } from '@/types';
 
 // Label status versi pendek supaya baris jadwal muat satu baris (warna sama dengan StatusBadge).
 const LABEL_STATUS_SINGKAT: Record<SessionStatus, string> = {
@@ -94,7 +95,7 @@ export function PanelLab({
   const lab = grup.labs.find((item) => item.id === labId) ?? grup.labs[0];
   const { berlangsung, berikutnya } = aktivitasLab(sessions, lab.id, sekarang);
   const hariIni = tanggalHariIni(sekarang);
-  const jadwalHariIni = role === 'asisten' ? jadwalLabPadaTanggal(sessions, lab.id, hariIni) : [];
+  const jadwalHariIni = isStafLab(role) ? jadwalLabPadaTanggal(sessions, lab.id, hariIni) : [];
   const jumlahSesi = jadwalHariIni.filter((baris) => baris.jenis === 'sesi').length;
   const jumlahKosong = jadwalHariIni.length - jumlahSesi;
   const ringkasanJadwal =
@@ -111,7 +112,7 @@ export function PanelLab({
 
   // Untuk asisten: tandai sesi milik asisten lain supaya tidak tertukar dengan sesinya sendiri.
   function keteranganPemilik(session: Session): string {
-    if (role !== 'asisten' || session.asistenId === userId) return '';
+    if (!isStafLab(role) || session.asistenId === userId) return '';
     return session.asistenNama ? ` · Bukan sesimu (${session.asistenNama})` : ' · Bukan sesimu';
   }
 
@@ -230,7 +231,7 @@ export function PanelLab({
         </View>
 
         {/* Khusus asisten (melihat semua sesi): jadwal lab hari ini beserta jeda kosongnya. */}
-        {role === 'asisten' ? (
+        {isStafLab(role) ? (
           <View style={styles.block}>
             <View style={styles.jadwalHeader}>
               <Text style={styles.blockLabel}>Jadwal hari ini</Text>

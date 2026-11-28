@@ -19,6 +19,7 @@ import { Palette } from '@/constants/theme';
 import { useCurrentUser } from '@/context/auth-context';
 import { useSessions } from '@/hooks/use-sessions';
 import type { Attendance, Session } from '@/types';
+import { isStafLab } from '@/types';
 
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -46,7 +47,7 @@ export default function BerandaJadwalScreen() {
   const currentUser = useCurrentUser();
   const { sessions, attendances, loading, error } = useSessions();
 
-  const isAsisten = currentUser?.role === 'asisten';
+  const isAsisten = isStafLab(currentUser?.role);
 
   // Urutkan sesi berdasarkan tanggal dan jam mulai. Sesi yang diarsipkan cron (selesai > 24 jam,
   // SRS4-04) tidak tampil di Beranda; riwayatnya tetap ada di Catatan, Rekap, dan Dashboard.
