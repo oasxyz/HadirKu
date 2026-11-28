@@ -21,6 +21,7 @@
 //   node scripts/seed-demo-aslab.mjs --asprak nissa@univ.ac.id --praktikan <email-praktikan>
 //      (jalankan ulang sebelum demo karena jam sesi dihitung dari jam komputer)
 //   node scripts/seed-demo-aslab.mjs --hapus   (hapus semua data demo)
+//   tambahkan --cek untuk melihat rencana jadwal tanpa menulis apa pun
 
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -129,6 +130,53 @@ async function isi() {
   const menitKini = sekarang.getHours() * 60 + sekarang.getMinutes();
   const tglHariIni = isoTanggal(hariIni(0));
 
+  // --- Penempatan jadwal sesuai aturan aplikasi ---------------------------------------
+  // Satu lab hanya satu sesi di jam yang sama, satu asprak hanya satu sesi di jam yang sama,
+  // dan jam sesi di 07.00–21.00. Sesi asli (bukan demo) ikut diperhitungkan, jadi seeder
+  // memilih lab/asprak lain bila bentrok, dan melewati sesi yang tidak bisa ditempatkan.
+  const JAM_BUKA = 7 * 60;
+  const JAM_TUTUP = 21 * 60;
+  const DURASI_MIN = 45;
+  const keMenit = (j) => Number(j.slice(0, 2)) * 60 + Number(j.slice(3, 5));
+  const terpakai = (await db.collection('sessions').get()).docs
+    .filter((d) => !d.id.startsWith(AWALAN))
+    .map((d) => d.data())
+    .filter((d) => typeof d.jamMulai === 'string' && typeof d.jamSelesai === 'string')
+    .map((d) => ({ tanggal: d.tanggal, labId: d.labId, asistenId: d.asistenId, m: keMenit(d.jamMulai), s: keMenit(d.jamSelesai) }));
+  const bentrok = (c) =>
+    terpakai.some(
+      (t) => t.tanggal === c.tanggal && c.m < t.s && t.m < c.s && (t.labId === c.labId || t.asistenId === c.asistenId),
+    );
+  const urutkanLab = (utama) => [utama, ...labUtama.filter((l) => l.id !== utama.id)];
+  const dilewati = [];
+  function tempatkan(nama, hari, mulai, selesai, daftarLab, daftarAsprak) {
+    const tanggal = isoTanggal(hariIni(hari));
+    const m = Math.max(mulai, JAM_BUKA);
+    const sl = Math.min(selesai, JAM_TUTUP);
+    if (sl - m < DURASI_MIN) {
+      dilewati.push(`${nama} (di luar jam lab)`);
+      return null;
+    }
+    for (const lab of daftarLab) {
+      for (const as of daftarAsprak) {
+        const calon = { tanggal, labId: lab.id, asistenId: as.id, m, s: sl };
+        if (!bentrok(calon)) {
+          terpakai.push(calon);
+          return { lab, as, tanggal, mulai: m, selesai: sl };
+        }
+      }
+    }
+    dilewati.push(`${nama} (semua lab/asprak bentrok)`);
+    return null;
+  }
+
+  // Sesi uji ditempatkan lebih dulu karena paling dibutuhkan untuk testing.
+  const posUjiIzin = asprakUji ? tempatkan('uji-izin', -1, 13 * 60, 15 * 60, urutkanLab(labA), [asprakUji]) : null;
+  const posUjiAbsen =
+    asprakUji && praktikanUji
+      ? tempatkan('uji-absen', 0, menitKini - 10, menitKini + 110, urutkanLab(labC), [asprakUji])
+      : null;
+
   // --- Sesi ---------------------------------------------------------------------------
   // [id, praktikum, kelas, lab, asprak, hari, mulai(menit), selesai(menit), status, jumlahPeserta, persenHadir]
   const RENCANA = [
@@ -146,7 +194,15 @@ async function isi() {
   const tulisan = [];
   const sesiDibuat = [];
   let urut = 0;
-  for (const [nama, praktikum, kelas, lab, as, hari, mulai, selesai, status, n, persen] of RENCANA) {
+  for (const [nama, praktikum, kelas, labPilihan, asPilihan, hari, mulaiRencana, selesaiRencana, status, n, persen] of RENCANA) {
+    const pos = tempatkan(nama, hari, mulaiRencana, selesaiRencana, urutkanLab(labPilihan), [
+      asPilihan,
+      ...asprakLain.filter((a) => a.id !== asPilihan.id),
+    ]);
+    if (!pos) continue;
+    const { lab, as, mulai, selesai } = pos;
+    // Sesi "berlangsung" yang terpotong jam buka bisa belum mulai; jadikan belum dibuka.
+    const statusAkhir = status === 'dibuka' && mulai > menitKini ? 'belum_dibuka' : status;
     const id = `${AWALAN}${nama}`;
     // Peserta: utamakan praktikan dengan kelas yang sama, sisanya diisi acak.
     const sekelas = praktikan.filter((p) => p.kelas === kelas);
@@ -162,18 +218,18 @@ async function isi() {
       asistenId: as.id,
       asistenNama: as.nama ?? 'Asprak',
       pesertaIds: peserta.map((p) => p.id),
-      status,
-      updatedAt: status === 'ditutup' ? waktu(hari, Math.floor(selesai / 60), selesai % 60) : new Date().toISOString(),
+      status: statusAkhir,
+      updatedAt: statusAkhir === 'ditutup' ? waktu(hari, Math.floor(selesai / 60), selesai % 60) : new Date().toISOString(),
       demo: true,
     };
     tulisan.push([db.collection('sessions').doc(id), sesi]);
-    if (status === 'dibuka') {
+    if (statusAkhir === 'dibuka') {
       tulisan.push([db.collection('sessionCodes').doc(id), { kode: KODE_SESI, asistenId: as.id, demo: true }]);
     }
     sesiDibuat.push({ id, sesi, peserta, persen, hari, mulai });
 
     // Presensi: sebagian peserta hadir; ±25% yang hadir terlambat dan didenda.
-    const hadir = peserta.slice(0, Math.round(peserta.length * persen));
+    const hadir = statusAkhir === 'belum_dibuka' ? [] : peserta.slice(0, Math.round(peserta.length * persen));
     hadir.forEach((p, i) => {
       const telat = i % 4 === 3 ? 5 + (i % 3) * 7 : 0;
       const waktuHadir = hariIni(hari);
@@ -195,7 +251,7 @@ async function isi() {
         urut += 1;
         // Status denda bergiliran supaya grafik punya tiga warna.
         const statusDenda =
-          hari === 0 && status === 'dibuka'
+          hari === 0 && statusAkhir === 'dibuka'
             ? urut % 3 === 0 ? 'paid' : 'pending'
             : ['paid', 'paid', 'pending', 'cancelled', 'expired'][urut % 5];
         tulisan.push([
@@ -287,7 +343,7 @@ async function isi() {
   const idKemarin = `${AWALAN}uji-izin`;
   const idBuka = `${AWALAN}uji-absen`;
 
-  if (asprakUji) {
+  if (asprakUji && posUjiIzin) {
     const lainnya = acak(praktikan.filter((p) => p.id !== praktikanUji?.id), 17);
     const pesertaKemarin = [...(praktikanUji ? [praktikanUji] : []), ...lainnya];
 
@@ -297,10 +353,10 @@ async function isi() {
       {
         praktikum: 'Basis Data',
         kelasLab: praktikanUji?.kelas ?? 'D1',
-        labId: labA.id,
-        tanggal: isoTanggal(hariIni(-1)),
-        jamMulai: '13:00',
-        jamSelesai: '15:00',
+        labId: posUjiIzin.lab.id,
+        tanggal: posUjiIzin.tanggal,
+        jamMulai: isoJam(posUjiIzin.mulai),
+        jamSelesai: isoJam(posUjiIzin.selesai),
         asistenId: asprakUji.id,
         asistenNama: asprakUji.nama ?? 'Asprak',
         pesertaIds: pesertaKemarin.map((p) => p.id),
@@ -344,7 +400,7 @@ async function isi() {
       {
         sessionId: idKemarin,
         userId: pemilikDenda.id,
-        labId: labA.id,
+        labId: posUjiIzin.lab.id,
         praktikum: 'Basis Data',
         kelasLab: praktikanUji?.kelas ?? 'D1',
         jumlahMenitTerlambat: 20,
@@ -358,7 +414,7 @@ async function isi() {
     ringkas.push(`asprak ${asprakUji.nama}: 4 izin menunggu di sesi kemarin (izin ${pemilikDenda.nama} punya denda pending)`);
   }
 
-  if (praktikanUji && asprakUji) {
+  if (praktikanUji && asprakUji && posUjiAbsen) {
     // Sesi milik asprak uji yang sedang dibuka dan memuat praktikan uji: tombol Absen aktif.
     const peserta = [praktikanUji.id, ...acak(praktikan, 15).map((p) => p.id)];
     tambahan.push([
@@ -366,11 +422,10 @@ async function isi() {
       {
         praktikum: 'Pemrograman Mobile',
         kelasLab: praktikanUji.kelas ?? 'D1',
-        // Lab ketiga: lab A dan B sudah dipakai sesi berlangsung Dashboard di jam yang sama.
-        labId: labC.id,
-        tanggal: tglHariIni,
-        jamMulai: isoJam(menitKini - 10),
-        jamSelesai: isoJam(menitKini + 110),
+        labId: posUjiAbsen.lab.id,
+        tanggal: posUjiAbsen.tanggal,
+        jamMulai: isoJam(posUjiAbsen.mulai),
+        jamSelesai: isoJam(posUjiAbsen.selesai),
         asistenId: asprakUji.id,
         asistenNama: asprakUji.nama ?? 'Asprak',
         pesertaIds: [...new Set(peserta)],
@@ -384,8 +439,8 @@ async function isi() {
   }
 
   if (praktikanUji) {
-    const sesiAcuan = asprakUji ? idBuka : `${AWALAN}berlangsung-1`;
-    const dendaAcuan = asprakUji ? `${idKemarin}_${praktikanUji.id}` : null;
+    const sesiAcuan = posUjiAbsen ? idBuka : `${AWALAN}berlangsung-1`;
+    const dendaAcuan = posUjiIzin ? `${idKemarin}_${praktikanUji.id}` : null;
     // [type, judul, isi, rujukan, menit lalu, sudah dibaca]
     const NOTIF = [
       ['sesi_dibuka', 'Sesi praktikum dibuka', 'Pemrograman Mobile sudah dibuka. Segera lakukan presensi.', { sessionId: sesiAcuan }, 0, false],
@@ -418,7 +473,6 @@ async function isi() {
   // --- Validasi aturan jadwal sebelum menulis apa pun ------------------------------------
   // Sama dengan aturan form Tambah Sesi: satu lab hanya satu sesi di jam yang sama, satu asprak
   // hanya mengajar satu sesi di jam yang sama, dan jam berada di 07.00–21.00.
-  const keMenit = (j) => Number(j.slice(0, 2)) * 60 + Number(j.slice(3, 5));
   const rencanaSesi = [...tulisan, ...tambahan]
     .filter(([ref]) => ref.parent.id === 'sessions')
     .map(([ref, d]) => ({ id: ref.id, ...d }));
@@ -446,6 +500,16 @@ async function isi() {
     process.exit(1);
   }
 
+  // --cek: tampilkan rencana jadwal tanpa menulis apa pun ke Firestore.
+  if (process.argv.includes('--cek')) {
+    console.log('Mode cek (tidak menulis apa pun). Rencana sesi:');
+    rencanaSesi
+      .sort((x, y) => (x.tanggal + x.jamMulai).localeCompare(y.tanggal + y.jamMulai))
+      .forEach((r) => console.log(`  ${r.tanggal} ${r.jamMulai}-${r.jamSelesai}  ${r.labId.padEnd(18)} ${r.status.padEnd(12)} ${r.id.replace(AWALAN, '')}`));
+    if (dilewati.length > 0) console.log(`  Dilewati: ${dilewati.join(', ')}`);
+    return;
+  }
+
   await tulisBertahap(tulisan);
   await tulisBertahap(tambahan);
 
@@ -454,6 +518,9 @@ async function isi() {
   console.log(`  sesi ${hitung('sessions')} (2 berlangsung di ${labA.nama} & ${labB.nama}), presensi ${hitung('attendances')},`);
   console.log(`  denda ${hitung('fines')}, pembayaran ${hitung('payments')}. Kode sesi berlangsung: ${KODE_SESI}`);
   ringkas.forEach((r) => console.log(`  ${r}`));
+  if (dilewati.length > 0) {
+    console.log(`  Dilewati karena aturan jadwal: ${dilewati.join(', ')}`);
+  }
   if (!asprakUji || !praktikanUji) {
     console.log('  (Tambah --asprak <email> --praktikan <email> untuk data uji izin, tombol Absen, dan notifikasi.)');
   }
