@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   baris: {
     backgroundColor: '#FFFFFF',
     borderColor: Palette.border,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     gap: 2,
     paddingHorizontal: 16,

@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   mini: {
     backgroundColor: 'rgba(255, 255, 255, 0.75)',
     borderColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 22,
+    borderRadius: 28,
     borderWidth: 1,
     boxShadow: shadow,
     flex: 1,
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   rk: {
     alignItems: 'center',
     backgroundColor: Palette.lavender,
-    borderRadius: 24,
+    borderRadius: 28,
     flexDirection: 'row',
     gap: 6,
     paddingLeft: 18,

@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   },
   loadingCard: {
     alignItems: 'center',
-    borderRadius: 24,
+    borderRadius: 28,
     gap: 12,
     paddingHorizontal: 28,
     paddingVertical: 24,

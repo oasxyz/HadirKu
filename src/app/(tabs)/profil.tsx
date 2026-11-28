@@ -144,7 +144,10 @@ export default function ProfilScreen() {
           }
         />
         {notif.loading ? (
-          <ActivityIndicator color={Palette.primary} />
+          <View style={styles.notifMemuat}>
+            <ActivityIndicator color={Palette.primary} />
+            <Text style={styles.notifEmpty}>Memuat pemberitahuan…</Text>
+          </View>
         ) : notif.error ? (
           <Text style={styles.notifEmpty}>{notif.error}</Text>
         ) : notif.items.length === 0 ? (
@@ -249,7 +252,7 @@ const styles = StyleSheet.create({
   infoCard: {
     backgroundColor: '#F7F6FB',
     borderColor: Palette.border,
-    borderRadius: 22,
+    borderRadius: 28,
     borderWidth: 1,
     paddingHorizontal: 18,
   },
@@ -288,6 +291,11 @@ const styles = StyleSheet.create({
     color: Palette.text,
     fontSize: 12,
     fontWeight: '700',
+  },
+  notifMemuat: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
   },
   notifEmpty: {
     color: Palette.textMuted,

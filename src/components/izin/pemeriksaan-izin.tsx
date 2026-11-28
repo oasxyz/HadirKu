@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   ringkas: {
     alignItems: "center",
     backgroundColor: Palette.infoMuted,
-    borderRadius: 24,
+    borderRadius: 28,
     flexDirection: "row",
     gap: 4,
     marginBottom: Spacing.three,
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#F7F6FB",
     borderColor: Palette.border,
-    borderRadius: 22,
+    borderRadius: 28,
     borderWidth: 1,
     gap: 8,
     paddingVertical: 24,
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
   reqCard: {
     backgroundColor: "#F7F6FB",
     borderColor: Palette.border,
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1,
     gap: Spacing.three,
     padding: 16,
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    borderRadius: 28,
     padding: Spacing.four,
     width: "100%",
     boxShadow: "0 8px 24px rgba(110, 70, 160, 0.10)",
